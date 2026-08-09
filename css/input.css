@@ -1720,3 +1720,100 @@ body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
   .home-nav { box-shadow: 0 -2px 22px rgba(8, 20, 50, 0.22); }
 }
+
+/* ================= DESKTOP, LAPTOP AND TV =================
+   Below 1024px nothing here applies, so every phone keeps exactly the layout
+   it has always had — this block is additive, not a rewrite.
+
+   Above it the app stops pretending to be a phone. A 430px column stranded in
+   the middle of a television is not a mobile view, it is an unfinished one, so
+   the shell widens to a real page, the bottom bar becomes a top bar the way
+   every bank's site does on a desktop, and the account list flows into two
+   columns instead of one long ribbon nobody scrolls. */
+@media (min-width: 1024px) {
+  body {
+    padding-top: 96px;
+    padding-bottom: 48px;
+  }
+
+  .app-shell {
+    max-width: 1120px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  /* ---- navigation moves to the top ---- */
+  .home-nav {
+    top: 0;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    transform: none;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: 0 1px 5px rgba(8, 20, 50, 0.10);
+  }
+
+  .home-nav > div {
+    max-width: 1120px;
+    padding: 0 32px;
+    display: flex;
+    gap: 6px;
+  }
+
+  /* Icon beside the label rather than above it — the stacked form is for a
+     thumb reaching the bottom of a phone, not for a row along the top. */
+  .home-nv {
+    flex-direction: row;
+    gap: 10px;
+    padding: 20px 16px;
+  }
+
+  /* ---- the balance and the actions share the top band ---- */
+  .home-top {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 28px;
+    align-items: start;
+    margin-bottom: 8px;
+  }
+
+  /* The rule under the balance separated it from the actions below. Side by
+     side there is nothing beneath it to separate. */
+  .home-hero {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  /* ---- accounts and offers in two columns ---- */
+  .home-columns {
+    column-count: 2;
+    column-gap: 28px;
+  }
+
+  /* A card split down the middle of a column break is unreadable, and a
+     section label orphaned at the foot of one column with its card at the head
+     of the next is worse. */
+  .home-columns > * {
+    break-inside: avoid;
+  }
+
+  .home-lab {
+    break-after: avoid;
+  }
+
+  /* ---- the screens that open over the dashboard ---- */
+  /* Every page fragment is built as a 430px column. On a wide screen that is a
+     ribbon of text down the middle, so they are given a reading width instead.
+     Still centred, still one column — a detail screen does not want to be as
+     wide as a dashboard. */
+  #page-root .max-w-\[430px\] {
+    max-width: 760px;
+  }
+
+  #supComposer {
+    width: 760px;
+  }
+}
