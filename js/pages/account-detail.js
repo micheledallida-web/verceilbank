@@ -57,7 +57,6 @@ const qaIcons = {
   interest: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M6 18L18 6"></path><circle cx="7.5" cy="7.5" r="2"></circle><circle cx="16.5" cy="16.5" r="2"></circle></svg>',
   directDeposit: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10l9-6 9 6"></path><path stroke-linecap="round" d="M5 10v9h14v-9M10 19v-6h4v6"></path></svg>',
   buy: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 17l5-5 4 4 7-8"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 8h5v5"></path></svg>',
-  sell: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7l5 5 4-4 7 8"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 16h5v-5"></path></svg>',
   portfolio: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path d="M12 2v10l7 5"></path><circle cx="12" cy="12" r="9.5"></circle></svg>',
 };
 
@@ -85,7 +84,7 @@ const quickActionConfigs = {
   investments: [
     { icon: qaIcons.deposit, title: 'Add Funds', subtitle: 'Add money to your investment account.', action: (ctx) => ctx.loadPage('fund-account') },
     { icon: qaIcons.buy, title: 'Buy Investments', subtitle: 'Purchase stocks, ETFs, or mutual funds.', action: (ctx) => ctx.loadPage('trade', 'buy') },
-    { icon: qaIcons.sell, title: 'Sell Investments', subtitle: 'Sell holdings and move proceeds to cash.', action: (ctx) => ctx.loadPage('trade', 'sell') },
+    { icon: qaIcons.transfer, title: 'Transfer Between Accounts', subtitle: 'Move money between your Verceil accounts.', action: (ctx) => ctx.loadPage('transfer') },
     { icon: qaIcons.portfolio, title: 'Portfolio Details', subtitle: 'View holdings, performance, and investment activity.', action: (ctx) => ctx.loadPage('portfolio') },
   ],
 };
