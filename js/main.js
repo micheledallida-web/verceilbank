@@ -573,7 +573,6 @@ const navMenus = {
     title: 'Profile',
     groups: [
       { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'] },
-      { category: 'Security', items: ['Password', 'Two-Step Verification', 'Face ID Sign-In', 'Devices & Sign-In Activity'] },
       { category: 'Additional', items: ['Linked Accounts', 'Tax Documents', 'Notification Preferences', 'Privacy & Data Settings'] },
     ],
     standaloneItems: ['Sign Out'],
@@ -630,13 +629,6 @@ const navMenuRoutes = {
   'Mailing Address': () => loadPage('profile-mailing-address'),
   'Phone Number': () => loadPage('profile-phone'),
   'Email Address': () => loadPage('profile-email'),
-
-  // Profile — Security. No screen has been built for any of these yet, so each
-  // one opens the shared placeholder rather than being left as a dead tap.
-  'Password': () => loadPage('coming-soon', 'Password'),
-  'Two-Step Verification': () => loadPage('coming-soon', 'Two-Step Verification'),
-  'Face ID Sign-In': () => loadPage('coming-soon', 'Face ID Sign-In'),
-  'Devices & Sign-In Activity': () => loadPage('coming-soon', 'Devices & Sign-In Activity'),
 
   // Profile — Additional
   'Linked Accounts': () => loadPage('linked-accounts'),
