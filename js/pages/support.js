@@ -356,7 +356,10 @@ function openNew(root, options) {
   pendingCategory = chosen;
 
   if (options && typeof options.subject === 'string') subjectEl.value = options.subject.slice(0, 80);
-  bodyEl.value = '';
+  // A caller that knows what the request is about can write the opening line
+  // too, so the form arrives ready to send rather than ready to type. Both
+  // fields stay editable.
+  bodyEl.value = (options && typeof options.body === 'string') ? options.body.slice(0, 2000) : '';
 
   hideError(root, '#supNewError');
   updateNewCount(root);
