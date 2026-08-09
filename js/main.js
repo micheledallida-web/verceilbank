@@ -48,21 +48,45 @@ export function parseBalanceText(text) {
   return Number(String(text).replace(/[^0-9.-]/g, '')) || 0;
 }
 
-// The routing number belongs to the bank and the account number is issued by a
-// database trigger on insert. Both used to be invented here — a random nine
-// digits cached in localStorage — which meant the same account showed different
-// numbers in two browsers, and a direct-deposit form could be filled in with an
-// account number that existed nowhere but that device.
+// The routing number belongs to the bank. The account number is the account's
+// own: a permanent one is issued server-side once identity is verified and the
+// account has been active thirty days, and until then the account carries a
+// temporary eleven-digit number so there is something to quote.
 //
-// Nothing is generated now. Both come from the server, and an empty string is
-// returned while they are still loading: a blank field is honest, a fabricated
-// routing number on a deposit slip is not. The name is kept because callers
-// across six screens use it.
+// Neither is rolled at random on the device any more. The name is kept because
+// callers across six screens use it.
 export function getOrCreateTempNumber(type, kind) {
   if (kind === 'routing') {
     return NO_ROUTING_ACCOUNT_TYPES.includes(type) ? '' : bankRoutingNumber;
   }
-  return accountNumbersByType[type] || '';
+  // A permanent, server-issued number always wins. Until one is issued the
+  // account still needs something to show, so it carries a temporary one.
+  return accountNumbersByType[type] || temporaryAccountNumber(type);
+}
+
+// A temporary account number has to be the same number wherever you sign in.
+// The old one was eleven random digits cached in localStorage, so the same
+// account read differently on a phone and a laptop. This derives the digits
+// from the account holder's id and the account type instead: same user, same
+// account, same number, on every device and with nothing stored. Each account
+// type seeds differently, so investments never shares checking's number.
+function temporaryAccountNumber(type) {
+  if (!currentUserId) return '';
+  const seed = `${currentUserId}:${type}`;
+
+  // Two independent FNV-1a passes, so the eleven digits are drawn from more
+  // entropy than a single 32-bit hash would give.
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < seed.length; i++) {
+    const code = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ code, 0x85ebca6b) >>> 0;
+  }
+
+  // Stays inside Number's safe range: 99999 * 1e6 + 999999 is well under 2^53.
+  const digits = (h1 % 100000) * 1000000 + (h2 % 1000000);
+  return String(digits).padStart(11, '0');
 }
 
 // ---------- Bank reference data ----------
@@ -81,6 +105,8 @@ const NO_ROUTING_ACCOUNT_TYPES = ['investments'];
 
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
 let accountNumbersByType = {};
+// Seeds the temporary account numbers above, so they are stable per person.
+let currentUserId = '';
 
 // Whether the user holds a card at all. Card Services is left out of the menu
 // entirely when they do not, rather than shown and then apologised for.
@@ -104,6 +130,7 @@ async function loadBankReference() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
+    currentUserId = user.id;
     const { data: rows, error } = await supabaseClient
       .from('accounts')
       .select('*')
@@ -124,17 +151,16 @@ async function loadBankReference() {
 }
 
 // The masked numbers on the account cards were literals in the markup, so every
-// account read •4892 or •9104 no matter what its real number was. They come
-// from the server-assigned number now — and stay blank until one exists, since
-// a card that shows someone else's last four is worse than a card that shows
-// none. Each account type carries its own, so investments never borrows the
-// checking account's.
+// account read •4892 or •9104 no matter what its real number was. They show the
+// account's own number now — permanent if one has been issued, temporary until
+// then — and each account type carries its own, so investments never borrows
+// the checking account's last four.
 function renderAccountNumberMasks() {
   const masks = { checkingNumber: 'checking', savingsNumber: 'savings', investmentsNumber: 'investments' };
   Object.keys(masks).forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const number = accountNumbersByType[masks[id]];
+    const number = getOrCreateTempNumber(masks[id], 'account');
     el.textContent = number ? `•${String(number).slice(-4)}` : '';
   });
 }
