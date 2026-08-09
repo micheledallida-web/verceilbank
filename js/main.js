@@ -293,8 +293,12 @@ window.openSupportMessage = openSupportMessage;
 const greetingLine1 = document.getElementById('greetingLine1');
 const greetingLine2 = document.getElementById('greetingLine2');
 
-// ---------- Header dropdown (Appearance / Messages / Profile) ----------
+// ---------- Header dropdown (More / Appearance / Messages / Profile) ----------
 const headerMenus = {
+  more: {
+    title: 'Quick Actions',
+    items: ['Nickname accounts', 'Reorder accounts', 'Hide an account', 'Download all statements', 'Card Services', 'Settings'],
+  },
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode'] },
   messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
   profile: { title: 'Profile', items: ['My Profile', 'Linked Accounts', 'Notification Preferences', 'Privacy & Data Settings', 'Sign Out'] },
@@ -430,7 +434,11 @@ function openHeaderDropdown(key, anchorEl) {
   const textColor = isLight ? '#111827' : '#FFFFFF';
   const chevronColor = isLight ? '#6B7280' : '#8E9CBA';
 
-  const items = menu.items;
+  // Card Services is only a destination for someone who holds a card. With no
+  // card the row is left out rather than rendered disabled.
+  const items = key === 'more' && !hasOpenCreditCard
+    ? menu.items.filter((item) => item !== 'Card Services')
+    : menu.items;
 
   headerDropdownList.innerHTML = items.map((item, idx) => {
     const label = typeof item === 'string' ? item : item.label;
@@ -488,6 +496,7 @@ function closeHeaderDropdown() {
 }
 
 headerDropdownOverlay.addEventListener('click', closeHeaderDropdown);
+document.getElementById('moreMenuBtn').addEventListener('click', (e) => openHeaderDropdown('more', e.currentTarget));
 document.getElementById('appearanceBtn').addEventListener('click', (e) => openHeaderDropdown('appearance', e.currentTarget));
 // The bell is a doorway to the Notifications screen now, not a dropdown: a
 // notification has to be readable in full, and a 260px box anchored under an
@@ -586,7 +595,8 @@ const navMenus = {
   navProfile: {
     title: 'Profile',
     groups: [
-      { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'] },
+      { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'], note: 'Name and date of birth are locked after verification. Contact support to change them.' },
+      { category: 'Security', items: ['Password', 'Two-Step Verification', 'Devices & Sign-In Activity'] },
       { category: 'Additional', items: ['Linked Accounts', 'Tax Documents', 'Notification Preferences', 'Privacy & Data Settings'] },
     ],
     standaloneItems: ['Sign Out'],
@@ -644,6 +654,12 @@ const navMenuRoutes = {
   'Phone Number': () => loadPage('profile-phone'),
   'Email Address': () => loadPage('profile-email'),
 
+  // Profile — Security. No screen exists for any of these yet, so each opens
+  // the shared placeholder rather than being left as a tap that does nothing.
+  'Password': () => loadPage('coming-soon', 'Password'),
+  'Two-Step Verification': () => loadPage('coming-soon', 'Two-Step Verification'),
+  'Devices & Sign-In Activity': () => loadPage('coming-soon', 'Devices & Sign-In Activity'),
+
   // Profile — Additional
   'Linked Accounts': () => loadPage('linked-accounts'),
   // Statements and tax forms are two tabs of the one documents screen, so this
@@ -655,6 +671,14 @@ const navMenuRoutes = {
 
 // Labels in the header "quick actions" dropdown that map to a ported screen.
 const headerMenuRoutes = {
+  // Quick actions. Only Card Services and Download all statements have a screen
+  // behind them; the rest open the shared placeholder rather than doing nothing.
+  'Nickname accounts': () => loadPage('coming-soon', 'Nickname accounts'),
+  'Reorder accounts': () => loadPage('coming-soon', 'Reorder accounts'),
+  'Hide an account': () => loadPage('coming-soon', 'Hide an account'),
+  'Download all statements': () => loadPage('docs-hub'),
+  'Card Services': () => loadPage('card-services'),
+  'Settings': () => loadPage('coming-soon', 'Settings'),
   'Contact Support': () => loadPage('contact-support'),
   'My Profile': () => loadPage('profile'),
   'Linked Accounts': () => loadPage('linked-accounts'),
@@ -666,7 +690,7 @@ const headerMenuRoutes = {
 // The personal information rows show what is currently on file beside their
 // label, read from the same `user_profile` row the individual profile screens
 // write to — so the sheet answers "what is my address?" without a tap.
-const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
+const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address', 'Two-Step Verification'];
 
 // Locked once identity has been verified. These two are facts on the record
 // rather than something to edit, so they lose their chevron and their tap.
@@ -686,17 +710,46 @@ function maskPhoneNumber(digitsSource) {
   return digits.length >= 4 ? `•••• ${digits.slice(-4)}` : '';
 }
 
-function buildProfileRowValues(profile, user) {
+// Enough to recognise the address as yours without printing where you live.
+function cityAndCountry(city, country) {
+  return [String(city || '').trim(), String(country || '').trim()].filter(Boolean).join(', ');
+}
+
+// First character, then the domain. Enough to tell two of your addresses
+// apart, not enough to harvest off a shoulder or a screenshot.
+function maskEmail(value) {
+  const email = String(value || '').trim();
+  const at = email.lastIndexOf('@');
+  if (at < 1) return '';
+  return `${email[0]}•••••${email.slice(at)}`;
+}
+
+// Name and date of birth live in three places and are written by three
+// different flows, so the sheet reads all three rather than the one that
+// happens to be empty. `user_profile` first because it is the one the profile
+// screens edit, then the verification record's legal name, then what was typed
+// at sign-up. Whichever is on file is what the row shows.
+function buildProfileRowValues(profile, user, verification) {
   // `mail_same_as_res` is only false once someone has explicitly said the two
   // differ, which is the same default the Mailing Address screen applies.
   const mailingDiffers = profile.mail_same_as_res === false;
+  const meta = (user && user.user_metadata) || {};
+  const ver = verification || {};
+
+  const nameFromProfile = [profile.first_name, profile.middle_name, profile.last_name, profile.suffix].filter(Boolean).join(' ');
+  const nameFromVerification = [ver.legal_first_name, ver.legal_last_name].filter(Boolean).join(' ');
+  const nameFromSignUp = [meta.first_name, meta.middle_name, meta.last_name, meta.suffix].filter(Boolean).join(' ');
+
+  const dob = profile.date_of_birth || ver.date_of_birth || meta.date_of_birth || '';
+
   return {
-    'Full Legal Name': [profile.first_name, profile.middle_name, profile.last_name, profile.suffix].filter(Boolean).join(' '),
-    'Date of Birth': maskDateOfBirth(profile.date_of_birth),
-    'Residential Address': profile.res_street || '',
-    'Mailing Address': mailingDiffers ? (profile.mail_street || '') : 'Same as residential',
+    'Full Legal Name': nameFromProfile || nameFromVerification || nameFromSignUp,
+    'Date of Birth': maskDateOfBirth(dob),
+    'Residential Address': cityAndCountry(profile.res_city || ver.city, profile.res_country || ver.state),
+    'Mailing Address': mailingDiffers ? cityAndCountry(profile.mail_city, profile.mail_state) : 'Same as residential',
     'Phone Number': maskPhoneNumber(profile.phone_number),
-    'Email Address': profile.email || (user && user.email) || '',
+    'Email Address': maskEmail(profile.email || (user && user.email)),
+    'Two-Step Verification': profile.two_factor_enabled ? 'On' : 'Off',
   };
 }
 
@@ -714,8 +767,13 @@ async function refreshProfileRowValues() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
-    const { data } = await supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle();
-    profileRowValues = buildProfileRowValues(data || {}, user);
+    // Both reads in parallel: the sheet needs whichever of them has the name.
+    const [{ data: profile }, { data: verification }] = await Promise.all([
+      supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle(),
+      supabaseClient.from('verification_requests').select('*').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    profileRowValues = buildProfileRowValues(profile || {}, user, verification || {});
     applyProfileRowValues();
   } catch (err) {
     console.error('Profile row values error:', err);
@@ -759,6 +817,7 @@ function openNavMenu(key) {
     navMenuList.innerHTML = menu.groups.map(group => `
       <div class="px-[12px] pt-[16px] pb-[4px] text-[12px] font-bold uppercase tracking-[0.8px] text-[#6B7280] dark:text-[#8E9CBA]">${group.category}</div>
       ${group.items.map(item => renderNavMenuGroupRow(item)).join('')}
+      ${group.note ? `<div class="px-[12px] pt-[6px] pb-[2px] text-[12px] leading-relaxed text-[#6B7280] dark:text-[#8E9CBA]">${group.note}</div>` : ''}
     `).join('') + (menu.standaloneItems ? `
       <div class="border-t border-gray-100 dark:border-white/[0.06] mt-[8px] pt-[8px]">
         ${menu.standaloneItems.map(item => `
