@@ -636,9 +636,22 @@ async function initSupabaseData() {
       && (acc.status === 'approved' || Number(acc.balance) > 0 || Number(acc.available_credit) > 0);
   }
 
+  // This table has no 'open' status: rows are written with status 'approved'
+  // and deposit rows carry no status at all, so testing for 'open' would
+  // exclude every account. A row counts unless it says it is shut.
+  const CLOSED_STATUSES = ['closed', 'cancelled', 'canceled', 'suspended', 'frozen'];
+
+  function isOpenAccount(acc) {
+    return !CLOSED_STATUSES.includes(String(acc.status || '').toLowerCase());
+  }
+
+  // Closed accounts are excluded here rather than in each caller, so no total
+  // can pick up a shut account by forgetting to ask.
   function sumCents(matches) {
     let cents = 0;
-    accountsById.forEach(acc => { if (matches(acc)) cents += toCents(acc.balance); });
+    accountsById.forEach(acc => {
+      if (isOpenAccount(acc) && matches(acc)) cents += toCents(acc.balance);
+    });
     return cents;
   }
 
@@ -649,7 +662,9 @@ async function initSupabaseData() {
 
   function firstMatch(matches) {
     let found = null;
-    accountsById.forEach(acc => { if (!found && matches(acc)) found = acc; });
+    accountsById.forEach(acc => {
+      if (!found && isOpenAccount(acc) && matches(acc)) found = acc;
+    });
     return found;
   }
 
@@ -669,9 +684,11 @@ async function initSupabaseData() {
     setText('homeDeposits', deposits);
     setText('homeInvestments', investments);
     setText('homeCardBalance', cardDebt);
-    // Card balance is money owed, so it comes off rather than sitting beside
-    // the total looking like it might be yours.
-    setText('homeTotalBalance', deposits + investments - cardDebt);
+    // Total balance is deposit money only, the way a bank states it. Investment
+    // value is a market figure that moves on its own and is reported beside the
+    // total, not inside it; a card balance is money owed to the issuer, so it
+    // is shown as its own line rather than netted off cash on hand.
+    setText('homeTotalBalance', deposits);
 
     const hasInterestChecking = !!firstMatch(acc => acc.account_type === 'interest_checking');
     const card = firstMatch(isActiveCard);
