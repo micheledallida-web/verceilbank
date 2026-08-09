@@ -185,6 +185,7 @@ export async function loadPage(name, ...args) {
     showModal,
     openSupportMessage,
     refreshAlertsBadge,
+    getCardEligibility,
     signOut: () => handleSignOut(),
   }, ...args);
 
@@ -448,21 +449,11 @@ function eligibilityMonthLabel(from) {
   return reached.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-// The note lives below the card rather than inside it, and the card is shown or
-// hidden by the accounts data as it arrives — so the note follows the card's own
-// class rather than the balance code having to know a note exists.
-function syncCreditNoteVisibility() {
-  const offer = document.getElementById('offerCredit');
-  const note = document.getElementById('offerCreditNote');
-  if (!offer || !note) return;
-  note.classList.toggle('hidden', offer.classList.contains('hidden'));
-}
-
-async function renderCardEligibility() {
-  const offer = document.getElementById('offerCredit');
-  const note = document.getElementById('offerCreditNote');
-  if (!offer || !note) return;
-
+// Everything the credit account screen needs to state its own terms: how long
+// the account has been open, whether that clears the threshold, and the month
+// it does. Computed here so membership length has one definition, and handed to
+// page modules through their context object.
+export async function getCardEligibility() {
   let joined = null;
   try {
     const user = await getCurrentUser();
@@ -486,26 +477,14 @@ async function renderCardEligibility() {
   }
 
   const months = joined ? wholeMonthsSince(joined, new Date()) : 0;
-  // An unknown join date is read as not yet eligible. Guessing in the user's
-  // favour would promise an application the bank cannot honour.
-  const eligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
-
-  // The card itself is untouched — same look, same tap. All that changes is the
-  // line underneath, which is what states the condition.
-  if (eligible) {
-    note.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
-  } else {
-    const when = joined ? eligibilityMonthLabel(joined) : 'a later date';
-    note.textContent = `Available after ${CARD_ELIGIBILITY_MONTHS} months of membership. You've been a member for ${months} months — eligible ${when}.`;
-  }
-
-  syncCreditNoteVisibility();
-}
-
-const offerCreditEl = document.getElementById('offerCredit');
-if (offerCreditEl) {
-  new MutationObserver(syncCreditNoteVisibility)
-    .observe(offerCreditEl, { attributes: true, attributeFilter: ['class'] });
+  return {
+    // An unknown join date reads as not yet eligible. Guessing in the user's
+    // favour would promise an application the bank cannot honour.
+    eligible: !!joined && months >= CARD_ELIGIBILITY_MONTHS,
+    months,
+    thresholdMonths: CARD_ELIGIBILITY_MONTHS,
+    eligibleFrom: joined ? eligibilityMonthLabel(joined) : '',
+  };
 }
 
 document.getElementById('offerCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
@@ -999,7 +978,6 @@ refreshAlertsBadge();
 // The routing number, the server-issued account numbers and whether a card is
 // held are all read once here, then reused by every screen that needs them.
 loadBankReference();
-renderCardEligibility();
 
 // Investments card sparkline. Runs on its own animation loop, and parks itself
 // when the tab is hidden or the card scrolls out of view.
