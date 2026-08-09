@@ -106,6 +106,8 @@ export function init(root, ctx, type) {
   const detailAccountBalance = root.querySelector('#detailAccountBalance');
   const detailAccountChevron = root.querySelector('#detailAccountChevron');
   const detailRoutingSection = root.querySelector('#detailRoutingSection');
+  const detailRoutingRow = root.querySelector('#detailRoutingRow');
+  const detailAccountRow = root.querySelector('#detailAccountRow');
   const detailFullRoutingNumber = root.querySelector('#detailFullRoutingNumber');
   const detailFullAccountNumber = root.querySelector('#detailFullAccountNumber');
   const detailQuickActionsSection = root.querySelector('#detailQuickActionsSection');
@@ -246,8 +248,15 @@ export function init(root, ctx, type) {
     detailQuickActionsSection.classList.add('hidden');
     detailTransactionsSection.classList.add('hidden');
   } else {
-    detailFullRoutingNumber.textContent = getOrCreateTempNumber(type, 'routing');
+    const routingNumber = getOrCreateTempNumber(type, 'routing');
+    detailFullRoutingNumber.textContent = routingNumber;
     detailFullAccountNumber.textContent = getOrCreateTempNumber(type, 'account');
+
+    // Investments have no routing number to give, so the row goes rather than
+    // sitting there empty — and the account number below it loses the divider
+    // that was separating the two.
+    detailRoutingRow.classList.toggle('hidden', !routingNumber);
+    detailAccountRow.classList.toggle('border-t', !!routingNumber);
     detailRoutingSection.classList.remove('hidden');
     detailQuickActionsSection.classList.remove('hidden');
     detailTransactionsSection.classList.remove('hidden');
