@@ -101,6 +101,18 @@ function preview(body) {
   return text.length > 60 ? text.slice(0, 60) : text;
 }
 
+// Hands the message to the edge function that emails the support inbox. Fire
+// and forget on purpose: the message is already saved by the time this runs, so
+// a mail outage must never surface to the user as a failed send. It is logged
+// and nothing else.
+function notifySupportInbox(ctx, threadId, messageId) {
+  if (!ctx.supabaseClient || !ctx.supabaseClient.functions || !threadId || !messageId) return;
+  ctx.supabaseClient.functions
+    .invoke('support-notify', { body: { thread_id: threadId, message_id: messageId } })
+    .then(({ error }) => { if (error) console.error('Support email notify error:', error); })
+    .catch((err) => console.error('Support email notify error:', err));
+}
+
 function emptyState(message) {
   return `<div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[14px] px-[16px] py-3 shadow-lg text-center text-[12px] text-[#6B7280] dark:text-[#8E9CBA]">${message}</div>`;
 }
@@ -322,6 +334,7 @@ async function sendReply(root, ctx) {
     if (error) throw error;
 
     activeMessages = activeMessages.concat(data ? [data] : [{ sender: 'user', body, created_at: new Date().toISOString() }]);
+    notifySupportInbox(ctx, activeThread.id, data && data.id);
     input.value = '';
     renderMessages(root);
     scrollToNewest(root);
@@ -405,13 +418,17 @@ async function submitNew(root, ctx) {
     if (threadError) throw threadError;
     if (!thread) throw new Error('Could not start the conversation. Please try again.');
 
-    const { error: messageError } = await ctx.supabaseClient
+    const { data: firstMessage, error: messageError } = await ctx.supabaseClient
       .from('support_messages')
-      .insert({ thread_id: thread.id, user_id: user.id, sender: 'user', body });
+      .insert({ thread_id: thread.id, user_id: user.id, sender: 'user', body })
+      .select()
+      .single();
     // A thread with no message in it is worse than no thread: opening it would
     // show an empty conversation the user believes they sent. Stay on the form
     // with the text still in it and say what happened.
     if (messageError) throw messageError;
+
+    notifySupportInbox(ctx, thread.id, firstMessage && firstMessage.id);
 
     pendingCategory = '';
     await loadThreads(root, ctx);
