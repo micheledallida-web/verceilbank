@@ -449,21 +449,10 @@ function eligibilityMonthLabel(from) {
   return reached.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-// The offer row is shown or hidden by the accounts data as it arrives. The note
-// belongs to that row, so it follows the row's own class rather than the
-// balance code having to know a note exists.
-function syncCreditNoteVisibility() {
-  const offer = document.getElementById('offerCredit');
-  const note = document.getElementById('offerCreditNote');
-  if (!offer || !note) return;
-  note.classList.toggle('hidden', offer.classList.contains('hidden'));
-}
-
 async function renderCardEligibility() {
   const offer = document.getElementById('offerCredit');
   const note = document.getElementById('offerCreditNote');
-  const apply = document.getElementById('creditCardRightContent');
-  if (!offer || !note || !apply) return;
+  if (!offer || !note) return;
 
   let joined = null;
   try {
@@ -492,11 +481,8 @@ async function renderCardEligibility() {
   // favour here would start an application the bank cannot honour.
   cardApplicationEligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
 
-  // The Apply control is a solid pill, so muting it means muting the pill —
-  // recolouring the label alone would put blue text on a blue background. The
-  // chevron inside it is stroked with currentColor, so it follows.
-  apply.classList.toggle('home-promo-go-locked', !cardApplicationEligible);
-
+  // The Apply pill keeps its own look either way. What changes is the terms
+  // line beneath it, which is where an offer states its conditions.
   if (cardApplicationEligible) {
     offer.style.cursor = 'pointer';
     note.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
@@ -506,13 +492,7 @@ async function renderCardEligibility() {
     note.textContent = `Available after ${CARD_ELIGIBILITY_MONTHS} months of membership. You've been a member for ${months} months — eligible ${when}.`;
   }
 
-  syncCreditNoteVisibility();
-}
-
-const offerCreditEl = document.getElementById('offerCredit');
-if (offerCreditEl) {
-  new MutationObserver(syncCreditNoteVisibility)
-    .observe(offerCreditEl, { attributes: true, attributeFilter: ['class'] });
+  note.classList.remove('hidden');
 }
 
 // Support is the application channel — there is no form. Under eight months the

@@ -1709,20 +1709,15 @@ body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
    field still reads as empty in dark mode. */
 body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
-/* The Apply pill on the Signature Card while the account is too young to
-   apply. Muted rather than removed: the offer is still worth seeing, it just
-   is not actionable yet. The pill is recoloured rather than its label, since
-   the label sits on a solid background — and the chevron inside is stroked
-   with currentColor, so it follows. Appended after the promo rules so it wins
-   the tie on specificity. */
-.home-promo-go.home-promo-go-locked {
-  background: #EEF1F7;
-  color: #8B95AB;
-  box-shadow: none;
-  cursor: default;
-}
-
-.dark .home-promo-go.home-promo-go-locked {
-  background: rgba(255, 255, 255, 0.08);
-  color: #8E9CBA;
+/* Eligibility fine print, inside the offer card beneath the Apply row — the
+   terms line belongs to the offer it qualifies, not to the page around it.
+   Sits above the artwork and clears its column the same way the headline
+   does, so a long line never runs under the card illustration. Typography
+   comes from .home-promo-note, which already carries both themes. */
+.home-promo-fine {
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  padding-right: 108px;
+  line-height: 1.45;
 }
