@@ -104,6 +104,7 @@ export function init(root, ctx, type) {
   const detailAccountNumber = root.querySelector('#detailAccountNumber');
   const detailAccountBalanceLabel = root.querySelector('#detailAccountBalanceLabel');
   const detailAccountBalance = root.querySelector('#detailAccountBalance');
+  const detailAccountChevron = root.querySelector('#detailAccountChevron');
   const detailRoutingSection = root.querySelector('#detailRoutingSection');
   const detailFullRoutingNumber = root.querySelector('#detailFullRoutingNumber');
   const detailFullAccountNumber = root.querySelector('#detailFullAccountNumber');
@@ -216,7 +217,31 @@ export function init(root, ctx, type) {
     }
   }
 
+  // An account you have not opened yet has no numbers, no actions and no
+  // history — what it has instead is the terms you would be opening it under.
+  async function renderCardEligibility() {
+    const card = root.querySelector('#detailCardEligibility');
+    const title = root.querySelector('#detailCardEligibilityTitle');
+    const body = root.querySelector('#detailCardEligibilityBody');
+    if (!card || !title || !body || !ctx.getCardEligibility) return;
+
+    const { eligible, months, thresholdMonths, eligibleFrom } = await ctx.getCardEligibility();
+
+    if (eligible) {
+      title.textContent = 'Ready to apply';
+      body.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
+    } else {
+      title.textContent = `Available after ${thresholdMonths} months of membership`;
+      const when = eligibleFrom || 'a later date';
+      body.textContent = `You've been a member for ${months} months — eligible ${when}.`;
+    }
+
+    card.classList.remove('hidden');
+  }
+
   if (cfg.unapplied) {
+    detailAccountChevron.classList.remove('hidden');
+    renderCardEligibility();
     detailRoutingSection.classList.add('hidden');
     detailQuickActionsSection.classList.add('hidden');
     detailTransactionsSection.classList.add('hidden');

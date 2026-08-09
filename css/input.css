@@ -1708,7 +1708,3 @@ body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
    rule above would otherwise outrank on specificity — restated so an empty
    field still reads as empty in dark mode. */
 body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
-
-/* The eligibility note sits below the Signature Card as its own block, so it
-   needs no rules of its own — .fund-cs-note already draws the app's note
-   panel, and it reads on the blue background and the dark one alike. */

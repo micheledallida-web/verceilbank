@@ -18,7 +18,24 @@
       </div>
     </div>
     <div id="detailAccountBalanceLabel" class="text-[12px] font-normal text-[#6B7280] dark:text-[#8E9CBA]">Available Balance</div>
-    <div id="detailAccountBalance" class="text-[32px] font-bold text-[#111827] dark:text-[#FFFFFF] tracking-tight leading-none mt-1">$0.00</div>
+    <div class="flex items-center justify-between gap-[12px]">
+      <div id="detailAccountBalance" class="text-[32px] font-bold text-[#111827] dark:text-[#FFFFFF] tracking-tight leading-none mt-1">$0.00</div>
+      <svg id="detailAccountChevron" class="hidden w-[22px] h-[22px] text-gray-400 dark:text-[#52607D] flex-shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </div>
+  </div>
+
+  <!-- Eligibility terms for the card above. Written by init() in
+       js/pages/account-detail.js, and shown only for the credit card. -->
+  <div id="detailCardEligibility" class="hidden bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[20px]">
+    <div class="flex items-start gap-[12px]">
+      <span class="w-[38px] h-[38px] rounded-[12px] bg-blue-50 dark:bg-white/5 flex items-center justify-center flex-shrink-0">
+        <svg class="w-[19px] h-[19px] text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+      </span>
+      <div class="min-w-0">
+        <div id="detailCardEligibilityTitle" class="text-[13px] font-bold text-[#111827] dark:text-white"></div>
+        <div id="detailCardEligibilityBody" class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[3px] leading-relaxed"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Routing & Account Numbers + Fund Account (hidden for unapplied accounts like the credit card) -->
