@@ -166,13 +166,29 @@ function renderAccountNumberMasks() {
 }
 
 // ---------- Theme ----------
+// Light is the default and stays the default. The app never consults the
+// device's colour scheme to decide for itself — a bank that opens dark because
+// the television happens to be dark is a surprise, not a preference. It opens
+// light, and only an explicit choice moves it, which is then remembered.
 const htmlElement = document.documentElement;
+const THEME_KEY = 'vercel_bank_theme';
+
 export function applyTheme(isDark) {
   htmlElement.classList.toggle('dark', isDark);
   document.body.classList.toggle('dark', isDark);
-  localStorage.setItem('vercel_bank_theme', isDark ? 'dark' : 'light');
+  // Wrapped, because a browser with storage blocked — a TV, a kiosk, private
+  // browsing — throws here. Unguarded, that throw happened at module load and
+  // took the entire app down with it rather than just the one setting.
+  try { localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light'); } catch (err) {}
 }
-applyTheme((localStorage.getItem('vercel_bank_theme') || 'light') === 'dark');
+
+function storedTheme() {
+  try { return localStorage.getItem(THEME_KEY) || ''; } catch (err) { return ''; }
+}
+
+// Only a stored 'dark' turns it dark. Anything else — no preference at all, an
+// unreadable store, a value from some older build — lands on light.
+applyTheme(storedTheme() === 'dark');
 
 // ---------- Shared modal (every page module can call this) ----------
 const actionModal = document.getElementById('actionModal');
@@ -279,7 +295,7 @@ const greetingLine2 = document.getElementById('greetingLine2');
 
 // ---------- Header dropdown (Appearance / Messages / Profile) ----------
 const headerMenus = {
-  appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode', 'System Default'] },
+  appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode'] },
   messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
   profile: { title: 'Profile', items: ['My Profile', 'Linked Accounts', 'Notification Preferences', 'Privacy & Data Settings', 'Sign Out'] },
 };
@@ -454,9 +470,7 @@ function openHeaderDropdown(key, anchorEl) {
       // A notification row is a record, not a destination.
       if (btn.getAttribute('data-inert')) return;
       if (key === 'appearance') {
-        if (clickedLabel === 'Light Mode') applyTheme(false);
-        else if (clickedLabel === 'Dark Mode') applyTheme(true);
-        else applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches);
+        applyTheme(clickedLabel === 'Dark Mode');
       } else if (clickedLabel === 'Sign Out') {
         handleSignOut();
       } else if (headerMenuRoutes[clickedLabel]) {
