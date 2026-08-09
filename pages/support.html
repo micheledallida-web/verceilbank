@@ -1,0 +1,118 @@
+<div class="min-h-full w-full pb-[40px]">
+
+  <!-- ============================ VIEW 1: SUPPORT HOME ============================ -->
+  <div id="supHomeView" class="w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[40px]">
+
+    <div class="flex items-center gap-3 mb-[16px]">
+      <button data-action="close" class="w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Back">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-[20px] font-bold text-white truncate">Support</div>
+    </div>
+
+    <input id="supSearch" type="text" placeholder="Search help" class="w-full h-[44px] px-[14px] rounded-[14px] bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none shadow-lg mb-[18px]">
+
+    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mb-[8px]">COMMON TOPICS</div>
+    <div id="supTopics" class="grid grid-cols-2 gap-[10px]"></div>
+    <div id="supTopicsEmpty" class="hidden bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[14px] px-[16px] py-3 shadow-lg text-center text-[12px] text-[#6B7280] dark:text-[#8E9CBA]">No topics match that search.</div>
+
+    <div class="flex items-center justify-between mt-[20px] mb-[8px]">
+      <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase">YOUR MESSAGES</div>
+      <div id="supUnreadCount" class="hidden text-[11px] font-bold tracking-[0.4px] text-white dark:text-[#3B82F6]"></div>
+    </div>
+    <div id="supThreads" class="flex flex-col gap-[10px] mb-[14px]"></div>
+
+    <button id="supNewMsgBtn" class="w-full h-[46px] rounded-[14px] bg-[#2563EB] text-white text-[14px] font-semibold cursor-pointer mb-[20px]">New message</button>
+
+    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mb-[8px]">CONTACT US</div>
+    <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg divide-y divide-gray-100 dark:divide-white/[0.06]">
+      <a href="tel:+18005550123" class="flex justify-between py-[8px] text-[13px] cursor-pointer"><span class="text-[#6B7280] dark:text-[#8E9CBA]">Call support</span><span class="font-semibold text-[#111827] dark:text-white">(800) 555-0123</span></a>
+      <div class="flex justify-between py-[8px] text-[13px]"><span class="text-[#6B7280] dark:text-[#8E9CBA]">Availability</span><span class="font-semibold text-[#111827] dark:text-white">Available 24/7</span></div>
+    </div>
+
+  </div>
+
+  <!-- ============================ VIEW 2: THREAD DETAIL ============================ -->
+  <div id="supThreadView" class="hidden w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[140px]">
+
+    <div class="flex items-center gap-3 mb-[10px]">
+      <button data-action="sup-back" class="w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Back">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div id="supThreadSubject" class="text-[20px] font-bold text-white truncate"></div>
+    </div>
+
+    <div class="flex items-center gap-[8px] mb-[14px] px-[2px]">
+      <span id="supThreadStatus" class="inline-flex items-center px-[8px] h-[20px] rounded-full text-[10px] font-bold"></span>
+      <span id="supThreadCategory" class="text-[12px] text-white/75 dark:text-[#8E9CBA] truncate"></span>
+    </div>
+
+    <div id="supMessages" class="flex flex-col gap-[12px]"></div>
+
+  </div>
+
+  <!-- Reply composer. Fixed to the bottom of the screen so it stays put while the
+       conversation scrolls behind it; shown and hidden with the thread view. -->
+  <div id="supComposer" class="hidden fixed bottom-0 left-0 right-0 z-[41] bg-white dark:bg-[#0D1728] border-t border-gray-100 dark:border-white/[0.06]">
+    <div class="w-full max-w-[430px] mx-auto px-[16px] py-[10px]">
+
+      <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
+
+      <div id="supReplyRow" class="flex gap-[8px]">
+        <input id="supReplyInput" type="text" placeholder="Write a reply..." class="flex-1 h-[44px] px-[14px] rounded-[14px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none">
+        <button id="supReplySendBtn" type="button" disabled class="h-[44px] px-[16px] rounded-[14px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-[8px] disabled:opacity-50">
+          <span id="supReplySpinner" class="kyc-spinner hidden"></span>
+          <span id="supReplyLabel">Send</span>
+        </button>
+      </div>
+
+      <div id="supClosedNotice" class="hidden">
+        <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] text-center mb-[10px]">This conversation is closed.</div>
+        <button id="supClosedNewBtn" type="button" class="w-full h-[42px] rounded-[12px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer">Start a new message</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================ VIEW 3: NEW MESSAGE ============================ -->
+  <div id="supNewView" class="hidden w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[40px]">
+
+    <div class="flex items-center gap-3 mb-[16px]">
+      <button data-action="sup-back" class="w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Back">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="text-[20px] font-bold text-white truncate">New message</div>
+    </div>
+
+    <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[14px]">
+      <div class="flex flex-col gap-[14px]">
+
+        <div>
+          <label for="supNewCategory" class="block text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Category</label>
+          <select id="supNewCategory" class="w-full h-[42px] px-[12px] rounded-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[13px] text-[#111827] dark:text-white outline-none"></select>
+        </div>
+
+        <div>
+          <label for="supNewSubject" class="block text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Subject</label>
+          <input id="supNewSubject" type="text" maxlength="80" placeholder="What is this about?" class="w-full h-[42px] px-[12px] rounded-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none">
+        </div>
+
+        <div>
+          <label for="supNewBody" class="block text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Message</label>
+          <textarea id="supNewBody" rows="6" maxlength="2000" placeholder="Tell us what you need help with" class="w-full px-[12px] py-[10px] rounded-[10px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none"></textarea>
+          <div id="supNewCount" class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] text-right mt-[4px]">0 / 2000</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="supNewError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[10px] px-[4px]"></div>
+
+    <button id="supNewSendBtn" type="button" disabled class="w-full h-[46px] rounded-[14px] bg-[#2563EB] text-white text-[14px] font-semibold cursor-pointer flex items-center justify-center gap-[8px] disabled:opacity-50">
+      <span id="supNewSpinner" class="kyc-spinner hidden"></span>
+      <span id="supNewLabel">Send message</span>
+    </button>
+
+  </div>
+
+</div>

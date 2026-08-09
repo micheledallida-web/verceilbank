@@ -133,6 +133,7 @@ export async function loadPage(name, ...args) {
     parseBalanceText,
     getOrCreateTempNumber,
     showModal,
+    openSupportMessage,
     signOut: () => handleSignOut(),
   }, ...args);
 
@@ -146,9 +147,18 @@ export function showHome() {
   window.scrollTo(0, 0);
 }
 
+// Opens the Support tab straight on its New message form with the category and
+// subject already filled in. Any screen can hand a user to support without
+// knowing how Support is put together: it is passed to every page module in
+// its context object, and sits on `window` for markup-level handlers.
+export function openSupportMessage({ category, subject } = {}) {
+  return loadPage('support', { view: 'new', category, subject });
+}
+
 // Expose for inline onclick handlers if any page markup still uses them
 window.loadPage = loadPage;
 window.showModal = showModal;
+window.openSupportMessage = openSupportMessage;
 
 // ==================== DASHBOARD SHELL ====================
 // Everything below wires up the always-present shell: header dropdown menus,
