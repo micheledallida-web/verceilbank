@@ -434,7 +434,6 @@ document.getElementById('cardInterestChecking').addEventListener('click', () => 
 document.getElementById('promoBanner').addEventListener('click', () => loadPage('interest-checking'));
 // ---------- Signature Card eligibility ----------
 const CARD_ELIGIBILITY_MONTHS = 8;
-let cardApplicationEligible = false;
 
 // Whole months only, so someone who joined on the 30th is not credited with a
 // month on the 1st.
@@ -447,6 +446,16 @@ function wholeMonthsSince(from, to) {
 function eligibilityMonthLabel(from) {
   const reached = new Date(from.getFullYear(), from.getMonth() + CARD_ELIGIBILITY_MONTHS, from.getDate());
   return reached.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// The note lives below the card rather than inside it, and the card is shown or
+// hidden by the accounts data as it arrives — so the note follows the card's own
+// class rather than the balance code having to know a note exists.
+function syncCreditNoteVisibility() {
+  const offer = document.getElementById('offerCredit');
+  const note = document.getElementById('offerCreditNote');
+  if (!offer || !note) return;
+  note.classList.toggle('hidden', offer.classList.contains('hidden'));
 }
 
 async function renderCardEligibility() {
@@ -477,30 +486,29 @@ async function renderCardEligibility() {
   }
 
   const months = joined ? wholeMonthsSince(joined, new Date()) : 0;
-  // An unknown join date is treated as not yet eligible. Guessing in the user's
-  // favour here would start an application the bank cannot honour.
-  cardApplicationEligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
+  // An unknown join date is read as not yet eligible. Guessing in the user's
+  // favour would promise an application the bank cannot honour.
+  const eligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
 
-  // The Apply pill keeps its own look either way. What changes is the terms
-  // line beneath it, which is where an offer states its conditions.
-  if (cardApplicationEligible) {
-    offer.style.cursor = 'pointer';
+  // The card itself is untouched — same look, same tap. All that changes is the
+  // line underneath, which is what states the condition.
+  if (eligible) {
     note.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
   } else {
-    offer.style.cursor = 'default';
     const when = joined ? eligibilityMonthLabel(joined) : 'a later date';
     note.textContent = `Available after ${CARD_ELIGIBILITY_MONTHS} months of membership. You've been a member for ${months} months — eligible ${when}.`;
   }
 
-  note.classList.remove('hidden');
+  syncCreditNoteVisibility();
 }
 
-// Support is the application channel — there is no form. Under eight months the
-// row is inert rather than leading somewhere that turns the user away.
-document.getElementById('offerCredit').addEventListener('click', () => {
-  if (!cardApplicationEligible) return;
-  openSupportMessage({ category: 'card_application', subject: 'Credit Card Application' });
-});
+const offerCreditEl = document.getElementById('offerCredit');
+if (offerCreditEl) {
+  new MutationObserver(syncCreditNoteVisibility)
+    .observe(offerCreditEl, { attributes: true, attributeFilter: ['class'] });
+}
+
+document.getElementById('offerCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 
 // ---------- Quick actions (from the old account summary) ----------
 document.getElementById('homeQuickTransfer').addEventListener('click', () => loadPage('transfer'));
