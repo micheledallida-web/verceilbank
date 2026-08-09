@@ -280,7 +280,7 @@ const greetingLine2 = document.getElementById('greetingLine2');
 // ---------- Header dropdown (Appearance / Messages / Profile) ----------
 const headerMenus = {
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode', 'System Default'] },
-  messages: { title: 'Messages', items: ['Secure Inbox', 'Contact Support', 'Live Chat', 'Schedule an Appointment'] },
+  messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
   profile: { title: 'Profile', items: ['My Profile', 'Linked Accounts', 'Notification Preferences', 'Privacy & Data Settings', 'Sign Out'] },
 };
 
@@ -567,7 +567,7 @@ const navMenus = {
   },
   navSupport: {
     title: 'Support',
-    items: ['Secure Messages', 'Live Chat', 'Contact Support', 'Card Services', 'Report Lost or Stolen Card', 'Dispute a Transaction', 'Travel Notification', 'Help Center'],
+    items: ['Contact Support', 'Card Services', 'Report Lost or Stolen Card', 'Dispute a Transaction', 'Travel Notification', 'Help Center'],
   },
   navProfile: {
     title: 'Profile',
@@ -618,8 +618,6 @@ const navMenuRoutes = {
   'Financial Advisor': () => loadPage('advisor'),
 
   // Support
-  'Secure Messages': () => loadPage('secure-messages'),
-  'Live Chat': () => loadPage('live-chat'),
   'Contact Support': () => loadPage('contact-support'),
   'Card Services': () => loadPage('card-services'),
   'Report Lost or Stolen Card': () => loadPage('report-card'),
@@ -653,9 +651,7 @@ const navMenuRoutes = {
 
 // Labels in the header "quick actions" dropdown that map to a ported screen.
 const headerMenuRoutes = {
-  'Secure Inbox': () => loadPage('secure-messages'),
   'Contact Support': () => loadPage('contact-support'),
-  'Live Chat': () => loadPage('live-chat'),
   'My Profile': () => loadPage('profile'),
   'Linked Accounts': () => loadPage('linked-accounts'),
   'Notification Preferences': () => loadPage('notification-prefs'),

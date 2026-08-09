@@ -56,7 +56,6 @@ export function init(root, ctx) {
       renderHelpTopics();
     });
   });
-  on(root.querySelector('#helpChatBtn'), 'click', () => loadPage('live-chat'));
   on(root.querySelector('#helpApptBtn'), 'click', () => loadPage('contact-support'));
 
   paintCategoryChips();
