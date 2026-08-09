@@ -1623,3 +1623,88 @@ body.dark .fund-cs-pill {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.5);
 }
+
+/* ---- fund deposit screen · theme ----
+   The deposit screen was drawn dark at every theme too, so in light mode the
+   timer, amount, QR, provider and status cards stayed near-black on the blue
+   background while every other screen went white. They follow the theme now.
+
+   The Bitcoin method row on the chooser is still the one deliberate exception
+   — it is handled above and stays dark in both. Notes (.fund-warn-card,
+   .fund-cs-note) are left alone on purpose: they are translucent panels on the
+   page background rather than cards, and read correctly on blue and on navy
+   alike. */
+body:not(.dark) .fund-timer-wrap,
+body:not(.dark) .fund-amt,
+body:not(.dark) .fund-qr-card,
+body:not(.dark) .fund-buy,
+body:not(.dark) .fund-status {
+  background: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(8, 20, 50, 0.08);
+}
+
+/* Primary ink on those cards. */
+body:not(.dark) .fund-timer-val,
+body:not(.dark) .fund-amt-btc,
+body:not(.dark) .fund-addr,
+body:not(.dark) .fund-buy-t,
+body:not(.dark) .fund-p-n,
+body:not(.dark) .fund-status-t { color: #111827; }
+
+/* Secondary ink. */
+body:not(.dark) .fund-amt-usd { color: #6B7280; }
+
+/* Muted ink — labels and asides. */
+body:not(.dark) .fund-timer-lab,
+body:not(.dark) .fund-amt-lab,
+body:not(.dark) .fund-addr-lab,
+body:not(.dark) .fund-net,
+body:not(.dark) .fund-buy-s,
+body:not(.dark) .fund-p-d,
+body:not(.dark) .fund-buy-tip,
+body:not(.dark) .fund-status-s { color: #8B95AB; }
+
+body:not(.dark) .fund-amt-rate { color: #9AA4B8; border-top-color: #EEF1F7; }
+body:not(.dark) .fund-net b { color: #6B7280; }
+
+/* Insets — the address strip and the provider rows sit inside a card, so they
+   need a surface a step down from white rather than a step up from black. */
+body:not(.dark) .fund-addr-row,
+body:not(.dark) .fund-prov {
+  background: #F7F8FB;
+  border-color: #EEF1F7;
+}
+
+body:not(.dark) .fund-prov:active { background: #EEF1F7; }
+
+/* Icon strokes. The Bitcoin row carries no chevron — it has .fund-m-check —
+   so this cannot reach it. */
+body:not(.dark) .fund-chev { stroke: #9AA4B8; }
+body:not(.dark) .fund-p-ext { stroke: #9AA4B8; }
+
+/* The timer bar's track, and the red it turns when time runs short: #F87171 is
+   pitched for a dark surface and goes weak on white. */
+body:not(.dark) .fund-bar { background: #EEF1F7; }
+body:not(.dark) .fund-timer-val.fund-warn { color: #EF4444; }
+body:not(.dark) .fund-bar-f.fund-warn { background: #EF4444; }
+
+/* ---- fund amount screen · theme ----
+   The amount card is the mirror image of the problem above: a white card at
+   every theme, which left it glaring on the near-black background. Its ink
+   flips with it, since near-black digits on a near-black card are no digits
+   at all. The focus ring is left to the rule above so it still fires. */
+body.dark .fund-amount-card {
+  background: #0F1523;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.dark .fund-amount-cur,
+body.dark .fund-amount-field input { color: #F5F7FA; }
+
+body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
+
+/* The dimmed state of the currency mark is a two-class rule, which the theme
+   rule above would otherwise outrank on specificity — restated so an empty
+   field still reads as empty in dark mode. */
+body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
