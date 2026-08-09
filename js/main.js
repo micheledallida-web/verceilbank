@@ -258,6 +258,24 @@ if (supabaseClient) {
 const ALERTS_SEEN_KEY = 'verceil_alerts_seen_at';
 const alertsBadge = document.getElementById('alertsBadge');
 
+// Every payment and transfer on record, newest first. The badge counts the
+// ones since Alerts was last opened; the dropdown lists them all, so opening
+// it never empties the list it just cleared the count for.
+let alertsFeed = [];
+
+function alertItems() {
+  if (!alertsFeed.length) {
+    return [{ label: 'No notifications', sublabel: 'Activity on your accounts will show up here.', inert: true }];
+  }
+  return alertsFeed.map(entry => ({
+    label: entry.label,
+    sublabel: new Date(entry.date).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }),
+    inert: true,
+  }));
+}
+
 function setAlertsCount(count) {
   if (!alertsBadge) return;
   alertsBadge.textContent = String(count);
@@ -284,10 +302,23 @@ async function refreshAlertsBadge() {
     const since = seenAt || new Date(0).toISOString();
 
     const [{ data: payments }, { data: transfers }] = await Promise.all([
-      supabaseClient.from('payments').select('created_at').eq('user_id', user.id).gt('created_at', since),
-      supabaseClient.from('transfers').select('created_at').eq('user_id', user.id).gt('created_at', since),
+      supabaseClient.from('payments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
+      supabaseClient.from('transfers').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
     ]);
-    setAlertsCount((payments ? payments.length : 0) + (transfers ? transfers.length : 0));
+
+    alertsFeed = [
+      ...(payments || []).map(payment => ({
+        label: `Payment to ${payment.recipient_name || 'recipient'} · ${formatCurrency(payment.amount || 0)}`,
+        date: payment.created_at,
+      })),
+      ...(transfers || []).map(transfer => ({
+        label: `Transfer ${transfer.from_account} → ${transfer.to_account}`,
+        date: transfer.created_at,
+      })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
+
+    // Only what landed since Alerts was last opened drives the badge.
+    setAlertsCount(alertsFeed.filter(entry => entry.date > since).length);
   } catch (err) {
     console.error('Alerts badge error:', err);
   }
@@ -310,15 +341,24 @@ function openHeaderDropdown(key, anchorEl) {
   const textColor = isLight ? '#111827' : '#FFFFFF';
   const chevronColor = isLight ? '#6B7280' : '#8E9CBA';
 
-  headerDropdownList.innerHTML = menu.items.map((item, idx) => {
+  // Alerts is a list of things that happened rather than a menu, so its rows
+  // carry a timestamp and go nowhere when tapped.
+  const items = key === 'alerts' ? alertItems() : menu.items;
+
+  headerDropdownList.innerHTML = items.map((item, idx) => {
     const label = typeof item === 'string' ? item : item.label;
-    const isLast = idx === menu.items.length - 1;
+    const sublabel = typeof item === 'string' ? '' : (item.sublabel || '');
+    const inert = typeof item !== 'string' && item.inert;
+    const isLast = idx === items.length - 1;
     return `
-      <button class="header-dropdown-item w-full flex items-center gap-[12px] px-[16px] transition-colors duration-200 cursor-pointer text-left"
-        style="height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${textColor};"
-        data-label="${label}">
-        <span class="flex-1 text-[15px] font-medium truncate">${label}</span>
-        <svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <button class="header-dropdown-item w-full flex items-center gap-[12px] px-[16px] py-[10px] transition-colors duration-200 ${inert ? 'cursor-default' : 'cursor-pointer'} text-left"
+        style="min-height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${textColor};"
+        data-label="${label}" ${inert ? 'data-inert="1"' : ''}>
+        <span class="flex-1 min-w-0">
+          <span class="block text-[15px] font-medium truncate">${label}</span>
+          ${sublabel ? `<span class="block text-[12px] font-normal truncate" style="color:${chevronColor};">${sublabel}</span>` : ''}
+        </span>
+        ${inert ? '' : `<svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`}
       </button>
     `;
   }).join('');
@@ -340,6 +380,8 @@ function openHeaderDropdown(key, anchorEl) {
     btn.addEventListener('click', () => {
       const clickedLabel = btn.getAttribute('data-label');
       closeHeaderDropdown();
+      // A notification row is a record, not a destination.
+      if (btn.getAttribute('data-inert')) return;
       if (key === 'appearance') {
         if (clickedLabel === 'Light Mode') applyTheme(false);
         else if (clickedLabel === 'Dark Mode') applyTheme(true);
@@ -580,8 +622,9 @@ async function initSupabaseData() {
     setText('homeDeposits', deposits);
     setText('homeInvestments', totals.investments);
     setText('homeCardBalance', totals.credit);
-    // The card balance is money owed, not held, so it is not added in.
-    setText('homeTotalBalance', deposits + totals.investments);
+    // The card balance is money owed, so it comes off the total rather than
+    // sitting beside it as a figure that looks like it might be yours.
+    setText('homeTotalBalance', deposits + totals.investments - totals.credit);
   }
 
   function applyAccountRow(acc) {

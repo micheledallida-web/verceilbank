@@ -1466,3 +1466,17 @@ body.dark {
 
 .dark .home-nv.home-nv-on svg { stroke: #3B82F6; }
 .dark .home-nv.home-nv-on span { color: #3B82F6; }
+
+/* The front/back uploads ride directly under the ID type they belong to,
+   inset behind a rule so they read as that card's own requirements rather
+   than a separate list further down the page. */
+.vf-typedocs { display: none; }
+
+.vf-typedocs.vf-typedocs-open {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-left: 16px;
+  padding-left: 14px;
+  border-left: 2px solid rgba(255, 255, 255, 0.28);
+}
