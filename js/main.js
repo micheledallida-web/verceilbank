@@ -34,8 +34,14 @@ export function genRef() {
   return 'VB-' + Math.random().toString(36).slice(2, 10).toUpperCase();
 }
 
+// The sign goes outside the symbol — "-$45.50", not "$-45.50", which is how
+// every US bank writes an overdraft and the only form people read at a glance.
 export function formatCurrency(n) {
-  return `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // Rounded to cents before the sign is read, so a value that is fractionally
+  // below zero renders as "$0.00" rather than a negative zero.
+  const cents = Math.round((Number(n) || 0) * 100);
+  const digits = (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${cents < 0 ? '-' : ''}$${digits}`;
 }
 
 export function parseBalanceText(text) {
@@ -258,6 +264,24 @@ if (supabaseClient) {
 const ALERTS_SEEN_KEY = 'verceil_alerts_seen_at';
 const alertsBadge = document.getElementById('alertsBadge');
 
+// Every payment and transfer on record, newest first. The badge counts the
+// ones since Alerts was last opened; the dropdown lists them all, so opening
+// it never empties the list it just cleared the count for.
+let alertsFeed = [];
+
+function alertItems() {
+  if (!alertsFeed.length) {
+    return [{ label: 'No notifications', sublabel: 'Activity on your accounts will show up here.', inert: true }];
+  }
+  return alertsFeed.map(entry => ({
+    label: entry.label,
+    sublabel: new Date(entry.date).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    }),
+    inert: true,
+  }));
+}
+
 function setAlertsCount(count) {
   if (!alertsBadge) return;
   alertsBadge.textContent = String(count);
@@ -284,10 +308,23 @@ async function refreshAlertsBadge() {
     const since = seenAt || new Date(0).toISOString();
 
     const [{ data: payments }, { data: transfers }] = await Promise.all([
-      supabaseClient.from('payments').select('created_at').eq('user_id', user.id).gt('created_at', since),
-      supabaseClient.from('transfers').select('created_at').eq('user_id', user.id).gt('created_at', since),
+      supabaseClient.from('payments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
+      supabaseClient.from('transfers').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
     ]);
-    setAlertsCount((payments ? payments.length : 0) + (transfers ? transfers.length : 0));
+
+    alertsFeed = [
+      ...(payments || []).map(payment => ({
+        label: `Payment to ${payment.recipient_name || 'recipient'} · ${formatCurrency(payment.amount || 0)}`,
+        date: payment.created_at,
+      })),
+      ...(transfers || []).map(transfer => ({
+        label: `Transfer ${transfer.from_account} → ${transfer.to_account}`,
+        date: transfer.created_at,
+      })),
+    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
+
+    // Only what landed since Alerts was last opened drives the badge.
+    setAlertsCount(alertsFeed.filter(entry => entry.date > since).length);
   } catch (err) {
     console.error('Alerts badge error:', err);
   }
@@ -310,15 +347,24 @@ function openHeaderDropdown(key, anchorEl) {
   const textColor = isLight ? '#111827' : '#FFFFFF';
   const chevronColor = isLight ? '#6B7280' : '#8E9CBA';
 
-  headerDropdownList.innerHTML = menu.items.map((item, idx) => {
+  // Alerts is a list of things that happened rather than a menu, so its rows
+  // carry a timestamp and go nowhere when tapped.
+  const items = key === 'alerts' ? alertItems() : menu.items;
+
+  headerDropdownList.innerHTML = items.map((item, idx) => {
     const label = typeof item === 'string' ? item : item.label;
-    const isLast = idx === menu.items.length - 1;
+    const sublabel = typeof item === 'string' ? '' : (item.sublabel || '');
+    const inert = typeof item !== 'string' && item.inert;
+    const isLast = idx === items.length - 1;
     return `
-      <button class="header-dropdown-item w-full flex items-center gap-[12px] px-[16px] transition-colors duration-200 cursor-pointer text-left"
-        style="height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${textColor};"
-        data-label="${label}">
-        <span class="flex-1 text-[15px] font-medium truncate">${label}</span>
-        <svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <button class="header-dropdown-item w-full flex items-center gap-[12px] px-[16px] py-[10px] transition-colors duration-200 ${inert ? 'cursor-default' : 'cursor-pointer'} text-left"
+        style="min-height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${textColor};"
+        data-label="${label}" ${inert ? 'data-inert="1"' : ''}>
+        <span class="flex-1 min-w-0">
+          <span class="block text-[15px] font-medium truncate">${label}</span>
+          ${sublabel ? `<span class="block text-[12px] font-normal truncate" style="color:${chevronColor};">${sublabel}</span>` : ''}
+        </span>
+        ${inert ? '' : `<svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`}
       </button>
     `;
   }).join('');
@@ -340,6 +386,8 @@ function openHeaderDropdown(key, anchorEl) {
     btn.addEventListener('click', () => {
       const clickedLabel = btn.getAttribute('data-label');
       closeHeaderDropdown();
+      // A notification row is a record, not a destination.
+      if (btn.getAttribute('data-inert')) return;
       if (key === 'appearance') {
         if (clickedLabel === 'Light Mode') applyTheme(false);
         else if (clickedLabel === 'Dark Mode') applyTheme(true);
@@ -567,68 +615,120 @@ async function initSupabaseData() {
 
   let userName = 'Mercy';
 
-  // Running totals behind the hero. Each account writes its own figure here
-  // so the header adds up to exactly what the cards below it show.
-  const totals = { checking: 0, savings: 0, interestChecking: 0, investments: 0, credit: 0 };
+  // Every account we know about, keyed by its row id. Totals are derived from
+  // this map rather than accumulated as rows arrive, so re-applying the same
+  // account updates it in place and two accounts of the same type add together
+  // instead of the second overwriting the first.
+  const accountsById = new Map();
 
-  function renderTotals() {
-    const deposits = totals.checking + totals.savings + totals.interestChecking;
-    const setText = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = formatCurrency(value);
-    };
-    setText('homeDeposits', deposits);
-    setText('homeInvestments', totals.investments);
-    setText('homeCardBalance', totals.credit);
-    // The card balance is money owed, not held, so it is not added in.
-    setText('homeTotalBalance', deposits + totals.investments);
+  // Money is summed in cents. Adding dollars as floats drifts — .10 + .20
+  // lands on 0.30000000000000004 — and a balance that is a cent out is worse
+  // than no balance at all.
+  function toCents(value) {
+    return Math.round((Number(value) || 0) * 100);
   }
 
-  function applyAccountRow(acc) {
-    const val = formatCurrency(acc.balance);
-    if (acc.account_type === 'checking') {
-      const el = document.getElementById('checkingBalance');
-      if (el) el.textContent = val;
-      totals.checking = Number(acc.balance) || 0;
-    } else if (acc.account_type === 'savings') {
-      const el = document.getElementById('savingsBalance');
-      if (el) el.textContent = val;
-      totals.savings = Number(acc.balance) || 0;
-    } else if (acc.account_type === 'investments') {
-      const el = document.getElementById('investmentsBalance');
-      if (el) el.textContent = val;
-      totals.investments = Number(acc.balance) || 0;
-    } else if (acc.account_type === 'interest_checking') {
-      const el = document.getElementById('interestCheckingBalance');
-      if (el) el.textContent = val;
-      totals.interestChecking = Number(acc.balance) || 0;
-      const section = document.getElementById('sectionInterestChecking');
-      const promo = document.getElementById('promoBanner');
-      // Once it is open it is an account, not an offer.
-      if (section) section.classList.remove('hidden');
-      if (promo) promo.classList.add('hidden');
-    } else if (acc.account_type === 'credit') {
-      if (acc.status === 'approved' || Number(acc.balance) > 0 || Number(acc.available_credit) > 0) {
-        totals.credit = Number(acc.balance) || 0;
-        const section = document.getElementById('sectionCredit');
-        const offer = document.getElementById('offerCredit');
-        if (section) section.classList.remove('hidden');
-        if (offer) offer.classList.add('hidden');
+  const DEPOSIT_TYPES = ['checking', 'savings', 'interest_checking'];
 
-        const balanceEl = document.getElementById('creditBalance');
-        if (balanceEl) balanceEl.textContent = val;
-        const sublabel = document.getElementById('creditSublabel');
-        if (sublabel && acc.available_credit !== undefined) {
-          sublabel.textContent = `${formatCurrency(acc.available_credit)} available`;
-        }
-        const numberEl = document.getElementById('creditNumber');
-        if (numberEl && acc.account_number) {
-          numberEl.textContent = `•${acc.account_number.slice(-4)}`;
-        }
+  // A card counts as real once it is approved or has any activity against it.
+  function isActiveCard(acc) {
+    return acc.account_type === 'credit'
+      && (acc.status === 'approved' || Number(acc.balance) > 0 || Number(acc.available_credit) > 0);
+  }
+
+  // This table has no 'open' status: rows are written with status 'approved'
+  // and deposit rows carry no status at all, so testing for 'open' would
+  // exclude every account. A row counts unless it says it is shut.
+  const CLOSED_STATUSES = ['closed', 'cancelled', 'canceled', 'suspended', 'frozen'];
+
+  function isOpenAccount(acc) {
+    return !CLOSED_STATUSES.includes(String(acc.status || '').toLowerCase());
+  }
+
+  // Closed accounts are excluded here rather than in each caller, so no total
+  // can pick up a shut account by forgetting to ask.
+  function sumCents(matches) {
+    let cents = 0;
+    accountsById.forEach(acc => {
+      if (isOpenAccount(acc) && matches(acc)) cents += toCents(acc.balance);
+    });
+    return cents;
+  }
+
+  function setText(id, cents) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = formatCurrency(cents / 100);
+  }
+
+  function firstMatch(matches) {
+    let found = null;
+    accountsById.forEach(acc => {
+      if (!found && isOpenAccount(acc) && matches(acc)) found = acc;
+    });
+    return found;
+  }
+
+  function renderTotals() {
+    const deposits = sumCents(acc => DEPOSIT_TYPES.includes(acc.account_type));
+    const investments = sumCents(acc => acc.account_type === 'investments');
+    const cardDebt = sumCents(isActiveCard);
+
+    // Each card shows the total across every account of its type, so the
+    // hero's Deposits is exactly the three cards beneath it added up.
+    setText('checkingBalance', sumCents(acc => acc.account_type === 'checking'));
+    setText('savingsBalance', sumCents(acc => acc.account_type === 'savings'));
+    setText('interestCheckingBalance', sumCents(acc => acc.account_type === 'interest_checking'));
+    setText('investmentsBalance', investments);
+    setText('creditBalance', cardDebt);
+
+    setText('homeDeposits', deposits);
+    setText('homeInvestments', investments);
+    setText('homeCardBalance', cardDebt);
+    // Total balance is deposit money only, the way a bank states it. Investment
+    // value is a market figure that moves on its own and is reported beside the
+    // total, not inside it; a card balance is money owed to the issuer, so it
+    // is shown as its own line rather than netted off cash on hand.
+    setText('homeTotalBalance', deposits);
+
+    const hasInterestChecking = !!firstMatch(acc => acc.account_type === 'interest_checking');
+    const card = firstMatch(isActiveCard);
+    toggleSection('sectionInterestChecking', 'promoBanner', hasInterestChecking);
+    toggleSection('sectionCredit', 'offerCredit', !!card);
+
+    if (card) {
+      const sublabel = document.getElementById('creditSublabel');
+      if (sublabel && card.available_credit !== undefined && card.available_credit !== null) {
+        sublabel.textContent = `${formatCurrency(card.available_credit)} available`;
+      }
+      const numberEl = document.getElementById('creditNumber');
+      if (numberEl && card.account_number) {
+        numberEl.textContent = `•${String(card.account_number).slice(-4)}`;
       }
     }
-    renderTotals();
+
     refreshOffersLabel();
+  }
+
+  // Once an account is open it is an account, not an offer.
+  function toggleSection(sectionId, offerId, isOpen) {
+    const section = document.getElementById(sectionId);
+    const offer = document.getElementById(offerId);
+    if (section) section.classList.toggle('hidden', !isOpen);
+    if (offer) offer.classList.toggle('hidden', isOpen);
+  }
+
+  // Rows without an id (the offline fallback below) are keyed by type, which
+  // is the best identity available and still cannot double-count itself.
+  function applyAccountRow(acc) {
+    if (!acc || !acc.account_type) return;
+    accountsById.set(acc.id != null ? `id:${acc.id}` : `type:${acc.account_type}`, acc);
+    renderTotals();
+  }
+
+  function removeAccountRow(acc) {
+    if (!acc) return;
+    accountsById.delete(acc.id != null ? `id:${acc.id}` : `type:${acc.account_type}`);
+    renderTotals();
   }
 
   // "Available to You" only makes sense while something is still on offer.
@@ -642,14 +742,18 @@ async function initSupabaseData() {
   }
 
   // Demo-mode fallback: if the Interest Checking account was opened while
-  // Supabase was unavailable (or before a session exists), still reveal it
-  // from the locally cached flag so the dashboard reflects prior activity.
-  try {
-    if (localStorage.getItem('verceil_interest_checking_opened') === '1') {
+  // Supabase was unavailable, reveal it from the locally cached flag. Applied
+  // only when the server returned nothing — otherwise a stale cached figure
+  // would sit in the deposits total next to the real accounts.
+  function applyCachedInterestChecking() {
+    try {
+      if (localStorage.getItem('verceil_interest_checking_opened') !== '1') return;
       const cachedBalance = Number(localStorage.getItem('verceil_interest_checking_balance') || 0);
       applyAccountRow({ account_type: 'interest_checking', balance: cachedBalance });
-    }
-  } catch (err) {}
+    } catch (err) {}
+  }
+
+  if (!supabaseClient) applyCachedInterestChecking();
 
   if (supabaseClient) {
     try {
@@ -669,14 +773,26 @@ async function initSupabaseData() {
         if (accountsData && !accountsError) {
           accountsData.forEach(applyAccountRow);
         }
-      }
+        if (!accountsById.size) applyCachedInterestChecking();
 
-      supabaseClient
-        .channel('public:accounts')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, (payload) => {
-          if (payload.new) applyAccountRow(payload.new);
-        })
-        .subscribe();
+        // Scoped to this user. An unfiltered subscription hands you every
+        // other account holder's updates, and applyAccountRow would happily
+        // fold a stranger's balance into these totals.
+        supabaseClient
+          .channel(`accounts:${user.id}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'accounts',
+            filter: `user_id=eq.${user.id}`,
+          }, (payload) => {
+            if (payload.eventType === 'DELETE') removeAccountRow(payload.old);
+            else if (payload.new) applyAccountRow(payload.new);
+          })
+          .subscribe();
+      } else {
+        applyCachedInterestChecking();
+      }
     } catch (err) {
       console.error('Supabase data fetch error:', err);
     }

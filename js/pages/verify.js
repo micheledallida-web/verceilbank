@@ -109,6 +109,7 @@ export function init(root, ctx) {
 
   const idTypeCards = root.querySelectorAll('.kyc-idtype');
   const idTypeEmpty = root.querySelector('#vfIdTypeEmpty');
+  const typeDocs = root.querySelector('#vfTypeDocs');
 
   // Required text fields, by id. Apt/Unit is deliberately absent.
   const REQUIRED_TEXT_IDS = ['vfFirstName', 'vfLastName', 'vfDob', 'vfAddress1', 'vfCity', 'vfState'];
@@ -204,6 +205,7 @@ export function init(root, ctx) {
 
     if (!spec) {
       idTypeEmpty.classList.remove('hidden');
+      typeDocs.classList.remove('vf-typedocs-open');
       front.classList.add('hidden');
       back.classList.add('hidden');
       selfie.classList.add('hidden');
@@ -213,6 +215,12 @@ export function init(root, ctx) {
     idTypeEmpty.classList.add('hidden');
     front.classList.remove('hidden');
     selfie.classList.remove('hidden');
+
+    // Park the uploads immediately beneath the card that asked for them, so
+    // "Front" and "Back" can never be read against the wrong ID type.
+    const selectedCard = root.querySelector(`.kyc-idtype[data-idtype="${selectedIdType}"]`);
+    if (selectedCard) selectedCard.insertAdjacentElement('afterend', typeDocs);
+    typeDocs.classList.add('vf-typedocs-open');
 
     setSlotText('idFront', spec.frontTitle, spec.frontHint);
     if (spec.needsBack) {
