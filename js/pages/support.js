@@ -508,6 +508,15 @@ export async function init(root, ctx, options) {
 
   showView(root, 'home');
   await loadThreads(root, ctx);
+
+  // Deep link straight to one conversation — a support notification names the
+  // thread it is about, and landing on the list instead would make the reader
+  // hunt for it. The list is loaded either way, so backing out lands somewhere
+  // real rather than on an empty screen.
+  if (options && options.view === 'thread' && options.threadId) {
+    const target = threads.find((entry) => String(entry.id) === String(options.threadId));
+    if (target) await openThread(root, ctx, target);
+  }
 }
 
 export function cleanup() {

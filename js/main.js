@@ -134,6 +134,7 @@ export async function loadPage(name, ...args) {
     getOrCreateTempNumber,
     showModal,
     openSupportMessage,
+    refreshAlertsBadge,
     signOut: () => handleSignOut(),
   }, ...args);
 
@@ -169,10 +170,9 @@ window.openSupportMessage = openSupportMessage;
 const greetingLine1 = document.getElementById('greetingLine1');
 const greetingLine2 = document.getElementById('greetingLine2');
 
-// ---------- Header dropdown (Appearance / Alerts / Messages / Profile) ----------
+// ---------- Header dropdown (Appearance / Messages / Profile) ----------
 const headerMenus = {
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode', 'System Default'] },
-  alerts: { title: 'Alerts', items: ['Transaction Alerts', 'Security Alerts', 'Payment Reminders', 'Account Notifications', 'Notification Settings'] },
   messages: { title: 'Messages', items: ['Secure Inbox', 'Contact Support', 'Live Chat', 'Schedule an Appointment'] },
   profile: { title: 'Profile', items: ['My Profile', 'Linked Accounts', 'Notification Preferences', 'Privacy & Data Settings', 'Sign Out'] },
 };
@@ -256,30 +256,10 @@ if (supabaseClient) {
 }
 
 // ---------- Alerts badge ----------
-// The badge was a hardcoded 3, so a brand-new account greeted you with three
-// notifications it could not name. It now counts real recorded activity —
-// payments and transfers newer than the last time Alerts was opened — and
-// stays hidden entirely at zero.
-const ALERTS_SEEN_KEY = 'verceil_alerts_seen_at';
+// The badge counts unread notifications and nothing else, so it is the same
+// number the Notifications view is showing and the two can never disagree. It
+// stays hidden entirely at zero rather than rendering a badge reading "0".
 const alertsBadge = document.getElementById('alertsBadge');
-
-// Every payment and transfer on record, newest first. The badge counts the
-// ones since Alerts was last opened; the dropdown lists them all, so opening
-// it never empties the list it just cleared the count for.
-let alertsFeed = [];
-
-function alertItems() {
-  if (!alertsFeed.length) {
-    return [{ label: 'No notifications', sublabel: 'Activity on your accounts will show up here.', inert: true }];
-  }
-  return alertsFeed.map(entry => ({
-    label: entry.label,
-    sublabel: new Date(entry.date).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-    }),
-    inert: true,
-  }));
-}
 
 function setAlertsCount(count) {
   if (!alertsBadge) return;
@@ -288,42 +268,25 @@ function setAlertsCount(count) {
   alertsBadge.classList.toggle('flex', count > 0);
 }
 
-function markAlertsSeen() {
-  try { localStorage.setItem(ALERTS_SEEN_KEY, new Date().toISOString()); } catch (err) {}
-  setAlertsCount(0);
-}
-
-async function refreshAlertsBadge() {
+// Counted on the server rather than by fetching the rows: the badge only ever
+// needs the number, and the Notifications view is what fetches the notifications.
+// Exported so that view can re-run it after a row is read, after Mark all read,
+// and when a new notification arrives over Realtime.
+export async function refreshAlertsBadge() {
   setAlertsCount(0);
   if (!supabaseClient) return;
   try {
     const user = await getCurrentUser();
     if (!user) return;
 
-    let seenAt = '';
-    try { seenAt = localStorage.getItem(ALERTS_SEEN_KEY) || ''; } catch (err) {}
-    // No marker yet means nothing has been opened, so everything on record
-    // counts — which for a fresh account is nothing.
-    const since = seenAt || new Date(0).toISOString();
+    const { count, error } = await supabaseClient
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+    if (error) throw error;
 
-    const [{ data: payments }, { data: transfers }] = await Promise.all([
-      supabaseClient.from('payments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
-      supabaseClient.from('transfers').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(20),
-    ]);
-
-    alertsFeed = [
-      ...(payments || []).map(payment => ({
-        label: `Payment to ${payment.recipient_name || 'recipient'} · ${formatCurrency(payment.amount || 0)}`,
-        date: payment.created_at,
-      })),
-      ...(transfers || []).map(transfer => ({
-        label: `Transfer ${transfer.from_account} → ${transfer.to_account}`,
-        date: transfer.created_at,
-      })),
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 20);
-
-    // Only what landed since Alerts was last opened drives the badge.
-    setAlertsCount(alertsFeed.filter(entry => entry.date > since).length);
+    setAlertsCount(count || 0);
   } catch (err) {
     console.error('Alerts badge error:', err);
   }
@@ -333,8 +296,6 @@ function openHeaderDropdown(key, anchorEl) {
   const menu = headerMenus[key];
   if (!menu) return;
 
-  // Opening Alerts is what marks them read.
-  if (key === 'alerts') markAlertsSeen();
   const isLight = !htmlElement.classList.contains('dark');
 
   headerDropdown.style.background = isLight ? '#FFFFFF' : '#0D1728';
@@ -346,9 +307,7 @@ function openHeaderDropdown(key, anchorEl) {
   const textColor = isLight ? '#111827' : '#FFFFFF';
   const chevronColor = isLight ? '#6B7280' : '#8E9CBA';
 
-  // Alerts is a list of things that happened rather than a menu, so its rows
-  // carry a timestamp and go nowhere when tapped.
-  const items = key === 'alerts' ? alertItems() : menu.items;
+  const items = menu.items;
 
   headerDropdownList.innerHTML = items.map((item, idx) => {
     const label = typeof item === 'string' ? item : item.label;
@@ -409,7 +368,10 @@ function closeHeaderDropdown() {
 
 headerDropdownOverlay.addEventListener('click', closeHeaderDropdown);
 document.getElementById('appearanceBtn').addEventListener('click', (e) => openHeaderDropdown('appearance', e.currentTarget));
-document.getElementById('alertsBtn').addEventListener('click', (e) => openHeaderDropdown('alerts', e.currentTarget));
+// The bell is a doorway to the Notifications screen now, not a dropdown: a
+// notification has to be readable in full, and a 260px box anchored under an
+// icon could not do that.
+document.getElementById('alertsBtn').addEventListener('click', () => loadPage('notifications'));
 document.getElementById('messagesBtn').addEventListener('click', (e) => openHeaderDropdown('messages', e.currentTarget));
 document.getElementById('profilePillBtn').addEventListener('click', (e) => openHeaderDropdown('profile', e.currentTarget));
 
