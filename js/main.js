@@ -297,7 +297,7 @@ const greetingLine2 = document.getElementById('greetingLine2');
 const headerMenus = {
   more: {
     title: 'Quick Actions',
-    items: ['Nickname accounts', 'Reorder accounts', 'Hide an account', 'Download all statements', 'Card Services', 'Settings'],
+    items: ['Download all statements', 'Card Services', 'Settings'],
   },
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode'] },
   messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
@@ -664,11 +664,8 @@ const navMenuRoutes = {
 
 // Labels in the header "quick actions" dropdown that map to a ported screen.
 const headerMenuRoutes = {
-  // Quick actions. Only Card Services and Download all statements have a screen
-  // behind them; the rest open the shared placeholder rather than doing nothing.
-  'Nickname accounts': () => loadPage('coming-soon', 'Nickname accounts'),
-  'Reorder accounts': () => loadPage('coming-soon', 'Reorder accounts'),
-  'Hide an account': () => loadPage('coming-soon', 'Hide an account'),
+  // Quick actions. Settings has no screen of its own yet, so it opens the
+  // shared placeholder rather than doing nothing.
   'Download all statements': () => loadPage('docs-hub'),
   'Card Services': () => loadPage('card-services'),
   'Settings': () => loadPage('coming-soon', 'Settings'),

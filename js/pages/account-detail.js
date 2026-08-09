@@ -83,7 +83,7 @@ const quickActionConfigs = {
     { icon: qaIcons.interest, title: 'Interest Details', subtitle: 'View APY, accrued interest, and monthly earnings.', action: (ctx) => ctx.loadPage('interest-details', 'interest_checking') },
   ],
   investments: [
-    { icon: qaIcons.transfer, title: 'Transfer Funds', subtitle: 'Move money between banking and investment accounts.', action: (ctx) => ctx.loadPage('transfer') },
+    { icon: qaIcons.deposit, title: 'Add Funds', subtitle: 'Add money to your investment account.', action: (ctx) => ctx.loadPage('fund-account') },
     { icon: qaIcons.buy, title: 'Buy Investments', subtitle: 'Purchase stocks, ETFs, or mutual funds.', action: (ctx) => ctx.loadPage('trade', 'buy') },
     { icon: qaIcons.sell, title: 'Sell Investments', subtitle: 'Sell holdings and move proceeds to cash.', action: (ctx) => ctx.loadPage('trade', 'sell') },
     { icon: qaIcons.portfolio, title: 'Portfolio Details', subtitle: 'View holdings, performance, and investment activity.', action: (ctx) => ctx.loadPage('portfolio') },
