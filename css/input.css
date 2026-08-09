@@ -1472,9 +1472,19 @@ body.dark {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
 }
 
-.home-promo-card .home-promo-art { color: rgba(17, 24, 39, 0.12); }
+/* The Signature Card's artwork is a card in its own right rather than a
+   background wash: it is drawn whole, parked in the top-right corner, and
+   stops above the pill row so nothing crops it or runs across it. */
+.home-promo-card .home-promo-art {
+  top: 14px;
+  right: 16px;
+  bottom: auto;
+  width: 120px;
+  height: 82px;
+  align-items: flex-start;
+}
 
-.dark .home-promo-card .home-promo-art { color: rgba(255, 255, 255, 0.12); }
+.home-promo-card .home-promo-head { padding-right: 130px; }
 
 .home-promo-card .home-promo-eyebrow { color: #1D61F2; }
 
