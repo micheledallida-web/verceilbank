@@ -16,7 +16,6 @@ export function init(root, ctx) {
   on(root.querySelector('#contactVideoBtn'), 'click', () => {
     showModal('Video Banking', 'Video banking sessions require a scheduled slot with an available specialist. This feature is coming soon.');
   });
-  on(root.querySelector('#contactMsgBtn'), 'click', () => loadPage('secure-messages'));
   on(root.querySelector('#contactBranchBtn'), 'click', async () => {
     try {
       if (!supabaseClient) throw new Error('Supabase client not available');
