@@ -48,15 +48,65 @@ export function parseBalanceText(text) {
   return Number(String(text).replace(/[^0-9.-]/g, '')) || 0;
 }
 
+// The routing number belongs to the bank and the account number is issued by a
+// database trigger on insert. Both used to be invented here — a random nine
+// digits cached in localStorage — which meant the same account showed different
+// numbers in two browsers, and a direct-deposit form could be filled in with an
+// account number that existed nowhere but that device.
+//
+// Nothing is generated now. Both come from the server, and an empty string is
+// returned while they are still loading: a blank field is honest, a fabricated
+// routing number on a deposit slip is not. The name is kept because callers
+// across six screens use it.
 export function getOrCreateTempNumber(type, kind) {
-  const key = `verceil_temp_${kind}_${type}`;
-  let val = null;
-  try { val = localStorage.getItem(key); } catch (e) {}
-  if (!val) {
-    val = String(Math.floor(100000000 + Math.random() * 900000000));
-    try { localStorage.setItem(key, val); } catch (e) {}
+  if (kind === 'routing') return bankRoutingNumber;
+  return accountNumbersByType[type] || '';
+}
+
+// ---------- Bank reference data ----------
+// Read once per session and shared by every screen that prints these, rather
+// than each screen asking for itself.
+let bankRoutingNumber = '';
+let accountNumbersByType = {};
+
+// Whether the user holds a card at all. Card Services is left out of the menu
+// entirely when they do not, rather than shown and then apologised for.
+let hasOpenCreditCard = false;
+
+async function loadBankReference() {
+  if (!supabaseClient) return;
+
+  try {
+    const { data: settings, error } = await supabaseClient
+      .from('bank_settings')
+      .select('routing_number')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error) throw error;
+    if (settings && settings.routing_number) bankRoutingNumber = String(settings.routing_number);
+  } catch (err) {
+    console.error('Bank settings error:', err);
   }
-  return val;
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) return;
+    const { data: rows, error } = await supabaseClient
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id);
+    if (error) throw error;
+
+    (rows || []).forEach((row) => {
+      if (row && row.account_type && row.account_number) {
+        accountNumbersByType[row.account_type] = String(row.account_number);
+      }
+    });
+
+    hasOpenCreditCard = (rows || []).some((row) => row && row.product_type === 'credit_card' && row.status === 'open');
+  } catch (err) {
+    console.error('Account reference error:', err);
+  }
 }
 
 // ---------- Theme ----------
@@ -382,7 +432,92 @@ document.getElementById('cardInvestments').addEventListener('click', () => loadP
 document.getElementById('cardCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 document.getElementById('cardInterestChecking').addEventListener('click', () => loadPage('account-detail', 'interest_checking'));
 document.getElementById('promoBanner').addEventListener('click', () => loadPage('interest-checking'));
-document.getElementById('offerCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
+// ---------- Signature Card eligibility ----------
+const CARD_ELIGIBILITY_MONTHS = 8;
+let cardApplicationEligible = false;
+
+// Whole months only, so someone who joined on the 30th is not credited with a
+// month on the 1st.
+function wholeMonthsSince(from, to) {
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  if (to.getDate() < from.getDate()) months -= 1;
+  return Math.max(0, months);
+}
+
+function eligibilityMonthLabel(from) {
+  const reached = new Date(from.getFullYear(), from.getMonth() + CARD_ELIGIBILITY_MONTHS, from.getDate());
+  return reached.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// The offer row is shown or hidden by the accounts data as it arrives. The note
+// belongs to that row, so it follows the row's own class rather than the
+// balance code having to know a note exists.
+function syncCreditNoteVisibility() {
+  const offer = document.getElementById('offerCredit');
+  const note = document.getElementById('offerCreditNote');
+  if (!offer || !note) return;
+  note.classList.toggle('hidden', offer.classList.contains('hidden'));
+}
+
+async function renderCardEligibility() {
+  const offer = document.getElementById('offerCredit');
+  const note = document.getElementById('offerCreditNote');
+  const apply = document.getElementById('creditCardRightContent');
+  if (!offer || !note || !apply) return;
+
+  let joined = null;
+  try {
+    const user = await getCurrentUser();
+    if (user) {
+      // The profile row carries the membership date; the auth user's own
+      // created_at is the fallback, since that one always exists.
+      let profileCreated = null;
+      if (supabaseClient) {
+        const { data } = await supabaseClient
+          .from('user_profile')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data && data.created_at) profileCreated = data.created_at;
+      }
+      const candidate = new Date(profileCreated || user.created_at);
+      if (!isNaN(candidate)) joined = candidate;
+    }
+  } catch (err) {
+    console.error('Card eligibility error:', err);
+  }
+
+  const months = joined ? wholeMonthsSince(joined, new Date()) : 0;
+  // An unknown join date is treated as not yet eligible. Guessing in the user's
+  // favour here would start an application the bank cannot honour.
+  cardApplicationEligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
+
+  if (cardApplicationEligible) {
+    apply.style.color = '#2563EB';
+    offer.style.cursor = 'pointer';
+    note.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
+  } else {
+    apply.style.color = '#8B95AB';
+    offer.style.cursor = 'default';
+    const when = joined ? eligibilityMonthLabel(joined) : 'a later date';
+    note.textContent = `Available after ${CARD_ELIGIBILITY_MONTHS} months of membership. You've been a member for ${months} months — eligible ${when}.`;
+  }
+
+  syncCreditNoteVisibility();
+}
+
+const offerCreditEl = document.getElementById('offerCredit');
+if (offerCreditEl) {
+  new MutationObserver(syncCreditNoteVisibility)
+    .observe(offerCreditEl, { attributes: true, attributeFilter: ['class'] });
+}
+
+// Support is the application channel — there is no form. Under eight months the
+// row is inert rather than leading somewhere that turns the user away.
+document.getElementById('offerCredit').addEventListener('click', () => {
+  if (!cardApplicationEligible) return;
+  openSupportMessage({ category: 'card_application', subject: 'Credit Card Application' });
+});
 
 // ---------- Quick actions (from the old account summary) ----------
 document.getElementById('homeQuickTransfer').addEventListener('click', () => loadPage('transfer'));
@@ -608,7 +743,13 @@ function openNavMenu(key) {
       </div>
     ` : '');
   } else {
-    navMenuList.innerHTML = menu.items.map(item => `
+    // Card Services is only a destination for someone who holds a card. With
+    // no card the row is left out rather than rendered disabled or opening a
+    // page whose only job is to say you have nothing here.
+    const items = key === 'navSupport' && !hasOpenCreditCard
+      ? menu.items.filter((item) => item !== 'Card Services')
+      : menu.items;
+    navMenuList.innerHTML = items.map(item => `
       <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer text-left">
         <span class="text-[15px] font-medium text-[#111827] dark:text-[#FFFFFF]">${item}</span>
         <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -864,6 +1005,10 @@ async function initSupabaseData() {
 
 initSupabaseData();
 refreshAlertsBadge();
+// The routing number, the server-issued account numbers and whether a card is
+// held are all read once here, then reused by every screen that needs them.
+loadBankReference();
+renderCardEligibility();
 
 // Investments card sparkline. Runs on its own animation loop, and parks itself
 // when the tab is hidden or the card scrolls out of view.
