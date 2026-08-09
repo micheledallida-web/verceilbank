@@ -59,14 +59,27 @@ export function parseBalanceText(text) {
 // routing number on a deposit slip is not. The name is kept because callers
 // across six screens use it.
 export function getOrCreateTempNumber(type, kind) {
-  if (kind === 'routing') return bankRoutingNumber;
+  if (kind === 'routing') {
+    return NO_ROUTING_ACCOUNT_TYPES.includes(type) ? '' : bankRoutingNumber;
+  }
   return accountNumbersByType[type] || '';
 }
 
 // ---------- Bank reference data ----------
 // Read once per session and shared by every screen that prints these, rather
 // than each screen asking for itself.
-let bankRoutingNumber = '';
+
+// The routing number identifies the bank, not the customer, so it is the same
+// on every account it applies to and does not vary between users — only the
+// account number does. It is a constant here so a screen is never blank waiting
+// on the network, and bank_settings still overrides it if the bank ever moves.
+const DEFAULT_ROUTING_NUMBER = '856919671';
+
+// A brokerage account is not a deposit account: it has no ABA routing number to
+// show, so asking for one returns nothing rather than the bank's.
+const NO_ROUTING_ACCOUNT_TYPES = ['investments'];
+
+let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
 let accountNumbersByType = {};
 
 // Whether the user holds a card at all. Card Services is left out of the menu
