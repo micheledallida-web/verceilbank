@@ -1463,3 +1463,13 @@ body.dark {
   padding-left: 14px;
   border-left: 2px solid rgba(255, 255, 255, 0.28);
 }
+
+/* ================= FUND ACCOUNT — other payment methods =================
+   The four support-routed funding rows reuse .fund-method and .fund-m-icon
+   wholesale. The only thing that is new is the colour that tells one tile
+   from another, which is the same split .fund-m-btc already uses for the
+   Bitcoin row. */
+.fund-m-zelle { background: #6D1ED4; color: #fff; }
+.fund-m-cashapp { background: #00C244; color: #fff; }
+.fund-m-paypal { background: #0070BA; color: #fff; }
+.fund-m-ach { background: #475569; color: #fff; }

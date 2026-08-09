@@ -387,6 +387,40 @@ export function init(root, ctx) {
     navigator.clipboard.writeText(DEPOSIT.address).then(markCopied).catch(selectAddress);
   });
 
+  // ---------- Other payment methods ----------
+  // None of these four rows shows a handle, tag, address, account number or
+  // routing number, and none of them fetches one. Those details are issued per
+  // request, so the row's whole job is to open a support message already
+  // carrying the right category — which is the only place they are ever given
+  // out, to one person, once.
+  const SUPPORT_FUNDING = {
+    zelle: { category: 'funding_zelle', subject: 'Zelle funding request', label: 'Zelle' },
+    cashapp: { category: 'funding_cashapp', subject: 'Cash App funding request', label: 'Cash App' },
+    paypal: { category: 'funding_paypal', subject: 'PayPal funding request', label: 'PayPal' },
+    ach: { category: 'funding_ach', subject: 'ACH funding request', label: 'ACH transfer' },
+  };
+
+  function requestFundingDetails(key) {
+    const method = SUPPORT_FUNDING[key];
+    if (!method || !ctx.openSupportMessage) return;
+    // The amount rides along only when one was actually entered, so a request
+    // made without it never claims a figure the user did not choose.
+    const body = chosenUsd > 0
+      ? `I would like to fund my account with ${formatUsd(chosenUsd)} via ${method.label}. Please send me the details.`
+      : `I would like to fund my account via ${method.label}. Please send me the details.`;
+    ctx.openSupportMessage({ category: method.category, subject: method.subject, body });
+  }
+
+  root.querySelectorAll('[data-fund-support]').forEach((row) => {
+    const key = row.getAttribute('data-fund-support');
+    on(row, 'click', () => requestFundingDetails(key));
+    on(row, 'keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      requestFundingDetails(key);
+    });
+  });
+
   // ---------- Buy Bitcoin ----------
   on(buyHead, 'click', () => {
     buy.classList.toggle('fund-open');
