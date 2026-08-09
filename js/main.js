@@ -689,61 +689,7 @@ async function initSupabaseData() {
   greetingLine2.textContent = userName;
 }
 
-// ---------- Recent activity (from the old account summary) ----------
-// Payments and transfers, newest first. The empty state in the markup stays
-// put until there is something real to replace it with.
-async function initRecentActivity() {
-  const container = document.getElementById('homeActivity');
-  if (!container || !supabaseClient) return;
-
-  try {
-    const user = await getCurrentUser();
-    if (!user) return;
-
-    const [{ data: payments }, { data: transfers }] = await Promise.all([
-      supabaseClient.from('payments').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-      supabaseClient.from('transfers').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
-    ]);
-
-    const entries = [
-      ...(payments || []).map(payment => ({
-        label: payment.recipient_name || 'Payment',
-        amount: -Math.abs(Number(payment.amount || 0)),
-        date: payment.created_at,
-      })),
-      ...(transfers || []).map(transfer => ({
-        label: `Transfer: ${transfer.from_account} → ${transfer.to_account}`,
-        amount: 0,
-        date: transfer.created_at,
-      })),
-    ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
-
-    if (!entries.length) return;
-
-    container.innerHTML = entries.map(entry => `
-      <div class="home-activity-row">
-        <div class="min-w-0">
-          <div class="home-activity-label truncate"></div>
-          <div class="home-activity-date"></div>
-        </div>
-        ${entry.amount !== 0
-          ? `<span class="home-activity-amt${entry.amount > 0 ? ' home-activity-in' : ''}">${entry.amount < 0 ? '-' : '+'}${formatCurrency(Math.abs(entry.amount))}</span>`
-          : ''}
-      </div>
-    `).join('');
-
-    // textContent for the label: recipient names are user-entered.
-    container.querySelectorAll('.home-activity-row').forEach((row, index) => {
-      row.querySelector('.home-activity-label').textContent = entries[index].label;
-      row.querySelector('.home-activity-date').textContent = new Date(entries[index].date).toLocaleDateString();
-    });
-  } catch (err) {
-    console.error('Recent activity error:', err);
-  }
-}
-
 initSupabaseData();
-initRecentActivity();
 refreshAlertsBadge();
 
 // Investments card sparkline. Runs on its own animation loop, and parks itself
