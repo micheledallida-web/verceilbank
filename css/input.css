@@ -1709,15 +1709,6 @@ body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
    field still reads as empty in dark mode. */
 body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
-/* Eligibility fine print, inside the offer card beneath the Apply row — the
-   terms line belongs to the offer it qualifies, not to the page around it.
-   Sits above the artwork and clears its column the same way the headline
-   does, so a long line never runs under the card illustration. Typography
-   comes from .home-promo-note, which already carries both themes. */
-.home-promo-fine {
-  position: relative;
-  z-index: 1;
-  margin-top: 10px;
-  padding-right: 108px;
-  line-height: 1.45;
-}
+/* The eligibility note sits below the Signature Card as its own block, so it
+   needs no rules of its own — .fund-cs-note already draws the app's note
+   panel, and it reads on the blue background and the dark one alike. */
