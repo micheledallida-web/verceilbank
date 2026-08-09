@@ -567,7 +567,7 @@ const navMenus = {
   },
   navSupport: {
     title: 'Support',
-    items: ['Contact Support', 'Card Services', 'Report Lost or Stolen Card', 'Dispute a Transaction', 'Travel Notification', 'Help Center'],
+    items: ['Contact Support', 'Card Services', 'Report Lost or Stolen Card', 'Help Center'],
   },
   navProfile: {
     title: 'Profile',
@@ -621,8 +621,6 @@ const navMenuRoutes = {
   'Contact Support': () => loadPage('contact-support'),
   'Card Services': () => loadPage('card-services'),
   'Report Lost or Stolen Card': () => loadPage('report-card'),
-  'Dispute a Transaction': () => loadPage('dispute'),
-  'Travel Notification': () => loadPage('travel'),
   'Help Center': () => loadPage('help-center'),
 
   // Profile — Personal Information
