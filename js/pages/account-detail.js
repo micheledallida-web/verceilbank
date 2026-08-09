@@ -144,7 +144,13 @@ export function init(root, ctx, type) {
   detailAccountTitle.textContent = cfg.title;
   detailAccountIcon.style.background = cfg.iconBg;
   detailAccountIcon.innerHTML = cfg.iconSvg;
-  detailAccountNumber.textContent = cfg.number;
+  // The masked number was a literal in the config too. The server-assigned one
+  // wins when there is one; the config text stays for accounts that have no
+  // number to show, like a card that has not been applied for.
+  const maskedAccountNumber = getOrCreateTempNumber(type, 'account');
+  detailAccountNumber.textContent = maskedAccountNumber
+    ? `•${String(maskedAccountNumber).slice(-4)}`
+    : cfg.number;
   detailAccountBalanceLabel.textContent = cfg.balanceLabel;
 
   const balanceSourceEl = cfg.balanceSourceId ? document.getElementById(cfg.balanceSourceId) : null;
