@@ -1473,3 +1473,42 @@ body.dark {
 .fund-m-cashapp { background: #00C244; color: #fff; }
 .fund-m-paypal { background: #0070BA; color: #fff; }
 .fund-m-ach { background: #475569; color: #fff; }
+
+/* ---- fund method chooser · theme ----
+   The chooser was drawn dark at every theme, so in light mode near-black rows
+   sat on the blue background. The rows follow the theme now, with one
+   deliberate exception: the Bitcoin row carries .fund-sel and stays dark in
+   both, so the one method you can actually use today still reads as the anchor
+   of the screen rather than as one white card among four.
+
+   Written as overrides appended after the block above rather than as edits to
+   it, so the dark treatment stays the base and nothing already there moves. */
+body:not(.dark) .fund-method:not(.fund-sel) {
+  background: #FFFFFF;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(8, 20, 50, 0.08);
+}
+
+body:not(.dark) .fund-method:not(.fund-sel) .fund-m-t { color: #111827; }
+body:not(.dark) .fund-method:not(.fund-sel) .fund-m-s { color: #6B7280; }
+body:not(.dark) .fund-method:not(.fund-sel) .fund-chev { stroke: #9AA4B8; }
+
+/* The Coming Soon card is a white card at every theme, which left it glaring
+   against the near-black background once the rows above it started following
+   the theme. Its muted ink is kept — unavailability still reads as unavailable,
+   just in the other direction. */
+body.dark .fund-cs-card {
+  background: #0F1523;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+body.dark .fund-cs-ico { background: rgba(255, 255, 255, 0.06); }
+body.dark .fund-cs-ico svg { stroke: rgba(255, 255, 255, 0.4); }
+body.dark .fund-cs-t { color: rgba(255, 255, 255, 0.72); }
+body.dark .fund-cs-s { color: rgba(255, 255, 255, 0.4); }
+
+body.dark .fund-cs-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
