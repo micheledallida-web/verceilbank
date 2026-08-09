@@ -1694,3 +1694,29 @@ body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
    rule above would otherwise outrank on specificity — restated so an empty
    field still reads as empty in dark mode. */
 body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
+
+/* ---- screens wider than the app itself ----
+   This is a 430px app. Two pieces of chrome were fixed to the viewport rather
+   than to that column — the bottom navigation and the support reply composer —
+   so on anything wider than a phone they stretched the full width of the
+   screen while the content stayed a narrow strip down the middle. On a laptop
+   that reads as unfinished; on a TV it is a white band two thousand pixels
+   across with five icons huddled in the centre of it.
+
+   Above the column's own width they are pinned to the column instead, and
+   given the corners and lift a bar needs once it no longer touches the edges
+   of the screen. Below that nothing changes at all: on a phone the bar still
+   runs edge to edge, which is exactly where it belongs. */
+@media (min-width: 431px) {
+  .home-nav,
+  #supComposer {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: 430px;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+  }
+
+  .home-nav { box-shadow: 0 -2px 22px rgba(8, 20, 50, 0.22); }
+}
