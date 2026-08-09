@@ -596,7 +596,6 @@ const navMenus = {
     title: 'Profile',
     groups: [
       { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'], note: 'Name and date of birth are locked after verification. Contact support to change them.' },
-      { category: 'Security', items: ['Password', 'Two-Step Verification', 'Devices & Sign-In Activity'] },
       { category: 'Additional', items: ['Linked Accounts', 'Tax Documents', 'Notification Preferences', 'Privacy & Data Settings'] },
     ],
     standaloneItems: ['Sign Out'],
@@ -654,12 +653,6 @@ const navMenuRoutes = {
   'Phone Number': () => loadPage('profile-phone'),
   'Email Address': () => loadPage('profile-email'),
 
-  // Profile — Security. No screen exists for any of these yet, so each opens
-  // the shared placeholder rather than being left as a tap that does nothing.
-  'Password': () => loadPage('coming-soon', 'Password'),
-  'Two-Step Verification': () => loadPage('coming-soon', 'Two-Step Verification'),
-  'Devices & Sign-In Activity': () => loadPage('coming-soon', 'Devices & Sign-In Activity'),
-
   // Profile — Additional
   'Linked Accounts': () => loadPage('linked-accounts'),
   // Statements and tax forms are two tabs of the one documents screen, so this
@@ -690,7 +683,7 @@ const headerMenuRoutes = {
 // The personal information rows show what is currently on file beside their
 // label, read from the same `user_profile` row the individual profile screens
 // write to — so the sheet answers "what is my address?" without a tap.
-const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address', 'Two-Step Verification'];
+const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
 
 // Locked once identity has been verified. These two are facts on the record
 // rather than something to edit, so they lose their chevron and their tap.
@@ -715,15 +708,6 @@ function cityAndCountry(city, country) {
   return [String(city || '').trim(), String(country || '').trim()].filter(Boolean).join(', ');
 }
 
-// First character, then the domain. Enough to tell two of your addresses
-// apart, not enough to harvest off a shoulder or a screenshot.
-function maskEmail(value) {
-  const email = String(value || '').trim();
-  const at = email.lastIndexOf('@');
-  if (at < 1) return '';
-  return `${email[0]}•••••${email.slice(at)}`;
-}
-
 // Name and date of birth live in three places and are written by three
 // different flows, so the sheet reads all three rather than the one that
 // happens to be empty. `user_profile` first because it is the one the profile
@@ -736,20 +720,28 @@ function buildProfileRowValues(profile, user, verification) {
   const meta = (user && user.user_metadata) || {};
   const ver = verification || {};
 
-  const nameFromProfile = [profile.first_name, profile.middle_name, profile.last_name, profile.suffix].filter(Boolean).join(' ');
-  const nameFromVerification = [ver.legal_first_name, ver.legal_last_name].filter(Boolean).join(' ');
-  const nameFromSignUp = [meta.first_name, meta.middle_name, meta.last_name, meta.suffix].filter(Boolean).join(' ');
+  // Sign-up stores these under whichever keys the form used, so every shape it
+  // could have taken is tried rather than one guess.
+  const joinName = (source, keys) => keys.map((k) => source[k]).filter(Boolean).join(' ');
 
-  const dob = profile.date_of_birth || ver.date_of_birth || meta.date_of_birth || '';
+  const nameFromProfile = joinName(profile, ['first_name', 'middle_name', 'last_name', 'suffix']) || profile.full_name || '';
+  const nameFromVerification = joinName(ver, ['legal_first_name', 'legal_middle_name', 'legal_last_name']);
+  const nameFromSignUp = joinName(meta, ['first_name', 'middle_name', 'last_name', 'suffix'])
+    || meta.full_name || meta.name || '';
+
+  const dob = profile.date_of_birth || ver.date_of_birth || meta.date_of_birth || meta.dob || '';
 
   return {
     'Full Legal Name': nameFromProfile || nameFromVerification || nameFromSignUp,
     'Date of Birth': maskDateOfBirth(dob),
     'Residential Address': cityAndCountry(profile.res_city || ver.city, profile.res_country || ver.state),
-    'Mailing Address': mailingDiffers ? cityAndCountry(profile.mail_city, profile.mail_state) : 'Same as residential',
+    // Nothing when the mailing address simply matches the residential one —
+    // saying so on the list is noise, and the detail screen says it anyway.
+    'Mailing Address': mailingDiffers ? cityAndCountry(profile.mail_city, profile.mail_state) : '',
     'Phone Number': maskPhoneNumber(profile.phone_number),
-    'Email Address': maskEmail(profile.email || (user && user.email)),
-    'Two-Step Verification': profile.two_factor_enabled ? 'On' : 'Off',
+    // Not shown on the list at all. The address is on its own screen, which is
+    // where you go to read it.
+    'Email Address': '',
   };
 }
 
