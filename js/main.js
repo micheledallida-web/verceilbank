@@ -492,12 +492,15 @@ async function renderCardEligibility() {
   // favour here would start an application the bank cannot honour.
   cardApplicationEligible = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
 
+  // The Apply control is a solid pill, so muting it means muting the pill —
+  // recolouring the label alone would put blue text on a blue background. The
+  // chevron inside it is stroked with currentColor, so it follows.
+  apply.classList.toggle('home-promo-go-locked', !cardApplicationEligible);
+
   if (cardApplicationEligible) {
-    apply.style.color = '#2563EB';
     offer.style.cursor = 'pointer';
     note.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
   } else {
-    apply.style.color = '#8B95AB';
     offer.style.cursor = 'default';
     const when = joined ? eligibilityMonthLabel(joined) : 'a later date';
     note.textContent = `Available after ${CARD_ELIGIBILITY_MONTHS} months of membership. You've been a member for ${months} months — eligible ${when}.`;

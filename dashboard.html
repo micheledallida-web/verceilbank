@@ -231,26 +231,118 @@
 
     <!-- ================= AVAILABLE TO YOU ================= -->
     <p class="home-lab" id="homeOffersLabel">Available to You</p>
-    <div id="homeOffers" class="flex flex-col gap-[10px]">
+    <div id="homeOffers">
 
-      <div id="promoBanner" class="home-offer home-offer-promo">
-        <div class="flex-1 min-w-0">
-          <span class="home-offer-t">Verceil Interest Checking</span>
-          <span class="home-offer-s">No monthly fees · Earn up to 4.00% APY</span>
+      <!-- ---- Verceil Signature Card ---- -->
+      <div id="offerCredit" class="home-promo home-promo-card">
+
+        <!-- Premium card illustration. One whole card with its own drop
+             shadow, drawn well inside the viewBox so no edge is cropped and
+             it clears the Apply pill entirely. -->
+        <div class="home-promo-art" aria-hidden="true">
+          <svg viewBox="0 0 140 96" fill="none">
+            <defs>
+              <linearGradient id="pcFace" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#374151"></stop>
+                <stop offset="55%" stop-color="#1F2937"></stop>
+                <stop offset="100%" stop-color="#111827"></stop>
+              </linearGradient>
+              <linearGradient id="pcGold" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#FDE68A"></stop>
+                <stop offset="50%" stop-color="#EAB308"></stop>
+                <stop offset="100%" stop-color="#CA8A04"></stop>
+              </linearGradient>
+              <linearGradient id="pcShine" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.30"></stop>
+                <stop offset="45%" stop-color="#FFFFFF" stop-opacity="0.05"></stop>
+                <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"></stop>
+              </linearGradient>
+              <filter id="pcDrop" x="-25%" y="-25%" width="150%" height="160%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#0B1220" flood-opacity="0.35"></feDropShadow>
+              </filter>
+            </defs>
+
+            <g transform="rotate(-6 68 45)" filter="url(#pcDrop)">
+              <rect x="10" y="10" width="116" height="70" rx="9" fill="url(#pcFace)"></rect>
+              <rect x="10" y="10" width="116" height="70" rx="9" fill="url(#pcShine)"></rect>
+              <rect x="10.6" y="10.6" width="114.8" height="68.8" rx="8.4" stroke="#EAB308" stroke-opacity="0.45" stroke-width="1.2"></rect>
+              <!-- Chip -->
+              <rect x="22" y="26" width="20" height="15" rx="3" fill="url(#pcGold)"></rect>
+              <path d="M22 31h20M22 36h20M32 26v15" stroke="#92400E" stroke-opacity="0.45" stroke-width="0.9"></path>
+              <!-- Contactless -->
+              <path d="M49 29a7.5 7.5 0 010 11M54 25a13 13 0 010 19" stroke="#EAB308" stroke-opacity="0.75" stroke-width="1.7" stroke-linecap="round"></path>
+              <!-- Number band -->
+              <rect x="22" y="54" width="42" height="5" rx="2.5" fill="#FFFFFF" fill-opacity="0.34"></rect>
+              <rect x="68" y="54" width="20" height="5" rx="2.5" fill="#FFFFFF" fill-opacity="0.16"></rect>
+              <!-- Scheme mark -->
+              <circle cx="100" cy="64" r="8.5" fill="#FFFFFF" fill-opacity="0.4"></circle>
+              <circle cx="112" cy="64" r="8.5" fill="#EAB308" fill-opacity="0.9"></circle>
+            </g>
+          </svg>
         </div>
-        <span class="home-offer-go" id="getStartedBtn">Open ›</span>
+
+        <div class="home-promo-head">
+          <span class="home-promo-eyebrow">Premium Card</span>
+          <span class="home-promo-t">Verceil Signature Card</span>
+          <span class="home-promo-s">Earn <b>2% cash back</b> everywhere</span>
+        </div>
+
+        <div class="home-promo-foot">
+          <span class="home-promo-note">No annual fee</span>
+          <button class="home-promo-go" id="creditCardRightContent" type="button">
+            <span>Apply</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
       </div>
 
-      <div id="offerCredit" class="home-offer">
-        <div class="flex-1 min-w-0">
-          <span class="home-offer-t">Verceil Signature Card</span>
-          <span class="home-offer-s">No annual fee · 2% cash back</span>
-        </div>
-        <span class="home-offer-go" id="creditCardRightContent">Apply</span>
-        <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
-      </div>
-
+      <!-- Eligibility line for the card above. Written by renderCardEligibility()
+           in js/main.js, and hidden alongside the card it belongs to. -->
       <div id="offerCreditNote" class="fund-cs-note hidden"></div>
+
+      <!-- ---- Verceil Interest Checking ---- -->
+      <div id="promoBanner" class="home-promo home-promo-rate">
+
+        <!-- Bank building and gold badge illustration -->
+        <div class="home-promo-art" aria-hidden="true">
+          <svg viewBox="0 0 200 160" fill="none">
+            <!-- Sparkles -->
+            <path d="M140 20L142 25L147 27L142 29L140 34L138 29L133 27L138 25Z" fill="#FFFFFF" opacity="0.6"></path>
+            <path d="M185 50L186 53L189 54L186 55L185 58L184 55L181 54L184 53Z" fill="#FACC15" opacity="0.9"></path>
+            <path d="M125 110L126 112L128 113L126 114L125 116L124 114L122 113L124 112Z" fill="#FFFFFF" opacity="0.5"></path>
+            <!-- Pediment / Roof -->
+            <path d="M130 55 L165 35 L200 55 Z" fill="currentColor"></path>
+            <rect x="132" y="56" width="66" height="4" fill="currentColor"></rect>
+            <!-- Pillars -->
+            <rect x="136" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
+            <rect x="149" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
+            <rect x="162" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
+            <rect x="175" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
+            <rect x="188" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
+            <!-- Base -->
+            <rect x="130" y="98" width="70" height="5" rx="1" fill="currentColor"></rect>
+            <!-- Gold Star Coin Badge -->
+            <circle cx="178" cy="92" r="9" fill="#EAB308" stroke="#CA8A04" stroke-width="1.5"></circle>
+            <path d="M178 87.5 L179.3 89.8 L181.8 90.3 L180 92.1 L180.4 94.6 L178 93.4 L175.6 94.6 L176 92.1 L174.2 90.3 L176.7 89.8 Z" fill="#FFFFFF"></path>
+          </svg>
+        </div>
+
+        <div class="home-promo-head">
+          <span class="home-promo-eyebrow">Recommended for you</span>
+          <span class="home-promo-t">Verceil Interest Checking</span>
+          <span class="home-promo-s">Earn up to <b>4.00% APY</b></span>
+        </div>
+
+        <div class="home-promo-foot">
+          <span class="home-promo-note">No monthly fees</span>
+          <button class="home-promo-go" id="getStartedBtn" type="button">
+            <span>Get Started</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+      </div>
 
     </div>
 

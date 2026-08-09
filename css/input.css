@@ -1316,88 +1316,199 @@ body.dark {
 .dark .home-rg.home-rg-on { background: #1D61F2; color: #FFFFFF; }
 
 /* ---- offers ----
-   Same elevated white card as the accounts above them: an offer is a row you
-   tap, so it should not read as a different kind of object from the account
-   it becomes once opened. */
-.home-offer {
-  background: #FFFFFF;
+   The two offers are the same object: an illustrated panel with an eyebrow, a
+   headline and a pill. These are the only cards on this screen selling
+   something rather than reporting a balance, so they read as a matched pair
+   and not as another account row. Shape, spacing and lift are the promo
+   banner's from before the merge; only the surface differs between them. */
+.home-promo {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 148px;
   border: 1px solid transparent;
-  border-radius: 20px;
-  padding: 16px 18px;
+  border-radius: 22px;
+  padding: 18px;
   margin-bottom: 10px;
   display: flex;
-  align-items: center;
-  gap: 13px;
-  cursor: pointer;
-  width: 100%;
+  flex-direction: column;
+  justify-content: space-between;
   text-align: left;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
   transition: transform 0.12s ease;
 }
 
-.dark .home-offer {
-  background: #0D1728;
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+.home-promo:active { transform: scale(0.985); }
+
+/* The artwork sits behind the copy and is allowed to run off the right edge —
+   the card's overflow does the cropping, which is what gives it depth. */
+.home-promo-art {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  bottom: 8px;
+  width: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
 }
 
-.home-offer:active { transform: scale(0.985); }
+.home-promo-art svg { width: 100%; height: 100%; }
 
-.home-offer-t {
-  color: #111827;
-  font-size: 16px;
+.home-promo-head,
+.home-promo-foot { position: relative; z-index: 1; }
+
+/* Reserve the artwork's column so a long headline never runs under it. */
+.home-promo-head { padding-right: 108px; }
+
+.home-promo-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.home-promo-eyebrow {
+  display: block;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: -0.01em;
-  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 5px;
 }
 
-.dark .home-offer-t { color: #FFFFFF; }
-
-.home-offer-s {
-  color: #6B7280;
-  font-size: 13px;
-  margin-top: 3px;
+.home-promo-t {
   display: block;
-}
-
-.dark .home-offer-s { color: #8E9CBA; }
-
-.home-offer-go {
-  color: #111827;
   font-size: 17px;
   font-weight: 700;
-  white-space: nowrap;
-  flex-shrink: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
-.dark .home-offer-go { color: #FFFFFF; }
+.home-promo-s {
+  display: block;
+  font-size: 14px;
+  margin-top: 4px;
+}
 
-/* The Interest Checking offer keeps the coloured promo treatment it had
-   before the merge. It is the one card on this screen that is selling
-   something rather than reporting a balance, so it should not disappear into
-   the white stack — same gradient, border and lift as the old banner, on the
-   current row structure and in the same position. */
-.home-offer.home-offer-promo {
+.home-promo-note { font-size: 13px; }
+
+.home-promo-go {
+  height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12);
+  transition: transform 0.12s ease;
+}
+
+.home-promo-go svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.home-promo-go:active { transform: scale(0.95); }
+
+/* Interest Checking — the blue gradient banner it had before the merge,
+   down to the same stops, border and shadow. */
+.home-promo-rate {
   background: linear-gradient(to right, #1E40AF 0%, #2563EB 50%, #4F46E5 100%);
   border-color: rgba(255, 255, 255, 0.2);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
-.dark .home-offer.home-offer-promo {
+.dark .home-promo-rate {
   background: linear-gradient(to right, #0C1B3A 0%, #10234A 50%, #152B5A 100%);
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.35);
 }
 
-.home-offer-promo .home-offer-t,
-.dark .home-offer-promo .home-offer-t { color: #FFFFFF; }
+.home-promo-rate .home-promo-art { opacity: 0.8; color: rgba(191, 219, 254, 0.3); }
 
-.home-offer-promo .home-offer-s,
-.dark .home-offer-promo .home-offer-s { color: rgba(255, 255, 255, 0.8); }
+.dark .home-promo-rate .home-promo-art { color: rgba(165, 180, 252, 0.2); }
 
-.home-offer-promo .home-offer-go,
-.dark .home-offer-promo .home-offer-go { color: #FFFFFF; }
+.home-promo-rate .home-promo-eyebrow { color: #DBEAFE; }
+
+.dark .home-promo-rate .home-promo-eyebrow { color: #8E9CBA; }
+
+.home-promo-rate .home-promo-t { color: #FFFFFF; }
+
+.home-promo-rate .home-promo-s { color: rgba(255, 255, 255, 0.9); }
+
+.home-promo-rate .home-promo-s b { color: #FFFFFF; font-weight: 700; }
+
+.home-promo-rate .home-promo-note { color: rgba(255, 255, 255, 0.8); }
+
+.dark .home-promo-rate .home-promo-note { color: #8E9CBA; }
+
+.home-promo-rate .home-promo-go { background: #FFFFFF; color: #1D61F2; }
+
+/* Signature Card — the white elevated surface the accounts above it use, so
+   the dark metal card in the artwork is the thing that carries the premium,
+   not the panel. currentColor tints the card sitting behind it. */
+.home-promo-card {
+  background: #FFFFFF;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+}
+
+.dark .home-promo-card {
+  background: #0D1728;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* The Signature Card's artwork is a card in its own right rather than a
+   background wash: it is drawn whole, parked in the top-right corner, and
+   stops above the pill row so nothing crops it or runs across it. */
+.home-promo-card .home-promo-art {
+  top: 14px;
+  right: 16px;
+  bottom: auto;
+  width: 120px;
+  height: 82px;
+  align-items: flex-start;
+}
+
+.home-promo-card .home-promo-head { padding-right: 130px; }
+
+.home-promo-card .home-promo-eyebrow { color: #1D61F2; }
+
+.dark .home-promo-card .home-promo-eyebrow { color: #8E9CBA; }
+
+.home-promo-card .home-promo-t { color: #111827; }
+
+.dark .home-promo-card .home-promo-t { color: #FFFFFF; }
+
+.home-promo-card .home-promo-s { color: #6B7280; }
+
+.dark .home-promo-card .home-promo-s { color: #8E9CBA; }
+
+.home-promo-card .home-promo-s b { color: #111827; font-weight: 700; }
+
+.dark .home-promo-card .home-promo-s b { color: #FFFFFF; }
+
+.home-promo-card .home-promo-note { color: #6B7280; }
+
+.dark .home-promo-card .home-promo-note { color: #8E9CBA; }
+
+.home-promo-card .home-promo-go { background: #0B4CC2; color: #FFFFFF; }
+
+.dark .home-promo-card .home-promo-go { background: #2563EB; }
 
 /* ---- bottom nav ---- */
 .home-nav {
@@ -1597,3 +1708,21 @@ body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
    rule above would otherwise outrank on specificity — restated so an empty
    field still reads as empty in dark mode. */
 body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
+
+/* The Apply pill on the Signature Card while the account is too young to
+   apply. Muted rather than removed: the offer is still worth seeing, it just
+   is not actionable yet. The pill is recoloured rather than its label, since
+   the label sits on a solid background — and the chevron inside is stroked
+   with currentColor, so it follows. Appended after the promo rules so it wins
+   the tie on specificity. */
+.home-promo-go.home-promo-go-locked {
+  background: #EEF1F7;
+  color: #8B95AB;
+  box-shadow: none;
+  cursor: default;
+}
+
+.dark .home-promo-go.home-promo-go-locked {
+  background: rgba(255, 255, 255, 0.08);
+  color: #8E9CBA;
+}
