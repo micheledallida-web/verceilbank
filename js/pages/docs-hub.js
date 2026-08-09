@@ -131,9 +131,14 @@ function renderDocs(root, ctx) {
   });
 }
 
-export async function init(root, ctx) {
+export async function init(root, ctx, initialTab) {
   const { close, loadPage, showModal, supabaseClient, getCurrentUser, parseBalanceText } = ctx;
   on(root.querySelector('[data-action="close"]'), 'click', close);
+
+  // Statements and tax forms are two tabs of this one screen rather than two
+  // screens, so callers say which tab they meant. Anything unrecognised falls
+  // through to the default.
+  if (initialTab && root.querySelector(`.adh-tab[data-tab="${initialTab}"]`)) activeTab = initialTab;
 
   setActiveClasses(root);
 

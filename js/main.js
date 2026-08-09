@@ -159,19 +159,8 @@ window.showModal = showModal;
 const greetingLine1 = document.getElementById('greetingLine1');
 const greetingLine2 = document.getElementById('greetingLine2');
 
-// ---------- Header dropdown (More / Appearance / Alerts / Messages / Profile) ----------
+// ---------- Header dropdown (Appearance / Alerts / Messages / Profile) ----------
 const headerMenus = {
-  more: {
-    title: 'Quick Actions',
-    items: [
-      { label: 'View Statements' },
-      { label: 'Transfer Funds' },
-      { label: 'Card Services' },
-      { label: 'Notifications' },
-      { label: 'Settings' },
-      { label: 'Help & Support' },
-    ],
-  },
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode', 'System Default'] },
   alerts: { title: 'Alerts', items: ['Transaction Alerts', 'Security Alerts', 'Payment Reminders', 'Account Notifications', 'Notification Settings'] },
   messages: { title: 'Messages', items: ['Secure Inbox', 'Contact Support', 'Live Chat', 'Schedule an Appointment'] },
@@ -409,7 +398,6 @@ function closeHeaderDropdown() {
 }
 
 headerDropdownOverlay.addEventListener('click', closeHeaderDropdown);
-document.getElementById('moreMenuBtn').addEventListener('click', (e) => openHeaderDropdown('more', e.currentTarget));
 document.getElementById('appearanceBtn').addEventListener('click', (e) => openHeaderDropdown('appearance', e.currentTarget));
 document.getElementById('alertsBtn').addEventListener('click', (e) => openHeaderDropdown('alerts', e.currentTarget));
 document.getElementById('messagesBtn').addEventListener('click', (e) => openHeaderDropdown('messages', e.currentTarget));
@@ -452,6 +440,7 @@ const navMenus = {
     title: 'Profile',
     groups: [
       { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'] },
+      { category: 'Security', items: ['Password', 'Two-Step Verification', 'Face ID Sign-In', 'Devices & Sign-In Activity'] },
       { category: 'Additional', items: ['Linked Accounts', 'Tax Documents', 'Notification Preferences', 'Privacy & Data Settings'] },
     ],
     standaloneItems: ['Sign Out'],
@@ -513,18 +502,24 @@ const navMenuRoutes = {
   'Phone Number': () => loadPage('profile-phone'),
   'Email Address': () => loadPage('profile-email'),
 
+  // Profile — Security. No screen has been built for any of these yet, so each
+  // one opens the shared placeholder rather than being left as a dead tap.
+  'Password': () => loadPage('coming-soon', 'Password'),
+  'Two-Step Verification': () => loadPage('coming-soon', 'Two-Step Verification'),
+  'Face ID Sign-In': () => loadPage('coming-soon', 'Face ID Sign-In'),
+  'Devices & Sign-In Activity': () => loadPage('coming-soon', 'Devices & Sign-In Activity'),
+
   // Profile — Additional
   'Linked Accounts': () => loadPage('linked-accounts'),
-  'Tax Documents': () => loadPage('tax-docs'),
+  // Statements and tax forms are two tabs of the one documents screen, so this
+  // opens that screen on its tax tab rather than a second page of its own.
+  'Tax Documents': () => loadPage('docs-hub', 'tax'),
   'Notification Preferences': () => loadPage('notification-prefs'),
   'Privacy & Data Settings': () => loadPage('privacy'),
 };
 
 // Labels in the header "quick actions" dropdown that map to a ported screen.
 const headerMenuRoutes = {
-  'View Statements': () => loadPage('docs-hub'),
-  'Transfer Funds': () => loadPage('transfer'),
-  'Card Services': () => loadPage('card-services'),
   'Secure Inbox': () => loadPage('secure-messages'),
   'Contact Support': () => loadPage('contact-support'),
   'Live Chat': () => loadPage('live-chat'),
@@ -533,6 +528,93 @@ const headerMenuRoutes = {
   'Notification Preferences': () => loadPage('notification-prefs'),
   'Privacy & Data Settings': () => loadPage('privacy'),
 };
+
+// ---------- Profile sheet row values ----------
+// The personal information rows show what is currently on file beside their
+// label, read from the same `user_profile` row the individual profile screens
+// write to — so the sheet answers "what is my address?" without a tap.
+const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
+
+// Locked once identity has been verified. These two are facts on the record
+// rather than something to edit, so they lose their chevron and their tap.
+const LOCKED_PROFILE_ROWS = ['Full Legal Name', 'Date of Birth'];
+
+let profileRowValues = {};
+
+// Enough of the date to recognise it as yours, not enough to be worth reading
+// over your shoulder — the year is the part people check.
+function maskDateOfBirth(value) {
+  const year = String(value || '').slice(0, 4);
+  return /^\d{4}$/.test(year) ? `••/••/${year}` : '';
+}
+
+function maskPhoneNumber(digitsSource) {
+  const digits = String(digitsSource || '').replace(/\D/g, '');
+  return digits.length >= 4 ? `•••• ${digits.slice(-4)}` : '';
+}
+
+function buildProfileRowValues(profile, user) {
+  // `mail_same_as_res` is only false once someone has explicitly said the two
+  // differ, which is the same default the Mailing Address screen applies.
+  const mailingDiffers = profile.mail_same_as_res === false;
+  return {
+    'Full Legal Name': [profile.first_name, profile.middle_name, profile.last_name, profile.suffix].filter(Boolean).join(' '),
+    'Date of Birth': maskDateOfBirth(profile.date_of_birth),
+    'Residential Address': profile.res_street || '',
+    'Mailing Address': mailingDiffers ? (profile.mail_street || '') : 'Same as residential',
+    'Phone Number': maskPhoneNumber(profile.phone_number),
+    'Email Address': profile.email || (user && user.email) || '',
+  };
+}
+
+function applyProfileRowValues() {
+  navMenuList.querySelectorAll('[data-profile-value]').forEach(el => {
+    el.textContent = profileRowValues[el.getAttribute('data-profile-value')] || '';
+  });
+}
+
+// Fetched each time the sheet opens so an edit made on a profile screen is
+// reflected the moment you come back to it. The rows render from the last
+// known values first, so the sheet never waits on the network to draw.
+async function refreshProfileRowValues() {
+  if (!supabaseClient) return;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return;
+    const { data } = await supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle();
+    profileRowValues = buildProfileRowValues(data || {}, user);
+    applyProfileRowValues();
+  } catch (err) {
+    console.error('Profile row values error:', err);
+  }
+}
+
+// One row rendered two ways: the standard tappable row with its chevron, or —
+// for a locked field — the same row without either, so nothing on it reads as
+// a link. Only the personal information rows carry a value.
+function renderNavMenuGroupRow(item) {
+  const label = `<span class="text-[15px] font-medium text-[#111827] dark:text-[#FFFFFF]">${item}</span>`;
+  const value = PROFILE_VALUE_ROWS.includes(item)
+    ? `<span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] text-right truncate min-w-0 ml-[12px]" data-profile-value="${item}">${profileRowValues[item] || ''}</span>`
+    : '';
+
+  if (LOCKED_PROFILE_ROWS.includes(item)) {
+    return `
+        <div class="w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] text-left">
+          ${label}
+          ${value}
+        </div>
+      `;
+  }
+
+  return `
+        <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer text-left">
+          ${label}
+          ${value}
+          <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      `;
+}
 
 function openNavMenu(key) {
   const menu = navMenus[key];
@@ -543,12 +625,7 @@ function openNavMenu(key) {
   if (menu.groups) {
     navMenuList.innerHTML = menu.groups.map(group => `
       <div class="px-[12px] pt-[16px] pb-[4px] text-[12px] font-bold uppercase tracking-[0.8px] text-[#6B7280] dark:text-[#8E9CBA]">${group.category}</div>
-      ${group.items.map(item => `
-        <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer text-left">
-          <span class="text-[15px] font-medium text-[#111827] dark:text-[#FFFFFF]">${item}</span>
-          <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
-      `).join('')}
+      ${group.items.map(item => renderNavMenuGroupRow(item)).join('')}
     `).join('') + (menu.standaloneItems ? `
       <div class="border-t border-gray-100 dark:border-white/[0.06] mt-[8px] pt-[8px]">
         ${menu.standaloneItems.map(item => `
@@ -581,10 +658,18 @@ function openNavMenu(key) {
     });
   });
 
+  if (key === 'navProfile') refreshProfileRowValues();
+
   navMenuOverlay.classList.remove('hidden');
   navMenuSheet.classList.remove('hidden');
+  // Every menu shares this one scroll container, so it opens wherever the last
+  // menu was left scrolled to — which hid the first group's section label
+  // behind the header. Reset it before the sheet slides up, and again once it
+  // has been laid out, since the browser can restore the old offset in between.
+  navMenuList.scrollTop = 0;
   requestAnimationFrame(() => {
     navMenuSheet.classList.remove('translate-y-full');
+    navMenuList.scrollTop = 0;
   });
   document.body.style.overflow = 'hidden';
 }
