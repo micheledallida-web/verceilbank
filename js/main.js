@@ -595,7 +595,7 @@ const navMenus = {
   navProfile: {
     title: 'Profile',
     groups: [
-      { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'], note: 'Name and date of birth are locked after verification. Contact support to change them.' },
+      { category: 'Personal Information', items: ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'] },
       { category: 'Additional', items: ['Linked Accounts', 'Tax Documents', 'Notification Preferences', 'Privacy & Data Settings'] },
     ],
     standaloneItems: ['Sign Out'],
@@ -806,7 +806,6 @@ function openNavMenu(key) {
     navMenuList.innerHTML = menu.groups.map(group => `
       <div class="px-[12px] pt-[16px] pb-[4px] text-[12px] font-bold uppercase tracking-[0.8px] text-[#6B7280] dark:text-[#8E9CBA]">${group.category}</div>
       ${group.items.map(item => renderNavMenuGroupRow(item)).join('')}
-      ${group.note ? `<div class="px-[12px] pt-[6px] pb-[2px] text-[12px] leading-relaxed text-[#6B7280] dark:text-[#8E9CBA]">${group.note}</div>` : ''}
     `).join('') + (menu.standaloneItems ? `
       <div class="border-t border-gray-100 dark:border-white/[0.06] mt-[8px] pt-[8px]">
         ${menu.standaloneItems.map(item => `
