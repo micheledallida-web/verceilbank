@@ -1,7 +1,7 @@
-// Support tab. Three views live in the one fragment — the home list, a thread,
-// and the new-message form — because they share one back stack and swapping a
-// hidden class is cheaper than tearing the page down and refetching on every
-// hop between them.
+// Support tab. Four views live in the one fragment — the home screen, the
+// message list, a thread, and the new-message form — because they share one
+// back stack and swapping a hidden class is cheaper than tearing the page down
+// and refetching on every hop between them.
 
 // The categories the support_threads table accepts, paired with something a
 // person would actually recognise. This is the only place the mapping lives.
@@ -16,15 +16,40 @@ const SUPPORT_CATEGORIES = [
   { value: 'account_access', label: 'Account access' },
 ];
 
-// Each tile is a shortcut into the new-message form with the category already
-// chosen, so the common cases never make anyone read the category list.
+// Each topic is a shortcut into the new-message form with the category and
+// subject already filled in, so the common cases never make anyone read the
+// category list. Icons are stroke SVGs matching the rest of the app.
 const SUPPORT_TOPICS = [
-  { label: 'Cards & PINs', category: 'card_application' },
-  { label: 'Disputes', category: 'disputes' },
-  { label: 'Transfers', category: 'funding_ach' },
-  { label: 'Statements', category: 'general' },
-  { label: 'Account access', category: 'account_access' },
-  { label: 'Fees', category: 'general' },
+  {
+    label: 'Cards & PINs',
+    category: 'card_application',
+    icon: '<rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M2 10h20"></path><path d="M6 15h4"></path>',
+  },
+  {
+    label: 'Disputes',
+    category: 'disputes',
+    icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',
+  },
+  {
+    label: 'Transfers',
+    category: 'funding_ach',
+    icon: '<path d="M7 7h11m0 0-4-4m4 4-4 4"></path><path d="M17 17H6m0 0 4 4m-4-4 4-4"></path>',
+  },
+  {
+    label: 'Statements',
+    category: 'general',
+    icon: '<path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M9 9h6M9 13h6M9 17h4"></path>',
+  },
+  {
+    label: 'Account access',
+    category: 'account_access',
+    icon: '<rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>',
+  },
+  {
+    label: 'Fees',
+    category: 'general',
+    icon: '<path d="M19 5 5 19"></path><circle cx="7.5" cy="7.5" r="2.5"></circle><circle cx="16.5" cy="16.5" r="2.5"></circle>',
+  },
 ];
 
 const STATUS_LABELS = { open: 'Open', answered: 'Answered', closed: 'Closed' };
@@ -121,6 +146,7 @@ function emptyState(message) {
 
 function showView(root, name) {
   root.querySelector('#supHomeView').classList.toggle('hidden', name !== 'home');
+  root.querySelector('#supListView').classList.toggle('hidden', name !== 'list');
   root.querySelector('#supThreadView').classList.toggle('hidden', name !== 'thread');
   root.querySelector('#supNewView').classList.toggle('hidden', name !== 'new');
   // The composer belongs to the thread view but is positioned against the
@@ -131,25 +157,49 @@ function showView(root, name) {
 
 // ---------- View 1: Support home ----------
 
+// Flat rows on the page background, divided by a hairline — the same row the
+// rest of this screen uses. No card, no container.
 function renderTopics(root) {
-  const grid = root.querySelector('#supTopics');
+  const list = root.querySelector('#supTopics');
   const empty = root.querySelector('#supTopicsEmpty');
   const needle = topicFilter.trim().toLowerCase();
   const matches = needle
     ? SUPPORT_TOPICS.filter((topic) => topic.label.toLowerCase().includes(needle))
     : SUPPORT_TOPICS;
 
-  grid.innerHTML = matches.map((topic) => `
-    <button class="sup-topic bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg text-left cursor-pointer" data-category="${escapeHtml(topic.category)}">
-      <span class="block text-[13px] font-semibold text-[#111827] dark:text-white">${escapeHtml(topic.label)}</span>
+  list.innerHTML = matches.map((topic) => `
+    <button type="button" class="sup-topic w-full flex items-center gap-[12px] px-[12px] py-[14px] text-left cursor-pointer border-b border-white/15 dark:border-white/[0.08]" data-label="${escapeHtml(topic.label)}">
+      <svg class="w-[20px] h-[20px] text-white/80 dark:text-[#8E9CBA] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${topic.icon}</svg>
+      <span class="flex-1 min-w-0 text-[15px] font-medium text-white truncate">${escapeHtml(topic.label)}</span>
+      <svg class="w-[16px] h-[16px] text-white/60 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </button>
   `).join('');
 
-  grid.classList.toggle('hidden', !matches.length);
+  list.classList.toggle('hidden', !matches.length);
   empty.classList.toggle('hidden', !!matches.length);
 }
 
-function renderThreads(root) {
+// The home row summarises the inbox: what the last conversation was about, and
+// how many are waiting on the reader.
+function renderThreadsSummary(root) {
+  const sub = root.querySelector('#supThreadsSub');
+  const pill = root.querySelector('#supAnsweredPill');
+
+  const answered = threads.filter((thread) => thread.status === 'answered').length;
+  pill.textContent = String(answered);
+  pill.classList.toggle('hidden', answered === 0);
+
+  if (!threads.length) {
+    sub.textContent = 'No messages yet';
+    return;
+  }
+
+  const newest = threads[0];
+  const when = relativeDate(newest.updated_at || newest.created_at);
+  sub.textContent = [newest.subject, when].filter(Boolean).join(' · ');
+}
+
+function renderThreads(root, ctx) {
   const list = root.querySelector('#supThreads');
   const unreadEl = root.querySelector('#supUnreadCount');
 
@@ -191,7 +241,7 @@ function renderThreads(root) {
   list.querySelectorAll('.sup-thread').forEach((btn) => {
     on(btn, 'click', () => {
       const thread = threads.find((entry) => String(entry.id) === btn.getAttribute('data-id'));
-      if (thread) openThread(root, currentCtx, thread);
+      if (thread) openThread(root, ctx, thread);
     });
   });
 }
@@ -204,7 +254,8 @@ async function loadThreads(root, ctx) {
   try {
     const user = await getCurrentUser();
     if (!user || !supabaseClient) {
-      renderThreads(root);
+      renderThreads(root, ctx);
+      renderThreadsSummary(root);
       return;
     }
 
@@ -235,7 +286,8 @@ async function loadThreads(root, ctx) {
     console.error('Support threads error:', err);
   }
 
-  renderThreads(root);
+  renderThreads(root, ctx);
+  renderThreadsSummary(root);
 }
 
 // ---------- View 2: Thread detail ----------
@@ -361,7 +413,7 @@ function openNew(root, options) {
   const subjectEl = root.querySelector('#supNewSubject');
   const bodyEl = root.querySelector('#supNewBody');
 
-  // A category handed in by a topic tile or by another screen is the whole
+  // A category handed in by a topic row or by another screen is the whole
   // point of arriving here, so it survives every later render of this view.
   if (options && options.category) pendingCategory = options.category;
   const chosen = SUPPORT_CATEGORIES.some((entry) => entry.value === pendingCategory) ? pendingCategory : 'general';
@@ -466,12 +518,7 @@ function hideError(root, selector) {
   el.classList.add('hidden');
 }
 
-// Thread rows are re-rendered on every refresh, so their click handler needs
-// the context that was handed to init().
-let currentCtx = null;
-
 export async function init(root, ctx, options) {
-  currentCtx = ctx;
   threads = [];
   latestByThread = {};
   activeThread = null;
@@ -486,12 +533,22 @@ export async function init(root, ctx, options) {
 
   on(root.querySelector('[data-action="close"]'), 'click', ctx.close);
 
-  // Both inner views back out to the home list rather than off the page.
+  // The thread and compose views back out to the list; the list backs out to
+  // the home screen.
   root.querySelectorAll('[data-action="sup-back"]').forEach((btn) => {
     on(btn, 'click', () => {
-      showView(root, 'home');
+      showView(root, 'list');
       loadThreads(root, ctx);
     });
+  });
+
+  root.querySelectorAll('[data-action="sup-home"]').forEach((btn) => {
+    on(btn, 'click', () => showView(root, 'home'));
+  });
+
+  on(root.querySelector('#supThreadsRow'), 'click', () => {
+    showView(root, 'list');
+    loadThreads(root, ctx);
   });
 
   on(root.querySelector('#supSearch'), 'input', (e) => {
@@ -499,14 +556,17 @@ export async function init(root, ctx, options) {
     renderTopics(root);
   });
 
-  // Delegated, because the tiles are rebuilt every time the search changes.
+  // Delegated, because the rows are rebuilt every time the search changes.
   on(root.querySelector('#supTopics'), 'click', (e) => {
-    const tile = e.target.closest('.sup-topic');
-    if (!tile) return;
-    openNew(root, { category: tile.getAttribute('data-category') });
+    const row = e.target.closest('.sup-topic');
+    if (!row) return;
+    const label = row.getAttribute('data-label');
+    const topic = SUPPORT_TOPICS.find((entry) => entry.label === label);
+    if (!topic) return;
+    ctx.openSupportMessage({ category: topic.category, subject: topic.label });
   });
 
-  on(root.querySelector('#supNewMsgBtn'), 'click', () => openNew(root, { category: '' }));
+  on(root.querySelector('#supNewMsgBtn'), 'click', () => ctx.openSupportMessage({ category: 'general' }));
   on(root.querySelector('#supClosedNewBtn'), 'click', () => openNew(root, { category: activeThread ? activeThread.category : '' }));
 
   on(root.querySelector('#supNewSubject'), 'input', () => updateNewEnabled(root));
@@ -531,8 +591,7 @@ export async function init(root, ctx, options) {
 
   // Deep link straight to one conversation — a support notification names the
   // thread it is about, and landing on the list instead would make the reader
-  // hunt for it. The list is loaded either way, so backing out lands somewhere
-  // real rather than on an empty screen.
+  // hunt for it.
   if (options && options.view === 'thread' && options.threadId) {
     const target = threads.find((entry) => String(entry.id) === String(options.threadId));
     if (target) await openThread(root, ctx, target);
@@ -550,5 +609,4 @@ export function cleanup() {
   pendingCategory = '';
   sendingNew = false;
   sendingReply = false;
-  currentCtx = null;
 }

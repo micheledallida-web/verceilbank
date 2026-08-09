@@ -1008,6 +1008,23 @@ body.dark {
   line-height: 1.05;
 }
 
+.home-dots {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #111827;
+  border: none;
+  flex-shrink: 0;
+  transition: transform 0.12s ease;
+}
+
+.dark .home-dots { background: #0D1728; color: #FFFFFF; }
+
 .home-pill {
   background: #FFFFFF;
   border-radius: 26px;
@@ -1034,7 +1051,7 @@ body.dark {
 
 .home-pill-btn svg { width: 20px; height: 20px; }
 
-.home-pill-btn:active { transform: scale(0.94); }
+.home-dots:active, .home-pill-btn:active { transform: scale(0.94); }
 
 /* ---- hero total ---- */
 .home-hero {
