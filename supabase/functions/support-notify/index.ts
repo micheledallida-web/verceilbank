@@ -63,7 +63,12 @@ Deno.serve(async (req) => {
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
   const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX');
   const SUPPORT_FROM = Deno.env.get('SUPPORT_FROM');
-  const SUPPORT_INBOUND_ADDRESS = Deno.env.get('SUPPORT_INBOUND_ADDRESS') || SUPPORT_INBOX;
+  // Deliberately no fallback. Until a domain is set up to receive mail there is
+  // no address a reply could come back through, and quietly falling back to the
+  // inbox itself would put a Reply-To on the mail that just loops to the reader.
+  // Unset means the email says how to answer instead of promising a reply works.
+  const SUPPORT_INBOUND_ADDRESS = Deno.env.get('SUPPORT_INBOUND_ADDRESS');
+  const inboundReady = !!SUPPORT_INBOUND_ADDRESS;
 
   if (!RESEND_API_KEY || !SUPPORT_INBOX || !SUPPORT_FROM) {
     console.error('support-notify is missing RESEND_API_KEY, SUPPORT_INBOX or SUPPORT_FROM');
@@ -107,7 +112,12 @@ Deno.serve(async (req) => {
     }
 
     const category = CATEGORY_LABELS[thread.category] ?? thread.category ?? 'General';
-    const replyTo = replyToAddress(String(SUPPORT_INBOUND_ADDRESS), String(thread.id));
+    const replyTo = inboundReady ? replyToAddress(String(SUPPORT_INBOUND_ADDRESS), String(thread.id)) : '';
+
+    // What the footer promises has to match what is actually wired up.
+    const howToAnswer = inboundReady
+      ? "Reply to this email and your answer appears in the customer's app."
+      : 'Replies by email are not enabled yet. Answer from the Supabase dashboard using the thread id above.';
 
     // The subject tag is a fallback: if a mail client ever drops the Reply-To,
     // the inbound side can still find the thread from the subject line.
@@ -124,7 +134,7 @@ Deno.serve(async (req) => {
           Thread: ${escapeHtml(thread.id)}
         </p>
         <p style="margin:16px 0 0;color:#6B7280;font-size:12px">
-          Reply to this email and your answer appears in the customer's app.
+          ${escapeHtml(howToAnswer)}
         </p>
       </div>
     `;
@@ -139,7 +149,7 @@ Deno.serve(async (req) => {
       `From: ${user.email ?? 'unknown'}`,
       `Thread: ${thread.id}`,
       '',
-      "Reply to this email and your answer appears in the customer's app.",
+      howToAnswer,
     ].join('\n');
 
     const sent = await fetch('https://api.resend.com/emails', {
@@ -151,7 +161,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: SUPPORT_FROM,
         to: [SUPPORT_INBOX],
-        reply_to: replyTo,
+        ...(replyTo ? { reply_to: replyTo } : {}),
         subject,
         html,
         text,
