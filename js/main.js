@@ -117,9 +117,26 @@ async function loadBankReference() {
     });
 
     hasOpenCreditCard = (rows || []).some((row) => row && row.product_type === 'credit_card' && row.status === 'open');
+    renderAccountNumberMasks();
   } catch (err) {
     console.error('Account reference error:', err);
   }
+}
+
+// The masked numbers on the account cards were literals in the markup, so every
+// account read •4892 or •9104 no matter what its real number was. They come
+// from the server-assigned number now — and stay blank until one exists, since
+// a card that shows someone else's last four is worse than a card that shows
+// none. Each account type carries its own, so investments never borrows the
+// checking account's.
+function renderAccountNumberMasks() {
+  const masks = { checkingNumber: 'checking', savingsNumber: 'savings', investmentsNumber: 'investments' };
+  Object.keys(masks).forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const number = accountNumbersByType[masks[id]];
+    el.textContent = number ? `•${String(number).slice(-4)}` : '';
+  });
 }
 
 // ---------- Theme ----------
