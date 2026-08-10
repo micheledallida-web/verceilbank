@@ -327,6 +327,25 @@
       margin-bottom: 1.25rem;
     }
 
+    /* One field group's worth of complaint, under the group it belongs to.
+       Empty and out of the flow until there is something to say, so nothing
+       moves on the page when it appears. */
+    .step-error {
+      display: none;
+      background-color: #fef2f2;
+      border: 1px solid #f87171;
+      color: #ef4444;
+      padding: 0.7rem 0.85rem;
+      border-radius: 4px;
+      font-size: 0.86rem;
+      line-height: 1.4;
+      margin-top: 1rem;
+    }
+
+    .step-error.visible {
+      display: block;
+    }
+
     .btn-back-link {
       display: block;
       width: 100%;
@@ -432,32 +451,28 @@
           Every account opens with a $100 minimum deposit. Fund your account within 60 days to keep it open and unlock full access — an account that has not been funded within 60 days is closed.
         </div>
 
-        <button type="button" id="productNextBtn" class="btn-next-full">Continue</button>
+        <button type="button" class="btn-next-full" data-next="identity">Continue</button>
       </div>
 
       <!-- ================= STEP 2 — WHO YOU ARE ================= -->
-      <div id="stepDetails" style="display:none;">
+      <!-- ================= STEP 2 — NAME AND DATE OF BIRTH ================= -->
+      <div id="stepIdentity" style="display:none;">
         <h1>Let's get to know you</h1>
-        <p class="subtitle">Tell us your full legal name as it appears on your government ID, along with your secure credentials and date of birth.</p>
+        <p class="subtitle">Your name and date of birth as they appear on your government ID. These are checked against your ID during verification, so they cannot be changed afterwards.</p>
 
-        <div id="errorBanner" class="error-msg"></div>
-        <div id="successBanner" class="success-msg">Account created successfully! Launching dashboard...</div>
-
-        <form id="signupForm">
-        
         <div class="input-group">
           <label for="firstName">First name</label>
-          <input type="text" id="firstName" required>
+          <input type="text" id="firstName" autocomplete="given-name" required>
         </div>
 
         <div class="input-group">
           <label for="middleName">Middle name (optional)</label>
-          <input type="text" id="middleName">
+          <input type="text" id="middleName" autocomplete="additional-name">
         </div>
 
         <div class="input-group">
           <label for="lastName">Last name</label>
-          <input type="text" id="lastName" required>
+          <input type="text" id="lastName" autocomplete="family-name" required>
         </div>
 
         <div class="input-group">
@@ -476,26 +491,114 @@
           <input type="date" id="dob" required>
         </div>
 
+        <div class="step-error" data-step-error="identity"></div>
+        <button type="button" class="btn-next-full" data-next="ssn">Next</button>
+        <button type="button" class="btn-back-link" data-back="product">Back</button>
+      </div>
+
+      <!-- ================= STEP 3 — SOCIAL SECURITY NUMBER ================= -->
+      <div id="stepSsn" style="display:none;">
+        <h1>Your Social Security Number</h1>
+        <p class="subtitle">Federal law requires us to collect this to open a bank account. It is encrypted in transit and never shown back to you in full.</p>
+
+        <div class="input-group">
+          <label for="ssn">Social Security Number</label>
+          <input type="text" id="ssn" inputmode="numeric" autocomplete="off" placeholder="•••-••-••••" maxlength="11" required>
+        </div>
+
+        <div class="step-note">
+          Verceil Bank uses your Social Security Number to confirm your identity and to report interest to the IRS. We do not use it to check your credit at sign-up.
+        </div>
+
+        <div class="step-error" data-step-error="ssn"></div>
+        <button type="button" class="btn-next-full" data-next="address">Next</button>
+        <button type="button" class="btn-back-link" data-back="identity">Back</button>
+      </div>
+
+      <!-- ================= STEP 4 — HOME ADDRESS ================= -->
+      <div id="stepAddress" style="display:none;">
+        <h1>Where do you live?</h1>
+        <p class="subtitle">Your home address. This has to be a street address in the United States — a PO box cannot be used to open an account.</p>
+
+        <div class="input-group">
+          <label for="address1">Street address</label>
+          <input type="text" id="address1" autocomplete="address-line1" required>
+        </div>
+
+        <div class="input-group">
+          <label for="address2">Apartment, suite or unit (optional)</label>
+          <input type="text" id="address2" autocomplete="address-line2">
+        </div>
+
+        <div class="input-group">
+          <label for="city">City</label>
+          <input type="text" id="city" autocomplete="address-level2" required>
+        </div>
+
+        <div class="input-group">
+          <label for="state">State</label>
+          <input type="text" id="state" autocomplete="address-level1" required>
+        </div>
+
+        <div class="input-group">
+          <label for="postalCode">ZIP code</label>
+          <input type="text" id="postalCode" inputmode="numeric" autocomplete="postal-code" maxlength="10" required>
+        </div>
+
+        <div class="step-error" data-step-error="address"></div>
+        <button type="button" class="btn-next-full" data-next="email">Next</button>
+        <button type="button" class="btn-back-link" data-back="ssn">Back</button>
+      </div>
+
+      <!-- ================= STEP 5 — EMAIL ================= -->
+      <div id="stepEmail" style="display:none;">
+        <h1>Your email address</h1>
+        <p class="subtitle">This is how you will sign in, and where statements, alerts and anything we need to tell you will be sent.</p>
+
         <div class="input-group">
           <label for="email">Email address</label>
-          <input type="email" id="email" required>
+          <input type="email" id="email" autocomplete="email" required>
         </div>
 
         <div class="input-group">
-          <label for="password">Create password</label>
-          <input type="password" id="password" autocomplete="new-password" required>
+          <label for="confirmEmail">Confirm email address</label>
+          <input type="email" id="confirmEmail" autocomplete="email" required>
         </div>
 
-        <div class="input-group">
-          <label for="confirmPassword">Confirm password</label>
-          <input type="password" id="confirmPassword" autocomplete="new-password" required>
-        </div>
+        <div class="step-error" data-step-error="email"></div>
+        <button type="button" class="btn-next-full" data-next="password">Next</button>
+        <button type="button" class="btn-back-link" data-back="address">Back</button>
+      </div>
 
-        <button type="submit" id="submitBtn" class="btn-next-full">Next</button>
+      <!-- ================= STEP 6 — PASSWORD ================= -->
+      <div id="stepPassword" style="display:none;">
+        <h1>Create your password</h1>
+        <p class="subtitle">At least 8 characters. Use something you do not use anywhere else.</p>
+
+        <div id="errorBanner" class="error-msg"></div>
+        <div id="successBanner" class="success-msg">Account created successfully! Launching dashboard...</div>
+
+        <form id="signupForm">
+
+          <div class="input-group">
+            <label for="password">Create password</label>
+            <input type="password" id="password" autocomplete="new-password" required>
+          </div>
+
+          <div class="input-group">
+            <label for="confirmPassword">Confirm password</label>
+            <input type="password" id="confirmPassword" autocomplete="new-password" required>
+          </div>
+
+          <div class="step-note">
+            By opening an account you agree to the Verceil Bank Deposit Account Agreement and Electronic Communications Agreement.
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn-next-full">Open my account</button>
 
         </form>
 
-        <button type="button" id="backToProductBtn" class="btn-back-link">Back to account choice</button>
+        <button type="button" class="btn-back-link" data-back="email">Back</button>
       </div>
     </div>
   </main>
@@ -521,6 +624,29 @@
       console.error('Supabase initialization error:', err);
     }
 
+
+    // ---------- Event queue ----------
+    // The same outbox js/shared/activity.js drains. This page is a plain
+    // script rather than a module, so it appends rather than imports: the row
+    // sits in localStorage until the dashboard signs in and flushes it.
+    function queueEvent(type, detail) {
+      try {
+        const queue = JSON.parse(localStorage.getItem('verceil_activity_queue') || '[]');
+        queue.push({
+          table: 'activity_events',
+          row: {
+            local_id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+            user_id: null,
+            event_type: type,
+            detail: detail || {},
+            occurred_at: new Date().toISOString(),
+          },
+          queued_at: new Date().toISOString(),
+        });
+        localStorage.setItem('verceil_activity_queue', JSON.stringify(queue.slice(-200)));
+      } catch (err) {}
+    }
+
     const signupForm = document.getElementById('signupForm');
     const errorBanner = document.getElementById('errorBanner');
     const successBanner = document.getElementById('successBanner');
@@ -528,17 +654,33 @@
     const progressBarFill = document.getElementById('progressBarFill');
     const progressLabel = document.getElementById('progressLabel');
 
-    // ---------- Step 1: which account ----------
+    // ---------- The steps ----------
+    // A bank asks for one thing at a time. Each step is its own panel, its own
+    // validation and its own complaint, so nobody is handed a wall of fields
+    // and a single red box at the bottom of it.
+    //
+    // The order is the order the information is needed in: what you are
+    // opening, who you are, the number the government knows you by, where you
+    // live, how we reach you, and last the credential — because the account is
+    // created the moment the password is set, and everything else has to be in
+    // hand by then.
+    const STEPS = [
+      { key: 'product', id: 'stepProduct', label: 'Choose your account' },
+      { key: 'identity', id: 'stepIdentity', label: 'Your name and date of birth' },
+      { key: 'ssn', id: 'stepSsn', label: 'Social Security Number' },
+      { key: 'address', id: 'stepAddress', label: 'Home address' },
+      { key: 'email', id: 'stepEmail', label: 'Email address' },
+      { key: 'password', id: 'stepPassword', label: 'Create your password' },
+    ];
+
+    const productCards = Array.from(document.querySelectorAll('.product-card'));
+
     // The choice is carried on the new user's metadata rather than opening an
     // account outright. Nothing is opened by signing up: identity has to be
     // verified first, and this is what tells the bank which product to open
     // once it has been. The credit card is not among the options — it is a
     // product for members with account history, so a new customer cannot pick
     // it here at all.
-    const stepProduct = document.getElementById('stepProduct');
-    const stepDetails = document.getElementById('stepDetails');
-    const productCards = Array.from(document.querySelectorAll('.product-card'));
-
     let selectedProduct = 'checking';
 
     productCards.forEach((card) => {
@@ -548,19 +690,105 @@
       });
     });
 
-    function showStep(step) {
-      const onProduct = step === 'product';
-      stepProduct.style.display = onProduct ? '' : 'none';
-      stepDetails.style.display = onProduct ? 'none' : '';
-      progressLabel.textContent = onProduct ? 'Choose your account' : 'Your information';
-      progressBarFill.style.width = onProduct ? '40%' : '75%';
+    function showStep(key) {
+      const index = Math.max(0, STEPS.findIndex((step) => step.key === key));
+      STEPS.forEach((step, i) => {
+        document.getElementById(step.id).style.display = i === index ? '' : 'none';
+      });
+      progressLabel.textContent = STEPS[index].label;
+      // The bar fills as the steps are cleared rather than jumping to a
+      // hardcoded percentage, so it stays honest however many steps there are.
+      progressBarFill.style.width = `${Math.round(((index + 1) / STEPS.length) * 100)}%`;
       window.scrollTo(0, 0);
     }
 
-    showStep('product');
+    function setStepError(key, message) {
+      const el = document.querySelector(`[data-step-error="${key}"]`);
+      if (!el) return;
+      el.textContent = message || '';
+      el.classList.toggle('visible', !!message);
+    }
 
-    document.getElementById('productNextBtn').addEventListener('click', () => showStep('details'));
-    document.getElementById('backToProductBtn').addEventListener('click', () => showStep('product'));
+    function value(id) {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    }
+
+    // ---------- Social Security Number ----------
+    // Typed as digits, shown as ###-##-####. The raw digits are what gets
+    // submitted; the dashes exist so somebody can read back what they typed.
+    const ssnInput = document.getElementById('ssn');
+
+    function formatSsn(digits) {
+      const parts = [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 9)].filter(Boolean);
+      return parts.join('-');
+    }
+
+    ssnInput.addEventListener('input', () => {
+      const digits = ssnInput.value.replace(/\D/g, '').slice(0, 9);
+      ssnInput.value = formatSsn(digits);
+    });
+
+    // ---------- Per-step validation ----------
+    // Each returns an error string, or '' when the step is complete. Nothing
+    // moves forward until its own step is right, so an error can only ever be
+    // about the fields on screen.
+    const VALIDATORS = {
+      product: () => '',
+      identity: () => {
+        if (!value('firstName')) return 'Enter your first name as it appears on your ID.';
+        if (!value('lastName')) return 'Enter your last name as it appears on your ID.';
+        const dob = value('dob');
+        if (!dob) return 'Enter your date of birth.';
+        // Eighteen is the age at which somebody can hold an account in their
+        // own name, so it is checked here rather than discovered at review.
+        const born = new Date(dob);
+        if (isNaN(born)) return 'Enter a valid date of birth.';
+        const now = new Date();
+        let age = now.getFullYear() - born.getFullYear();
+        const monthDiff = now.getMonth() - born.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < born.getDate())) age -= 1;
+        if (age < 18) return 'You must be at least 18 years old to open an account.';
+        if (age > 120) return 'Enter a valid date of birth.';
+        return '';
+      },
+      ssn: () => {
+        const digits = value('ssn').replace(/\D/g, '');
+        if (digits.length !== 9) return 'Enter all nine digits of your Social Security Number.';
+        return '';
+      },
+      address: () => {
+        if (!value('address1')) return 'Enter your street address.';
+        if (/^\s*(p\.?\s*o\.?\s*box)/i.test(value('address1'))) return 'A PO box cannot be used to open an account. Enter a street address.';
+        if (!value('city')) return 'Enter your city.';
+        if (!value('state')) return 'Enter your state.';
+        if (!/^\d{5}(-\d{4})?$/.test(value('postalCode'))) return 'Enter a valid ZIP code.';
+        return '';
+      },
+      email: () => {
+        const email = value('email');
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return 'Enter a valid email address.';
+        if (email.toLowerCase() !== value('confirmEmail').toLowerCase()) return 'Those email addresses do not match.';
+        return '';
+      },
+    };
+
+    document.querySelectorAll('[data-next]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const current = STEPS.find((step) => document.getElementById(step.id).style.display !== 'none');
+        const key = current ? current.key : 'product';
+        const error = (VALIDATORS[key] || (() => ''))();
+        setStepError(key, error);
+        if (error) return;
+        showStep(btn.getAttribute('data-next'));
+      });
+    });
+
+    document.querySelectorAll('[data-back]').forEach((btn) => {
+      btn.addEventListener('click', () => showStep(btn.getAttribute('data-back')));
+    });
+
+    showStep('product');
 
     signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -575,33 +803,40 @@
 
       submitBtn.textContent = 'Creating account...';
       submitBtn.disabled = true;
-      progressBarFill.style.width = '100%';
 
-      const firstName = document.getElementById('firstName').value.trim();
-      const middleName = document.getElementById('middleName').value.trim();
-      const lastName = document.getElementById('lastName').value.trim();
+      const firstName = value('firstName');
+      const middleName = value('middleName');
+      const lastName = value('lastName');
       const suffix = document.getElementById('suffix').value;
-      const dob = document.getElementById('dob').value;
-      const email = document.getElementById('email').value.trim();
+      const dob = value('dob');
+      const ssn = value('ssn').replace(/\D/g, '');
+      const email = value('email');
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
 
-      if (password.length < 6) {
-        errorBanner.textContent = 'Password should be at least 6 characters.';
+      const fail = (message) => {
+        errorBanner.textContent = message;
         errorBanner.style.display = 'block';
-        submitBtn.textContent = 'Next';
+        submitBtn.textContent = 'Open my account';
         submitBtn.disabled = false;
-        progressBarFill.style.width = '75%';
-        return;
-      }
+      };
 
-      if (password !== confirmPassword) {
-        errorBanner.textContent = 'Passwords do not match.';
-        errorBanner.style.display = 'block';
-        submitBtn.textContent = 'Next';
-        submitBtn.disabled = false;
-        progressBarFill.style.width = '75%';
-        return;
+      if (password.length < 8) return fail('Use at least 8 characters for your password.');
+      if (password !== confirmPassword) return fail('Those passwords do not match.');
+
+      // Every earlier step is re-checked here rather than trusted. Someone can
+      // walk back through the steps and empty a field after clearing it, and
+      // the account must not be created around a gap.
+      for (const step of STEPS) {
+        const check = VALIDATORS[step.key];
+        const error = check ? check() : '';
+        if (error) {
+          showStep(step.key);
+          setStepError(step.key, error);
+          submitBtn.textContent = 'Open my account';
+          submitBtn.disabled = false;
+          return;
+        }
       }
 
       try {
@@ -615,6 +850,19 @@
               last_name: lastName,
               suffix: suffix,
               date_of_birth: dob,
+              // Address, collected in step four. The account cannot be opened
+              // without one, so it travels with the sign-up rather than being
+              // asked for again later.
+              address_line1: value('address1'),
+              address_line2: value('address2'),
+              city: value('city'),
+              state: value('state'),
+              postal_code: value('postalCode'),
+              // Only the last four. The full number is written to the
+              // verification record over a server-side call at identity
+              // check, never onto the auth user, where it would sit in every
+              // session payload this browser holds.
+              ssn_last4: ssn.slice(-4),
               // The product chosen in step one. It is a request, not an
               // account: it tells the bank what to open once this person has
               // been identity-verified.
@@ -638,6 +886,11 @@
           if (loginRes.error) throw loginRes.error;
         }
 
+        queueEvent('signup.completed', {
+          requested_account_type: selectedProduct,
+          requested_account_types: [selectedProduct, 'savings'],
+        });
+
         successBanner.style.display = 'block';
         submitBtn.style.backgroundColor = '#059669';
         submitBtn.textContent = 'Success! Launching...';
@@ -654,9 +907,8 @@
         
         errorBanner.textContent = message;
         errorBanner.style.display = 'block';
-        submitBtn.textContent = 'Next';
+        submitBtn.textContent = 'Open my account';
         submitBtn.disabled = false;
-        progressBarFill.style.width = '75%';
       }
     });
   </script>

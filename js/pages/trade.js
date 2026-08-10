@@ -212,6 +212,19 @@ export function init(root, ctx, side = 'buy', prefill = null) {
       });
       if (error) throw error;
 
+      // A buy takes cash out of the investment account and a sell puts it
+      // back, so the sign follows the side of the order. Pending, because an
+      // order is submitted to a market rather than settled on the spot.
+      ctx.recordTransaction({
+        accountType: 'investments',
+        amount: pendingTrade.side === 'buy' ? -Math.abs(pendingTrade.total) : Math.abs(pendingTrade.total),
+        title: `${pendingTrade.side === 'buy' ? 'Buy' : 'Sell'} ${pendingTrade.shares} ${pendingTrade.symbol}`,
+        iconText: pendingTrade.side === 'buy' ? '↑' : '↓',
+        category: 'trade',
+        reference: pendingTrade.ref,
+        status: 'pending',
+      });
+
       if (pendingTrade.side === 'buy') {
         if (pendingTrade.heldRow) {
           const newShares = Number(pendingTrade.heldRow.shares) + pendingTrade.shares;

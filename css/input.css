@@ -2400,3 +2400,109 @@ html.dark body .vb-modal-btn-quiet {
 }
 
 html.dark body .vb-modal-btn-quiet:hover { background: rgba(255, 255, 255, 0.05); }
+
+/* ===================== LOCKED PROFILE FIELDS =====================
+   Name and date of birth. Both were checked against a government ID when the
+   customer was verified, so they are the bank's record rather than a setting —
+   these screens show them and say so, and there is no input on either to
+   change them with. A correction goes through a representative, and the change
+   itself is made in the database by an administrator.
+
+   Styled as a record rather than a disabled form: greyed-out inputs read as
+   something broken, while a plain row of label and value reads as a fact. */
+.pf-locked-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 20px;
+  padding: 4px 20px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+}
+
+html.dark body .pf-locked-card {
+  background: #0D1728;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.pf-locked-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+html.dark body .pf-locked-row { border-bottom-color: rgba(255, 255, 255, 0.06); }
+
+.pf-locked-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6B7280;
+  flex-shrink: 0;
+}
+
+html.dark body .pf-locked-label { color: #8E9CBA; }
+
+.pf-locked-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0F172A;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+html.dark body .pf-locked-value { color: #FFFFFF; }
+
+/* The padlock. Quiet and factual — this is not a warning, it is the state the
+   field is meant to be in. */
+.pf-locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+html.dark body .pf-locked-badge {
+  background: rgba(255, 255, 255, 0.06);
+  color: #8E9CBA;
+}
+
+.pf-locked-badge svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.pf-locked-note {
+  background: #F8FAFC;
+  border: 1px solid #E5E7EB;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 28px;
+}
+
+html.dark body .pf-locked-note {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.pf-locked-note-t {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 6px;
+}
+
+html.dark body .pf-locked-note-t { color: #FFFFFF; }
+
+.pf-locked-note-s {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.55;
+}
+
+html.dark body .pf-locked-note-s { color: #8E9CBA; }

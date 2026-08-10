@@ -93,6 +93,26 @@ export function init(root, ctx) {
       });
       if (error) throw error;
 
+      // Two ledger rows, because a transfer is two movements: one account is
+      // debited and another credited, and each account's activity list has to
+      // show its own side of it.
+      ctx.recordTransaction({
+        accountType: pendingTransfer.from,
+        amount: -Math.abs(pendingTransfer.amount),
+        title: `Transfer to ${accountLabels[pendingTransfer.to]}`,
+        iconText: '↑',
+        category: 'transfer',
+        reference: pendingTransfer.confirmation,
+      });
+      ctx.recordTransaction({
+        accountType: pendingTransfer.to,
+        amount: Math.abs(pendingTransfer.amount),
+        title: `Transfer from ${accountLabels[pendingTransfer.from]}`,
+        iconText: '↓',
+        category: 'transfer',
+        reference: pendingTransfer.confirmation,
+      });
+
       const fromEl = document.getElementById(accountBalanceIds[pendingTransfer.from]);
       const toEl = document.getElementById(accountBalanceIds[pendingTransfer.to]);
       if (fromEl) fromEl.textContent = formatCurrency(parseBalanceText(fromEl.textContent) - pendingTransfer.amount);

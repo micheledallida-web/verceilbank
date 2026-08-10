@@ -1,4 +1,10 @@
-import { showConfirmation } from '../shared/profile-confirmation.js';
+// Date of Birth — Profile > Personal Information > Date of Birth.
+//
+// Read-only. This is one of the two fields the bank's record of a person rests
+// on, checked against a government ID at verification, so it is not something
+// a session can change: the screen has no input, the module has no save, and
+// the only route to a correction is a representative who can evidence it.
+// Changing it in the database is an administrator's job.
 
 let listeners = [];
 function on(el, evt, fn) {
@@ -7,58 +13,53 @@ function on(el, evt, fn) {
   listeners.push(() => el.removeEventListener(evt, fn));
 }
 
-async function getOrCreateUserProfile({ supabaseClient, getCurrentUser }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  if (!supabaseClient) return { user_id: user.id };
-  try {
-    const { data } = await supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle();
-    return data || { user_id: user.id };
-  } catch (err) {
-    console.error('Load profile error:', err);
-    return { user_id: user.id };
-  }
-}
-
-async function saveUserProfile({ supabaseClient, getCurrentUser }, patch) {
-  const user = await getCurrentUser();
-  if (!user || !supabaseClient) throw new Error('Not signed in');
-  const { error } = await supabaseClient.from('user_profile').upsert({ user_id: user.id, ...patch }, { onConflict: 'user_id' });
-  if (error) throw error;
-}
-
 function formatDob(value) {
-  if (!value) return 'May 14, 1990';
-  const [year, month, day] = value.split('-').map(Number);
+  if (!value) return '';
+  const [year, month, day] = String(value).split('-').map(Number);
+  if (!year || !month || !day) return '';
   const d = new Date(year, month - 1, day);
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+// Three places have held a date of birth over the life of this app — the
+// profile row, the verification record and what was typed at sign-up — so all
+// three are read and whichever is on file is shown.
+async function readDateOfBirth({ supabaseClient, getCurrentUser }) {
+  const user = await getCurrentUser();
+  if (!user) return '';
+  const meta = (user.user_metadata) || {};
+
+  if (!supabaseClient) return meta.date_of_birth || meta.dob || '';
+
+  try {
+    const [profileRes, verificationRes] = await Promise.all([
+      supabaseClient.from('user_profile').select('date_of_birth').eq('user_id', user.id).maybeSingle(),
+      supabaseClient.from('verification_requests').select('date_of_birth').eq('user_id', user.id)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    return (profileRes.data && profileRes.data.date_of_birth)
+      || (verificationRes.data && verificationRes.data.date_of_birth)
+      || meta.date_of_birth || meta.dob || '';
+  } catch (err) {
+    console.error('Date of birth read error:', err);
+    return meta.date_of_birth || meta.dob || '';
+  }
 }
 
 export async function init(root, ctx) {
-  const { loadPage, showModal } = ctx;
+  const { loadPage, openSupportMessage } = ctx;
 
   root.querySelectorAll('[data-action="back"]').forEach((btn) => on(btn, 'click', () => loadPage('profile')));
 
-  const profile = await getOrCreateUserProfile(ctx);
-  if (profile && profile.date_of_birth) {
-    root.querySelector('#pdDobInput').value = profile.date_of_birth;
-    root.querySelector('#pdCurrentDob').textContent = formatDob(profile.date_of_birth);
-  }
+  on(root.querySelector('#pdContactBtn'), 'click', () => openSupportMessage({
+    category: 'Account',
+    subject: 'Correction to date of birth',
+    body: 'The date of birth on my account is incorrect. Please tell me what documentation you need to correct it.',
+  }));
 
-  on(root.querySelector('#pdSaveBtn'), 'click', async () => {
-    const value = root.querySelector('#pdDobInput').value;
-    if (!value) {
-      showModal('Missing Date of Birth', 'Please select a date of birth before saving.');
-      return;
-    }
-    try {
-      await saveUserProfile(ctx, { date_of_birth: value });
-      showConfirmation(root, ctx, { fieldLabel: 'Date of Birth', valueText: formatDob(value) });
-    } catch (err) {
-      console.error(err);
-      showModal('Could Not Save', 'Please try again.');
-    }
-  });
+  const dob = await readDateOfBirth(ctx);
+  const el = root.querySelector('#pdCurrentDob');
+  if (el) el.textContent = formatDob(dob) || 'Not on file';
 }
 
 export function cleanup() {

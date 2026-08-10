@@ -7,6 +7,14 @@
 // and parses the one screen someone is looking at.
 
 import { createLiveSparkline } from './shared/live-sparkline.js';
+import {
+  initActivity,
+  recordEvent,
+  recordTransaction,
+  readLocalActivity,
+  subscribeToActivity,
+  flushQueue,
+} from './shared/activity.js';
 
 // Populated by js/config.js (generated at build time from SUPABASE_URL /
 // SUPABASE_ANON_KEY env vars -- see scripts/generate-config.js). js/config.js
@@ -221,6 +229,13 @@ async function loadBankReference() {
     if (!user) return;
     currentUserId = user.id;
 
+    // From here on the ledger and the event log know who they belong to, and
+    // anything queued before this — including whatever sign-in and sign-up put
+    // in the queue on their way here — goes out.
+    initActivity({ supabaseClient, currentUserId });
+    recordEvent('session.started', { returning: true });
+    startActivityFlow();
+
     // The accounts and the verification status are wanted together — the
     // opening-terms notice needs both — so they are asked for together.
     const [accountsRes, profileRes] = await Promise.all([
@@ -254,6 +269,24 @@ async function loadBankReference() {
   } catch (err) {
     console.error('Account reference error:', err);
   }
+}
+
+// ---------- The inbound flow ----------
+// Rows written anywhere else — a representative posting a credit, a transfer
+// made on another device, an administrator correcting the record — arrive here
+// over Realtime and the app reacts to them rather than waiting for a refresh.
+let stopActivityFlow = null;
+
+function startActivityFlow() {
+  if (stopActivityFlow) return;
+  stopActivityFlow = subscribeToActivity(({ kind, row }) => {
+    if (kind !== 'transaction') return;
+    // A transaction landing means a balance moved, so the badge and the
+    // account cards are asked to catch up. The accounts subscription in
+    // initSupabaseData() carries the balances themselves.
+    refreshAlertsBadge();
+    console.info('Transaction received:', row && row.title);
+  });
 }
 
 // An account number is the bank's record, not a value each device recomputes,
@@ -419,8 +452,12 @@ const htmlElement = document.documentElement;
 const THEME_KEY = 'vercel_bank_theme';
 
 export function applyTheme(isDark) {
+  const changed = htmlElement.classList.contains('dark') !== isDark;
   htmlElement.classList.toggle('dark', isDark);
   document.body.classList.toggle('dark', isDark);
+  // Only an actual change, not the call at boot that re-asserts what the head
+  // script already decided.
+  if (changed) recordEvent('settings.changed', { changed: ['theme'], values: { theme: isDark ? 'dark' : 'light' } });
   // Wrapped, because a browser with storage blocked — a TV, a kiosk, private
   // browsing — throws here. Unguarded, that throw happened at module load and
   // took the entire app down with it rather than just the one setting.
@@ -477,6 +514,7 @@ export function writeSettings(patch) {
   const next = { ...readSettings(), ...patch };
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch (err) {}
   applySettings(next);
+  recordEvent('settings.changed', { changed: Object.keys(patch), values: patch });
   return next;
 }
 
@@ -572,7 +610,13 @@ export async function loadPage(name, ...args) {
   // Everything that moves money passes through here, so this is the one place
   // the full-access rule has to be enforced — a new screen or a new button
   // that calls loadPage() is covered without knowing the rule exists.
-  if (!allowFullAccess(name)) return;
+  if (!allowFullAccess(name)) {
+    recordEvent('screen.blocked', { screen: name, reason: kycStatus === 'verified' ? 'unfunded' : 'unverified' });
+    return;
+  }
+
+  // Same reasoning for the audit trail: one call site covers every screen.
+  recordEvent('screen.opened', { screen: name });
 
   // Tear down whatever page is currently open first
   if (activePageCleanup) { activePageCleanup(); activePageCleanup = null; }
@@ -611,6 +655,13 @@ export async function loadPage(name, ...args) {
     applyTheme,
     isDarkTheme: () => htmlElement.classList.contains('dark'),
     openCompulsorySavings,
+    // The ledger and the event log. Every flow that moves money calls
+    // recordTransaction() so it lands in the account's activity list; anything
+    // else worth keeping calls recordEvent(). Both queue locally first, so a
+    // page module never has to think about the network.
+    recordEvent,
+    recordTransaction,
+    readLocalActivity,
     MINIMUM_OPENING_DEPOSIT,
     MINIMUM_OPENING_DEPOSIT_LABEL,
     FUNDING_DEADLINE_DAYS,
@@ -704,6 +755,12 @@ function goToSignIn(reason) {
 }
 
 async function handleSignOut(reason) {
+  // Recorded before the sign-out rather than after it. The queue outlives the
+  // redirect; the session does not, so writing it afterwards would write it as
+  // nobody.
+  recordEvent('session.ended', { reason: reason || 'user_signed_out' });
+  await flushQueue();
+
   try {
     if (!supabaseClient) throw new Error('Supabase client is unavailable — signing out locally only.');
 

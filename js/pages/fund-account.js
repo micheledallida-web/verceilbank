@@ -224,6 +224,11 @@ export function init(root, ctx) {
 
   on(continueBtn, 'click', () => {
     if (chosenUsd < MIN_USD || chosenUsd > MAX_USD) return;
+    // A deposit request, not a deposit: the money arrives when the payment
+    // does, so this is an event rather than a ledger row. The credit is posted
+    // by the server when the deposit confirms, and arrives here over the
+    // Realtime flow in js/shared/activity.js.
+    ctx.recordEvent('deposit.requested', { amount_usd: chosenUsd, method: 'bitcoin' });
     showMethodScreen();
   });
 

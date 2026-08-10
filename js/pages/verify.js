@@ -531,6 +531,10 @@ export function init(root, ctx) {
         .eq('id', user.id);
       if (profileError) throw profileError;
 
+      // The documents themselves are never logged — only that they were sent,
+      // and which kind of ID they were.
+      if (ctx.recordEvent) ctx.recordEvent('verification.submitted', { id_type: selectedIdType });
+
       // 4. Straight into the pending state, in place. The view stays open.
       let submittedAt = null;
       try {
