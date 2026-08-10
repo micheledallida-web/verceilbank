@@ -30,7 +30,10 @@ const DEPOSIT = {
   expiryKey: 'verceil_fund_deposit_expiry',
 };
 
-const MIN_USD = 25;
+// The floor is the opening deposit every account is held to, not a separate
+// rule this screen invented — a screen that accepted $25 while the rest of the
+// app asked for $100 was telling people the deposit was made when it was not.
+const MIN_USD = 100;
 const MAX_USD = 100000;
 // Matches the field's transform transition, so the class comes off once the
 // pop has played and the next chip tap can replay it.

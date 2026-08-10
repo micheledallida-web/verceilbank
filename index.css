@@ -13,6 +13,13 @@
   --vb-navy: #004B87;
   --vb-navy-deep: #002E52;
 
+  /* The action green. It belongs to the two promotional calls to action —
+     the investing bonus and the article — and to nothing else, which is what
+     keeps it meaning "this one is worth a look" rather than becoming a second
+     brand colour. */
+  --vb-green: #1B853E;
+  --vb-green-dark: #156D31;
+
   /* Ink & surfaces */
   --vb-ink: #141414;
   --vb-body: #3D4550;
@@ -659,12 +666,15 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* Secondary promo action — same pill language as the primary CTA */
+/* Same pill, same size, same spacing — only the colour changes. Green is what
+   these two buttons were, and it reads as an offer rather than as another
+   piece of navigation. */
 .btn-success-custom {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--vb-blue);
-  border: 1px solid var(--vb-blue);
+  background-color: var(--vb-green);
+  border: 1px solid var(--vb-green);
   color: #ffffff;
   font-weight: 700;
   font-size: 0.94rem;
@@ -675,8 +685,8 @@ a { text-decoration: none; color: inherit; }
 }
 
 .btn-success-custom:hover {
-  background-color: var(--vb-blue-dark);
-  border-color: var(--vb-blue-dark);
+  background-color: var(--vb-green-dark);
+  border-color: var(--vb-green-dark);
 }
 
 /* --------------------------------------------------------------------------

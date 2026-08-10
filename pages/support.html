@@ -90,7 +90,10 @@
 
   <!-- Reply composer. Fixed to the bottom of the screen so it stays put while the
        conversation scrolls behind it; shown and hidden with the thread view. -->
-  <div id="supComposer" class="hidden fixed bottom-0 left-0 right-0 z-[41] bg-white dark:bg-[#0D1728] border-t border-gray-100 dark:border-white/[0.06]">
+  <!-- Above the bottom navigation, not under it. At z-41 the nav bar was
+       painted over the reply box, so the one control this screen exists for
+       was half covered by tabs. -->
+  <div id="supComposer" class="hidden fixed bottom-0 left-0 right-0 z-[51] bg-white dark:bg-[#0D1728] border-t border-gray-100 dark:border-white/[0.06]">
     <div class="w-full max-w-[430px] mx-auto px-[16px] py-[10px]">
 
       <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
