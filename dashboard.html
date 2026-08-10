@@ -172,6 +172,12 @@
         <span id="accountStatusActionLabel"></span>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </span>
+      <!-- Puts the notice away for this visit. What it is asking for is still
+           outstanding, so it returns next time — and the gate in js/main.js
+           asks again the moment someone tries to move money. -->
+      <span class="home-notice-x" id="accountStatusDismiss" role="button" tabindex="0" aria-label="Dismiss">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </span>
     </button>
 
     <div class="home-columns">
@@ -485,6 +491,11 @@
     <div class="bg-white dark:bg-[#0D1728] text-[#111827] dark:text-white border border-gray-200 dark:border-white/10 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center space-y-4">
       <h3 id="modalTitle" class="text-base font-bold">Secure Action</h3>
       <p id="modalDesc" class="text-xs text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed">Connecting securely to your Verceil Private Banking session...</p>
+      <!-- The action button only exists when showModal() is given something to
+           do. Without one the modal is a message with an acknowledgement, which
+           is what most callers want; with one it becomes a decision, and the
+           dismiss button below re-labels itself accordingly. -->
+      <button id="modalActionBtn" class="hidden w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"></button>
       <button id="modalCloseBtn" class="w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer">
         Continue
       </button>

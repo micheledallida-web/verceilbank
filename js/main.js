@@ -230,15 +230,42 @@ function daysLeftToFund() {
   return FUNDING_DEADLINE_DAYS - elapsed;
 }
 
+// Dismissing the notice puts it away for this visit, not for good. It is a
+// banner, not a decision — the thing it is asking for is still outstanding —
+// so it comes back next time the app is opened, and in the meantime the gate
+// below asks at the only moment it genuinely matters. sessionStorage rather
+// than localStorage is exactly that distinction.
+const STATUS_DISMISSED_KEY = 'verceil_status_notice_dismissed';
+
+function statusNoticeDismissed() {
+  try { return sessionStorage.getItem(STATUS_DISMISSED_KEY) === '1'; } catch (err) { return false; }
+}
+
+function dismissStatusNotice() {
+  try { sessionStorage.setItem(STATUS_DISMISSED_KEY, '1'); } catch (err) {}
+  const notice = document.getElementById('accountStatusNotice');
+  if (notice) notice.classList.add('hidden');
+}
+
+// What full access means, in one place. Both conditions have to hold: an
+// identity the bank has confirmed, and the opening deposit actually deposited.
+export function fullAccessState() {
+  return {
+    known: openingTermsLoaded && depositBalanceLoaded,
+    verified: kycStatus === 'verified',
+    funded: depositBalanceCents >= MINIMUM_OPENING_DEPOSIT * 100,
+    kycStatus,
+  };
+}
+
 function renderAccountStatus() {
   const notice = document.getElementById('accountStatusNotice');
   if (!notice) return;
 
-  const funded = depositBalanceCents >= MINIMUM_OPENING_DEPOSIT * 100;
-  const verified = kycStatus === 'verified';
+  const { known, verified, funded } = fullAccessState();
 
-  // Nothing outstanding, or nothing known yet.
-  if (!openingTermsLoaded || !depositBalanceLoaded || (funded && verified)) {
+  // Nothing outstanding, nothing known yet, or put away for this visit.
+  if (!known || (funded && verified) || statusNoticeDismissed()) {
     notice.classList.add('hidden');
     return;
   }
@@ -279,6 +306,59 @@ function renderAccountStatus() {
   document.getElementById('accountStatusActionLabel').textContent = actionLabel;
   notice.onclick = action;
   notice.classList.remove('hidden');
+
+  const dismissBtn = document.getElementById('accountStatusDismiss');
+  if (dismissBtn) {
+    dismissBtn.onclick = (event) => {
+      // The whole banner is the tap target for the action, so the X has to
+      // stop the click before it reaches it.
+      event.stopPropagation();
+      dismissStatusNotice();
+    };
+  }
+}
+
+// ---------- Full-access gate ----------
+// Screens that move money or buy something. Reading is never gated — someone
+// can look at their accounts, their statements and their profile whatever
+// state their application is in — and neither is anything that gets them out
+// of this state: Fund Account and the identity check are the way through it,
+// not things to be stopped by it.
+const FULL_ACCESS_PAGES = [
+  'transfer',
+  'send-money',
+  'external-transfers',
+  'wire-transfers',
+  'scheduled-payments',
+  'trade',
+];
+
+// Asks for whichever step is outstanding, and takes them there. Returns false
+// when the page should not open. Nothing is blocked until the two reads have
+// landed — a slow network is not a reason to tell somebody they are unverified.
+function allowFullAccess(name) {
+  if (!FULL_ACCESS_PAGES.includes(name)) return true;
+
+  const { known, verified, funded } = fullAccessState();
+  if (!known || (verified && funded)) return true;
+
+  if (!verified) {
+    showModal(
+      'Verify your identity first',
+      kycStatus === 'pending'
+        ? "Your documents are with a representative. We'll notify you within 1 business day, and this unlocks as soon as you're verified."
+        : 'Moving money needs a confirmed identity. It takes about 3 minutes, and unlocks every account you hold.',
+      kycStatus === 'pending' ? undefined : { label: 'Verify now', run: () => loadPage('verify') },
+    );
+    return false;
+  }
+
+  showModal(
+    `Add ${MINIMUM_OPENING_DEPOSIT_LABEL} to continue`,
+    `Your accounts need their ${MINIMUM_OPENING_DEPOSIT_LABEL} opening deposit before money can move in or out. It takes a minute, and it is what keeps the account open.`,
+    { label: 'Fund account', run: () => loadPage('fund-account') },
+  );
+  return false;
 }
 
 // The masked numbers on the account cards were literals in the markup, so every
@@ -406,14 +486,43 @@ IDLE_EVENTS.forEach((evt) => {
 const actionModal = document.getElementById('actionModal');
 const modalTitle = document.getElementById('modalTitle');
 const modalDesc = document.getElementById('modalDesc');
+const modalActionBtn = document.getElementById('modalActionBtn');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 
-export function showModal(title, desc) {
+// `action` is optional: { label, run }. Given one, the modal grows a primary
+// button that does the thing and the existing button becomes the way out —
+// which is what turns this from an announcement into a question. Every caller
+// that passes nothing behaves exactly as it did before.
+export function showModal(title, desc, action) {
   modalTitle.textContent = title;
   modalDesc.textContent = desc;
+
+  if (action && action.label) {
+    modalActionBtn.textContent = action.label;
+    modalActionBtn.classList.remove('hidden');
+    modalActionBtn.onclick = () => {
+      hideModal();
+      if (action.run) action.run();
+    };
+    modalCloseBtn.textContent = action.cancelLabel || 'Not now';
+    // A secondary button that looks like the primary one is how people agree
+    // to things they meant to decline.
+    modalCloseBtn.className = 'w-full py-2.5 rounded-xl bg-transparent border border-gray-200 dark:border-white/10 hover:opacity-90 text-[#6B7280] dark:text-[#8E9CBA] font-semibold text-xs transition-all cursor-pointer';
+  } else {
+    modalActionBtn.classList.add('hidden');
+    modalActionBtn.onclick = null;
+    modalCloseBtn.textContent = 'Continue';
+    modalCloseBtn.className = 'w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer';
+  }
+
   actionModal.classList.remove('hidden');
 }
-modalCloseBtn.addEventListener('click', () => actionModal.classList.add('hidden'));
+
+function hideModal() {
+  actionModal.classList.add('hidden');
+}
+
+modalCloseBtn.addEventListener('click', hideModal);
 
 // ---------- Lazy page loader ----------
 // pageRoot is a single empty <div> in index.html. Every screen's markup gets
@@ -435,6 +544,11 @@ export async function loadPage(name, ...args) {
     if (activePageCleanup) { activePageCleanup(); activePageCleanup = null; }
     return openNavMenu('navProfile');
   }
+
+  // Everything that moves money passes through here, so this is the one place
+  // the full-access rule has to be enforced — a new screen or a new button
+  // that calls loadPage() is covered without knowing the rule exists.
+  if (!allowFullAccess(name)) return;
 
   // Tear down whatever page is currently open first
   if (activePageCleanup) { activePageCleanup(); activePageCleanup = null; }
@@ -520,11 +634,15 @@ const headerMenus = {
   // Quick Actions holds what is not already reachable from the home screen.
   // "Download all statements" was the Statements action in the row below the
   // balance under a second name, so it is gone; Card Services is filtered out
-  // below for anyone without a card, which leaves Settings as the one thing
-  // here that exists nowhere else.
+  // below for anyone without a card, which leaves Settings.
+  //
+  // Sign Out is the one deliberate repeat in the whole app. It is also in the
+  // Profile sheet, and that is the point: leaving should never be more than
+  // one tap away from wherever you are, and this menu is reachable from the
+  // top of the screen while Profile is at the bottom.
   more: {
     title: 'Quick Actions',
-    items: ['Card Services', 'Settings'],
+    items: ['Card Services', 'Settings', 'Sign Out'],
   },
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode'] },
   messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
@@ -680,15 +798,20 @@ function openHeaderDropdown(key, anchorEl) {
     const sublabel = typeof item === 'string' ? '' : (item.sublabel || '');
     const inert = typeof item !== 'string' && item.inert;
     const isLast = idx === items.length - 1;
+    // Signing out reads red here for the same reason it does in the Profile
+    // sheet: it is the one row in the menu that ends the session, and it
+    // should never be mistaken for the row above it.
+    const isSignOut = label === 'Sign Out';
+    const rowColor = isSignOut ? '#DC2626' : textColor;
     return `
       <button class="header-dropdown-item w-full flex items-center gap-[12px] px-[16px] py-[10px] transition-colors duration-200 ${inert ? 'cursor-default' : 'cursor-pointer'} text-left"
-        style="min-height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${textColor};"
-        data-label="${label}" ${inert ? 'data-inert="1"' : ''}>
+        style="min-height:52px; ${isLast ? '' : `border-bottom:1px solid ${rowBorder};`} color:${rowColor};"
+        data-label="${label}" ${isSignOut ? 'data-signout="1"' : ''} ${inert ? 'data-inert="1"' : ''}>
         <span class="flex-1 min-w-0">
-          <span class="block text-[15px] font-medium truncate">${label}</span>
+          <span class="block text-[15px] ${isSignOut ? 'font-semibold' : 'font-medium'} truncate">${label}</span>
           ${sublabel ? `<span class="block text-[12px] font-normal truncate" style="color:${chevronColor};">${sublabel}</span>` : ''}
         </span>
-        ${inert ? '' : `<svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`}
+        ${inert || isSignOut ? '' : `<svg class="w-[16px] h-[16px] flex-shrink-0" style="color:${chevronColor};" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`}
       </button>
     `;
   }).join('');
@@ -705,8 +828,12 @@ function openHeaderDropdown(key, anchorEl) {
   headerDropdown.classList.remove('hidden');
 
   headerDropdownList.querySelectorAll('.header-dropdown-item').forEach(btn => {
-    btn.addEventListener('mouseenter', () => { btn.style.color = '#2563EB'; });
-    btn.addEventListener('mouseleave', () => { btn.style.color = textColor; });
+    // Sign Out keeps its own colour through the hover, rather than turning
+    // blue like a navigation row on the way to being tapped.
+    const restColor = btn.getAttribute('data-signout') ? '#DC2626' : textColor;
+    const hoverColor = btn.getAttribute('data-signout') ? '#B91C1C' : '#2563EB';
+    btn.addEventListener('mouseenter', () => { btn.style.color = hoverColor; });
+    btn.addEventListener('mouseleave', () => { btn.style.color = restColor; });
     btn.addEventListener('click', () => {
       const clickedLabel = btn.getAttribute('data-label');
       closeHeaderDropdown();

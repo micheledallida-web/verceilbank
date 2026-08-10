@@ -786,3 +786,63 @@ a { text-decoration: none; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .quick-link-item, .hero-title, .btn { transition: none !important; }
 }
+
+/* ==========================================================================
+   RETIREMENT / IRA SECTION
+   The shortest section on the page on purpose. An IRA is one decision — tax
+   now or tax later — so the block states the two options side by side and
+   stops. Everything else about IRAs belongs on the product page, not here.
+   Built on the brand tokens rather than its own colours, so it moved with the
+   rest of the page when the palette changed.
+   ========================================================================== */
+.ira-eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--vb-blue);
+  margin-bottom: 0.5rem;
+}
+
+.ira-paragraph {
+  margin-bottom: 1.25rem;
+}
+
+.ira-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.ira-option {
+  background: var(--vb-tint);
+  border: 1px solid var(--vb-line);
+  border-left: 3px solid var(--vb-blue);
+  border-radius: var(--vb-radius);
+  padding: 0.85rem 1rem;
+}
+
+.ira-option-name {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--vb-ink);
+  margin-bottom: 0.2rem;
+}
+
+.ira-option-line {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--vb-body);
+  line-height: 1.4;
+}
+
+/* Two cards side by side stop being two cards below about 480px — they become
+   two slivers. They stack instead. */
+@media (max-width: 520px) {
+  .ira-options {
+    grid-template-columns: 1fr;
+  }
+}
