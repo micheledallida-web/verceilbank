@@ -1,44 +1,85 @@
 <div class="w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[40px]">
+
   <div class="flex items-center gap-3 mb-[16px]">
     <button data-action="close" class="w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Back">
       <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
     </button>
-    <div class="text-[20px] font-bold text-white truncate">Report Lost or Stolen Card</div>
+    <div class="text-[20px] font-bold text-white truncate">Report a Card</div>
   </div>
 
-  <div class="bg-[#EF4444]/15 border border-[#EF4444]/30 rounded-[16px] p-[14px] mb-[16px]">
-    <div class="text-[13px] font-semibold text-white">⚠️ Your card can be immediately blocked to prevent unauthorized transactions.</div>
+  <!-- What actually happens, stated plainly. A red alarm strip tells someone
+       who has just lost their card that they are in trouble; they are not —
+       the bank is. This says what the bank will do about it. -->
+  <div class="rc-note">
+    <span class="rc-note-ic">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l7.5 3v5.5c0 4.4-3.1 8.2-7.5 9.5-4.4-1.3-7.5-5.1-7.5-9.5V6z"></path>
+        <path d="M9.2 12.2l2 2 3.6-3.9"></path>
+      </svg>
+    </span>
+    <span class="rc-note-body">
+      <span class="rc-note-t">You're covered from the moment you report it</span>
+      <span class="rc-note-s">We stop the card straight away. You are not responsible for anything charged to it after this report, and your account stays open.</span>
+    </span>
   </div>
 
-  <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[22px] p-[18px] shadow-lg">
-    <div class="flex flex-col gap-[12px]">
-      <div>
-        <label class="text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px] block">Card</label>
-        <select id="reportCardType" class="w-full h-[44px] px-[14px] rounded-[12px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[14px] text-[#111827] dark:text-white outline-none">
+  <!-- ---- The report ---- -->
+  <div class="rc-card">
+    <div class="rc-field">
+      <label class="rc-label" for="reportCardType">Which card</label>
+      <div class="rc-select-wrap">
+        <select id="reportCardType" class="rc-select">
           <option value="debit">Debit Card</option>
           <option value="credit">Credit Card</option>
         </select>
+        <svg class="rc-select-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-      <div>
-        <label class="text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px] block">Reason</label>
-        <select id="reportReason" class="w-full h-[44px] px-[14px] rounded-[12px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[14px] text-[#111827] dark:text-white outline-none">
+    </div>
+
+    <div class="rc-field">
+      <label class="rc-label" for="reportReason">What happened</label>
+      <div class="rc-select-wrap">
+        <select id="reportReason" class="rc-select">
           <option>Lost</option>
           <option>Stolen</option>
           <option>Damaged</option>
           <option>Unauthorized Use</option>
         </select>
+        <svg class="rc-select-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-      <div>
-        <label class="text-[12px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] mb-[6px] block">Replacement</label>
-        <select id="reportReplacement" class="w-full h-[44px] px-[14px] rounded-[12px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[14px] text-[#111827] dark:text-white outline-none">
+    </div>
+
+    <div class="rc-field">
+      <label class="rc-label" for="reportReplacement">Replacement</label>
+      <div class="rc-select-wrap">
+        <select id="reportReplacement" class="rc-select">
           <option>Standard Delivery</option>
           <option>Expedited Delivery</option>
           <option>Temporary Digital Card</option>
         </select>
+        <svg class="rc-select-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="6 9 12 15 18 9"></polyline></svg>
       </div>
-      <div id="reportCardError" class="hidden text-[12px] font-medium text-[#EF4444]"></div>
-      <button id="lockNowBtn" class="w-full h-[46px] rounded-[14px] bg-[#DC2626] text-white text-[14px] font-semibold cursor-pointer">Lock Card Immediately</button>
-      <button id="blockPermanentBtn" class="w-full h-[46px] rounded-[14px] bg-white dark:bg-white/5 border border-[#DC2626] text-[#DC2626] text-[14px] font-semibold cursor-pointer">Permanently Block &amp; Request Replacement</button>
+      <span class="rc-hint" id="reportReplacementHint"></span>
     </div>
+
+    <div id="reportCardError" class="hidden rc-error"></div>
   </div>
+
+  <!-- ---- The two things you can do ----
+       Ordered by how reversible they are. Locking is the safe first move and
+       leads; replacing the card for good is the decision, and reads like one. -->
+  <div class="rc-actions">
+    <button id="lockNowBtn" class="rc-btn rc-btn-primary">
+      <span class="rc-btn-t">Lock this card</span>
+      <span class="rc-btn-s">Stops new charges now. You can unlock it if it turns up.</span>
+    </button>
+
+    <button id="blockPermanentBtn" class="rc-btn rc-btn-secondary">
+      <span class="rc-btn-t">Close it and send a replacement</span>
+      <span class="rc-btn-s">Permanent. A new card and number are issued.</span>
+    </button>
+  </div>
+
+  <p class="rc-foot">Reported a card by mistake? Contact support and we'll unlock it.</p>
+
 </div>

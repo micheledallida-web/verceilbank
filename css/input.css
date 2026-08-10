@@ -1864,6 +1864,38 @@ html.dark body .home-notice-go { background: #FBBF24; color: #1F2937; }
   stroke-linejoin: round;
 }
 
+/* The dismiss X. Deliberately quieter than the action pill beside it: putting
+   the notice away is the lesser of the two things on offer here, and it should
+   not compete with the one that finishes the job. */
+.home-notice-x {
+  width: 26px;
+  height: 26px;
+  margin: -6px -4px 0 2px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #B45309;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.home-notice-x:hover { opacity: 1; background: rgba(180, 83, 9, 0.10); }
+
+html.dark body .home-notice-x { color: #FBBF24; }
+html.dark body .home-notice-x:hover { background: rgba(251, 191, 36, 0.14); }
+
+.home-notice-x svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
 /* On the narrowest phones the pill and the two lines of text cannot share a
    row without one of them being squeezed to nothing, so the pill drops out and
    the whole card becomes the tap target it already was. */
@@ -2129,3 +2161,212 @@ body {
     font-size: 15px;
   }
 }
+
+/* ===================== REPORT A CARD =====================
+   pages/report-card.html. The screen someone reaches on the worst banking day
+   they have had this year, so it is the calmest one in the app: no red strip
+   across the top, no exclamation marks, one reassurance and two clearly
+   different buttons. The alarm colour is kept for the permanent action alone,
+   which is the only thing here that cannot be undone. */
+.rc-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+}
+
+html.dark body .rc-note {
+  background: #0D1728;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.rc-note-ic {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ECFDF5;
+  color: #059669;
+}
+
+html.dark body .rc-note-ic {
+  background: rgba(16, 185, 129, 0.14);
+  color: #34D399;
+}
+
+.rc-note-ic svg { width: 21px; height: 21px; }
+
+.rc-note-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+
+.rc-note-t {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.rc-note-s {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #6B7280;
+  line-height: 1.45;
+}
+
+html.dark body .rc-note-t { color: #FFFFFF; }
+html.dark body .rc-note-s { color: #8E9CBA; }
+
+/* ---- the form ---- */
+.rc-card {
+  background: #FFFFFF;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  padding: 6px 18px 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+}
+
+html.dark body .rc-card {
+  background: #0D1728;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.rc-field { padding-top: 14px; }
+
+.rc-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B7280;
+  margin-bottom: 7px;
+}
+
+html.dark body .rc-label { color: #8E9CBA; }
+
+/* The chevron is drawn once here rather than left to the browser, which draws
+   a different one on every platform — the only reason appearance is reset. */
+.rc-select-wrap { position: relative; }
+
+.rc-select {
+  width: 100%;
+  height: 48px;
+  padding: 0 40px 0 14px;
+  border-radius: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E5E7EB;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.rc-select:focus { border-color: #2563EB; }
+
+html.dark body .rc-select {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+.rc-select-chev {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: #9AA4B8;
+  pointer-events: none;
+}
+
+.rc-hint {
+  display: block;
+  font-size: 12px;
+  color: #6B7280;
+  margin-top: 7px;
+  line-height: 1.4;
+}
+
+html.dark body .rc-hint { color: #8E9CBA; }
+
+.rc-error {
+  font-size: 12px;
+  font-weight: 500;
+  color: #EF4444;
+  margin-top: 14px;
+}
+
+/* ---- the two actions ----
+   Both are full-width stacked buttons with a second line, because the
+   difference between them is the consequence, and a one-word label cannot
+   carry a consequence. */
+.rc-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rc-btn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 16px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.rc-btn:active { transform: scale(0.99); }
+.rc-btn:disabled { opacity: 0.6; cursor: default; }
+
+.rc-btn-t { font-size: 14.5px; font-weight: 700; line-height: 1.2; }
+.rc-btn-s { font-size: 12px; font-weight: 400; line-height: 1.4; }
+
+.rc-btn-primary {
+  background: #2563EB;
+  color: #FFFFFF;
+  box-shadow: 0 8px 16px -6px rgba(37, 99, 235, 0.55);
+}
+
+.rc-btn-primary .rc-btn-s { color: rgba(255, 255, 255, 0.82); }
+
+/* Red belongs to the irreversible action and to nothing else on this screen. */
+.rc-btn-secondary {
+  background: #FFFFFF;
+  border-color: #FCA5A5;
+  color: #B91C1C;
+}
+
+.rc-btn-secondary .rc-btn-s { color: #9CA3AF; }
+
+html.dark body .rc-btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(248, 113, 113, 0.34);
+  color: #FCA5A5;
+}
+
+html.dark body .rc-btn-secondary .rc-btn-s { color: #8E9CBA; }
+
+.rc-foot {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  line-height: 1.5;
+  margin: 16px 4px 0;
+}
+
+html.dark body .rc-foot { color: #8E9CBA; }

@@ -73,7 +73,7 @@
     }
 
     .signin-header .logo-main {
-      color: #3b82f6 !important;
+      color: var(--vb-blue) !important;
       font-weight: 900 !important;
       opacity: 1 !important;
       filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
@@ -124,7 +124,7 @@
       padding: 0.75rem 0;
       font-size: 1.05rem;
       border: none;
-      border-bottom: 2px solid #0044ff;
+      border-bottom: 2px solid var(--vb-blue);
       outline: none;
       background: transparent;
       color: #111827;
@@ -132,7 +132,7 @@
     }
 
     .input-group input:focus {
-      border-bottom-color: #0033cc;
+      border-bottom-color: var(--vb-blue-dark);
     }
 
     .show-password-btn {
@@ -141,7 +141,7 @@
       bottom: 0.75rem;
       background: none;
       border: none;
-      color: #0044ff;
+      color: var(--vb-blue);
       font-weight: 600;
       font-size: 0.9rem;
       cursor: pointer;
@@ -167,13 +167,13 @@
     .checkbox-label input[type="checkbox"] {
       width: 18px;
       height: 18px;
-      accent-color: #0044ff;
+      accent-color: var(--vb-blue);
       cursor: pointer;
     }
 
     .btn-signin-full {
       width: 100%;
-      background-color: #0044ff;
+      background-color: var(--vb-blue);
       color: #ffffff;
       padding: 0.85rem;
       font-size: 1rem;
@@ -186,7 +186,7 @@
     }
 
     .btn-signin-full:hover {
-      background-color: #0033cc;
+      background-color: var(--vb-blue-dark);
     }
 
     .divider-container {
@@ -209,22 +209,95 @@
       padding: 0 1rem;
     }
 
+    /* The passwordless button and its padlock sit on one row, the way every
+       bank's sign-in card pairs the alternative sign-in method with the mark
+       that says the channel is secured. The padlock is a real control — it
+       opens the note below it — not a decorative badge. */
+    .passwordless-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+    }
+
     .btn-passwordless {
-      width: 100%;
+      flex: 1;
       background-color: #ffffff;
-      color: #0044ff;
-      border: 2px solid #0044ff;
+      color: var(--vb-blue);
+      border: 2px solid var(--vb-blue);
       padding: 0.75rem;
       font-size: 1rem;
       font-weight: 600;
       border-radius: 4px;
       cursor: pointer;
       transition: background-color 0.2s ease;
-      margin-bottom: 1.75rem;
     }
 
     .btn-passwordless:hover {
-      background-color: rgba(0, 68, 255, 0.04);
+      background-color: var(--vb-tint);
+    }
+
+    .btn-padlock {
+      width: 52px;
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--vb-blue);
+      color: #ffffff;
+      border: 2px solid var(--vb-blue);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn-padlock:hover {
+      background-color: var(--vb-blue-dark);
+      border-color: var(--vb-blue-dark);
+    }
+
+    .btn-padlock svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .btn-padlock[aria-expanded="true"] {
+      background-color: var(--vb-blue-dark);
+      border-color: var(--vb-blue-dark);
+    }
+
+    .security-note {
+      background-color: var(--vb-tint);
+      border: 1px solid var(--vb-line);
+      border-radius: 4px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .security-note-title {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 0.35rem;
+    }
+
+    .security-note ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      font-size: 0.82rem;
+      color: #4b5563;
+      line-height: 1.5;
+    }
+
+    .passwordless-row + .signin-links,
+    .security-note + .signin-links {
+      margin-top: 0.75rem;
     }
 
     .signin-links {
@@ -237,7 +310,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      color: #0044ff;
+      color: var(--vb-blue);
       font-size: 0.95rem;
       font-weight: 500;
       text-decoration: none;
@@ -367,7 +440,25 @@
           <span>Or</span>
         </div>
 
-        <button type="button" class="btn-passwordless">Passwordless sign in</button>
+        <div class="passwordless-row">
+          <button type="button" class="btn-passwordless" id="passwordlessBtn">Passwordless sign in</button>
+          <button type="button" class="btn-padlock" id="securityInfoBtn" aria-label="How we keep your sign-in secure" aria-expanded="false" aria-controls="securityNote">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="10.5" width="16" height="10" rx="2.5"></rect>
+              <path d="M8 10.5V7.5a4 4 0 018 0v3"></path>
+              <path d="M12 14.5v2.5"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="security-note" id="securityNote" hidden>
+          <span class="security-note-title">Your sign-in is protected</span>
+          <ul>
+            <li>This session is encrypted end to end.</li>
+            <li>Passwordless sign-in uses your device, so no password is typed or stored.</li>
+            <li>Verceil will never ask for your password or a security code by phone or email.</li>
+          </ul>
+        </div>
 
         <div class="signin-links">
           <a href="#" class="signin-link-item">
@@ -432,6 +523,21 @@
     const successBanner = document.getElementById('successBanner');
     const submitBtn = document.getElementById('submitBtn');
 
+    // The padlock beside the passwordless button. It opens and closes the note
+    // below it rather than navigating anywhere — someone checking whether a
+    // sign-in page is safe should not have to leave the sign-in page to find
+    // out. aria-expanded is kept in step so a screen reader hears the state.
+    (function wireSecurityInfo() {
+      const btn = document.getElementById('securityInfoBtn');
+      const note = document.getElementById('securityNote');
+      if (!btn || !note) return;
+      btn.addEventListener('click', () => {
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!open));
+        note.hidden = open;
+      });
+    })();
+
     // Why the dashboard sent you here, when it did. An automatic sign-out that
     // drops you on a bare sign-in page reads as a fault rather than as the
     // security feature it is, so the dashboard passes its reason along and this
@@ -481,7 +587,7 @@
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Sign in';
         submitBtn.disabled = false;
-        submitBtn.style.backgroundColor = '#0044ff';
+        submitBtn.style.backgroundColor = 'var(--vb-blue)';
       }
     });
 
