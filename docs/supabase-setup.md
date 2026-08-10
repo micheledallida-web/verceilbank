@@ -414,6 +414,146 @@ section 5c — the balance follows automatically.
 
 ---
 
+## 5e. Bitcoin deposits — the Quidax webhook
+
+`supabase/functions/quidax-webhook/index.ts` credits a customer when a deposit
+confirms at Quidax. It needs two tables.
+
+`deposit_requests` is the link between a customer and an address: without it a
+deposit is an anonymous payment and the function will not credit it to anybody.
+
+```sql
+create table if not exists public.deposit_requests (
+  id             bigint generated always as identity primary key,
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  -- Which of their accounts the money lands in.
+  account_type   text not null default 'checking',
+  -- The address shown to this customer for this request.
+  address        text not null,
+  quidax_user_id text,
+  amount_usd     numeric(14,2),
+  -- The rate they were quoted. The credit uses this, not the rate at the
+  -- moment the coins land, because that is the number they were shown.
+  quoted_rate    numeric(14,2),
+  status         text not null default 'awaiting',
+  expires_at     timestamptz,
+  credited_at    timestamptz,
+  created_at     timestamptz not null default now()
+);
+
+create index if not exists deposit_requests_address_idx
+  on public.deposit_requests (address);
+create index if not exists deposit_requests_user_idx
+  on public.deposit_requests (user_id, created_at desc);
+```
+
+`deposit_events` is every delivery Quidax makes, recorded before anything is
+decided about it — including the ones that could not be attributed.
+
+```sql
+create table if not exists public.deposit_events (
+  id                      bigint generated always as identity primary key,
+  -- Quidax's own id for the deposit. Unique, so a redelivery lands on the
+  -- existing row rather than crediting twice.
+  reference               text not null unique,
+  user_id                 uuid references auth.users (id) on delete set null,
+  event_type              text,
+  currency                text,
+  amount                  numeric(24,8),
+  address                 text,
+  quidax_user_id          text,
+  status                  text,
+  payload                 jsonb,
+  credited_transaction_id bigint,
+  created_at              timestamptz not null default now()
+);
+```
+
+### RLS
+
+```sql
+alter table public.deposit_requests enable row level security;
+alter table public.deposit_events   enable row level security;
+
+-- A customer may see their own deposit requests. Nothing else is granted:
+-- the function writes with the service key, which bypasses RLS.
+create policy "own deposit requests read"
+  on public.deposit_requests for select using (auth.uid() = user_id);
+```
+
+`deposit_events` gets **no policy at all** — it holds raw exchange payloads and
+belongs to the bank, not the customer.
+
+### Secrets
+
+In **Project Settings → Edge Functions → Secrets**:
+
+| Name | Value |
+|---|---|
+| `QUIDAX_WEBHOOK_SECRET` | the Signature Secret you set in Quidax |
+| `QUIDAX_CREDIT_ACCOUNT_TYPE` | optional, defaults to `checking` |
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to functions
+automatically. **Never put the service key or the Quidax API key in Vercel** —
+those are browser-visible.
+
+### Deploy, and the callback URL
+
+```bash
+supabase functions deploy quidax-webhook --no-verify-jwt
+```
+
+`--no-verify-jwt` matters: Quidax has no Supabase session, so the default JWT
+check would reject every delivery. The signature check inside the function is
+what guards it instead.
+
+The URL to paste into Quidax's **Callback URL** field is then:
+
+```
+https://<your-project-ref>.supabase.co/functions/v1/quidax-webhook
+```
+
+Your project ref is the subdomain of your `SUPABASE_URL` — visible under
+Project Settings → General.
+
+### Attributing a deposit by hand
+
+When the function cannot tell whose a deposit is, it stores it and credits
+nobody. To assign one:
+
+```sql
+-- What is waiting
+select reference, amount, currency, address, created_at
+  from public.deposit_events
+ where credited_transaction_id is null
+ order by created_at desc;
+
+-- Credit it: insert the ledger row, then mark the event so it is not
+-- credited twice. The balance trigger from section 5c does the rest.
+with posted as (
+  insert into public.transactions
+    (local_id, user_id, account_type, amount, title, category, reference_number, status)
+  values
+    ('quidax:<reference>', '<user-uuid>', 'checking', 500.00,
+     'Bitcoin deposit', 'deposit', '<reference>', 'completed')
+  returning id
+)
+update public.deposit_events
+   set credited_transaction_id = (select id from posted),
+       user_id = '<user-uuid>'
+ where reference = '<reference>';
+```
+
+### What is still not wired
+
+The app does not yet create a `deposit_requests` row, and every customer is
+shown the same address — so until per-customer addresses are issued through
+Quidax's API, **every deposit will land in the unattributed pile** and need the
+SQL above. The webhook, the tables and the crediting are ready for them; the
+piece that issues an address per request is the remaining work.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -478,4 +618,5 @@ Never put the service key in these variables.
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
 - [ ] `bank_settings.btc_usd_rate` added and set (section 5d)
+- [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)
