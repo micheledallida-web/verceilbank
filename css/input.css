@@ -1772,15 +1772,20 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
    sits directly under the balance because it outranks everything below it
    until it is dealt with, and it disappears entirely once it is. */
 .home-notice {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   text-align: left;
   background: #FFFBEB;
   border: 1px solid #FDE68A;
   border-radius: 18px;
-  padding: 14px 14px 14px 16px;
+  /* The right padding is the corner the dismiss X sits in. It is reserved
+     rather than shared, so the X never wraps onto a line of its own and the
+     text never runs underneath it. */
+  padding: 14px 38px 14px 16px;
   margin: 18px 0 4px;
   cursor: pointer;
   transition: transform 0.12s ease;
@@ -1812,12 +1817,17 @@ html.dark body .home-notice-ic {
 
 .home-notice-ic svg { width: 20px; height: 20px; }
 
+/* The text takes whatever room is left and wraps inside it. `min-width` is what
+   makes the card flexible rather than merely stretchy: below that the pill drops
+   to its own line instead of crushing the sentence into a column one word wide.
+   `flex-basis: 0` keeps the text from pushing the pill off a narrow card. */
 .home-notice-body {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 .home-notice-t {
@@ -1850,6 +1860,10 @@ html.dark body .home-notice-s { color: rgba(253, 230, 138, 0.72); }
   justify-content: center;
   gap: 2px;
   flex-shrink: 0;
+  /* Pushed to the right of whatever row it lands on — beside the text on a
+     wide card, at the end of its own row on a narrow one. */
+  margin-left: auto;
+  align-self: center;
 }
 
 html.dark body .home-notice-go { background: #FBBF24; color: #1F2937; }
@@ -1868,12 +1882,12 @@ html.dark body .home-notice-go { background: #FBBF24; color: #1F2937; }
    the notice away is the lesser of the two things on offer here, and it should
    not compete with the one that finishes the job. */
 .home-notice-x {
-  width: 26px;
-  height: 26px;
-  margin: -6px -4px 0 2px;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
-  flex-shrink: 0;
-  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   justify-content: center;

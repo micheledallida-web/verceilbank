@@ -164,12 +164,17 @@
           <path d="M12 16.5v.01"></path>
         </svg>
       </span>
+      <!-- The copy is written here as well as by renderAccountStatus(), which
+           refines it once the account's real state is known. A card whose only
+           text came from script rendered as an empty amber box on any build
+           where that script had not run yet — so the general case is in the
+           markup and the specific case replaces it. -->
       <span class="home-notice-body">
-        <span class="home-notice-t" id="accountStatusTitle"></span>
-        <span class="home-notice-s" id="accountStatusBody"></span>
+        <span class="home-notice-t" id="accountStatusTitle">Finish opening your account</span>
+        <span class="home-notice-s" id="accountStatusBody">Verify your identity and make your opening deposit to unlock full access to your accounts.</span>
       </span>
       <span class="home-notice-go" id="accountStatusAction">
-        <span id="accountStatusActionLabel"></span>
+        <span id="accountStatusActionLabel">Continue</span>
         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </span>
       <!-- Puts the notice away for this visit. What it is asking for is still
