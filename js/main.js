@@ -194,14 +194,11 @@ let heldAccountTypes = new Set(CORE_ACCOUNT_TYPES);
 // entirely when they do not, rather than shown and then apologised for.
 let hasOpenCreditCard = false;
 
-// What the opening-terms notice needs to know: whether identity has been
-// confirmed, and when the clock started. Both are read once, with the account
-// rows, rather than by the notice itself.
+// Whether identity has been confirmed. Read once, with the account rows,
+// rather than by every screen that needs to know.
 let kycStatus = null;
-let accountsOpenedAt = null;
-// Nothing is shown until both of those are known — a notice that says "verify
-// your identity" to somebody already verified, for the half second before the
-// read lands, is worse than no notice at all.
+// Nothing is gated until this is known: a slow read must never tell somebody
+// already verified that they are not.
 let openingTermsLoaded = false;
 
 async function loadBankReference() {
@@ -248,9 +245,7 @@ async function loadBankReference() {
     renderAccountNumberMasks();
 
     kycStatus = profileRes.data ? profileRes.data.kyc_status : null;
-    accountsOpenedAt = earliestOpenDate(rows, user);
     openingTermsLoaded = true;
-    renderAccountStatus();
 
     // Last, and deliberately not awaited by anything above: writing the
     // assigned numbers back is what turns them from derived into issued, but
@@ -285,18 +280,6 @@ async function persistAssignedNumbers(rows) {
       console.error('Account number assignment error:', err);
     }
   }));
-}
-
-// The funding clock starts when the first account was opened. Before any
-// account exists it starts at sign-up, which is the same moment from the
-// customer's point of view and the only date there is to go on.
-function earliestOpenDate(rows, user) {
-  const dates = (rows || [])
-    .map((row) => row && row.created_at && new Date(row.created_at))
-    .filter((date) => date && !isNaN(date));
-  if (dates.length) return new Date(Math.min(...dates.map((d) => d.getTime())));
-  const joined = new Date(user.created_at);
-  return isNaN(joined) ? null : joined;
 }
 
 // Savings comes with whatever else is opened, so every flow that opens an
@@ -335,35 +318,15 @@ export async function openCompulsorySavings() {
 // have to happen, and it takes itself off the screen when both are done.
 let depositBalanceCents = 0;
 // The balances and the verification status arrive on two independent requests.
-// Whichever lands first must not draw the notice on its own: a funded account
-// would be told to fund itself for as long as the other request took.
+// Nothing is gated on either alone: a funded account must not be stopped for
+// as long as the other request happens to take.
 let depositBalanceLoaded = false;
-
-function daysLeftToFund() {
-  if (!accountsOpenedAt) return FUNDING_DEADLINE_DAYS;
-  const elapsed = Math.floor((Date.now() - accountsOpenedAt.getTime()) / 86400000);
-  return FUNDING_DEADLINE_DAYS - elapsed;
-}
-
-// Dismissing the notice puts it away for this visit, not for good. It is a
-// banner, not a decision — the thing it is asking for is still outstanding —
-// so it comes back next time the app is opened, and in the meantime the gate
-// below asks at the only moment it genuinely matters. sessionStorage rather
-// than localStorage is exactly that distinction.
-const STATUS_DISMISSED_KEY = 'verceil_status_notice_dismissed';
-
-function statusNoticeDismissed() {
-  try { return sessionStorage.getItem(STATUS_DISMISSED_KEY) === '1'; } catch (err) { return false; }
-}
-
-function dismissStatusNotice() {
-  try { sessionStorage.setItem(STATUS_DISMISSED_KEY, '1'); } catch (err) {}
-  const notice = document.getElementById('accountStatusNotice');
-  if (notice) notice.classList.add('hidden');
-}
 
 // What full access means, in one place. Both conditions have to hold: an
 // identity the bank has confirmed, and the opening deposit actually deposited.
+// It is asked for at the point of action — see allowFullAccess() — rather than
+// announced on the home screen: the dashboard says what you have, and the
+// screen you are trying to use says what is standing in your way.
 export function fullAccessState() {
   return {
     known: openingTermsLoaded && depositBalanceLoaded,
@@ -371,74 +334,6 @@ export function fullAccessState() {
     funded: depositBalanceCents >= MINIMUM_OPENING_DEPOSIT * 100,
     kycStatus,
   };
-}
-
-function renderAccountStatus() {
-  const notice = document.getElementById('accountStatusNotice');
-  if (!notice) return;
-
-  const { known, verified, funded } = fullAccessState();
-
-  // Nothing outstanding, nothing known yet, or put away for this visit.
-  if (!known || (funded && verified) || statusNoticeDismissed()) {
-    notice.classList.add('hidden');
-    return;
-  }
-
-  const days = daysLeftToFund();
-  const dayWord = days === 1 ? 'day' : 'days';
-  const minimum = MINIMUM_OPENING_DEPOSIT_LABEL;
-
-  let title;
-  let body;
-  let actionLabel;
-  let action;
-
-  if (days <= 0) {
-    // Past the deadline the account is the bank's to close, so the notice
-    // stops asking for a deposit — taking one now would not save the account
-    // on its own — and points at the people who can actually keep it open.
-    title = 'Funding deadline passed';
-    body = `This account went ${FUNDING_DEADLINE_DAYS} days without its ${minimum} opening deposit and is due to be closed. Contact support if you want to keep it.`;
-    actionLabel = 'Support';
-    action = () => loadPage('contact-support');
-  } else if (!verified) {
-    // Identity first: a deposit into an account the bank cannot yet attach to
-    // a verified person does not unlock anything.
-    title = 'Verify your identity';
-    body = `Your accounts, savings included, have limited access until we confirm who you are. Fund at least ${minimum} within ${days} ${dayWord} to keep them open.`;
-    actionLabel = kycStatus === 'pending' ? 'In review' : 'Verify';
-    action = () => loadPage('verify');
-  } else {
-    title = `Add ${minimum} to activate your accounts`;
-    body = `Full access starts at a ${minimum} balance. ${days} ${dayWord} left before an unfunded account is closed.`;
-    actionLabel = 'Fund';
-    action = () => loadPage('fund-account');
-  }
-
-  // Each line is only replaced when there is something to replace it with, so
-  // a missing element or an empty string leaves the markup's own copy standing
-  // rather than blanking the card.
-  const setLine = (id, text) => {
-    const el = document.getElementById(id);
-    if (el && text) el.textContent = text;
-  };
-  setLine('accountStatusTitle', title);
-  setLine('accountStatusBody', body);
-  setLine('accountStatusActionLabel', actionLabel);
-
-  notice.onclick = action;
-  notice.classList.remove('hidden');
-
-  const dismissBtn = document.getElementById('accountStatusDismiss');
-  if (dismissBtn) {
-    dismissBtn.onclick = (event) => {
-      // The whole banner is the tap target for the action, so the X has to
-      // stop the click before it reaches it.
-      event.stopPropagation();
-      dismissStatusNotice();
-    };
-  }
 }
 
 // ---------- Full-access gate ----------
@@ -1483,7 +1378,6 @@ async function initSupabaseData() {
     // something whose worth changes overnight.
     depositBalanceCents = deposits;
     depositBalanceLoaded = true;
-    renderAccountStatus();
 
     // Retirement money is neither a deposit nor part of the brokerage account,
     // so it is totalled and shown on its own — the way a bank reports an IRA.

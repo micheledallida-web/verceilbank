@@ -151,40 +151,6 @@
 
     </div>
 
-    <!-- ================= ACTION NEEDED =================
-         One notice, three states, written by renderAccountStatus() in
-         js/main.js: verify your identity, fund the opening deposit, or
-         nothing at all once both are done. Hidden until it has something
-         to say. -->
-    <button id="accountStatusNotice" class="home-notice hidden" type="button">
-      <span class="home-notice-ic">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="M12 8v5"></path>
-          <path d="M12 16.5v.01"></path>
-        </svg>
-      </span>
-      <!-- The copy is written here as well as by renderAccountStatus(), which
-           refines it once the account's real state is known. A card whose only
-           text came from script rendered as an empty amber box on any build
-           where that script had not run yet — so the general case is in the
-           markup and the specific case replaces it. -->
-      <span class="home-notice-body">
-        <span class="home-notice-t" id="accountStatusTitle">Finish opening your account</span>
-        <span class="home-notice-s" id="accountStatusBody">Verify your identity and make your opening deposit to unlock full access to your accounts.</span>
-      </span>
-      <span class="home-notice-go" id="accountStatusAction">
-        <span id="accountStatusActionLabel">Continue</span>
-        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      </span>
-      <!-- Puts the notice away for this visit. What it is asking for is still
-           outstanding, so it returns next time — and the gate in js/main.js
-           asks again the moment someone tries to move money. -->
-      <span class="home-notice-x" id="accountStatusDismiss" role="button" tabindex="0" aria-label="Dismiss">
-        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"></path></svg>
-      </span>
-    </button>
-
     <div class="home-columns">
 
     <!-- ================= CHECKING ================= -->
