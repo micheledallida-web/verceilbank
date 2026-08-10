@@ -6,7 +6,7 @@ function on(el, evt, fn) {
 }
 
 export function init(root, ctx, options = null) {
-  const { supabaseClient, getCurrentUser, formatCurrency, parseBalanceText, getOrCreateTempNumber, showModal, close } = ctx;
+  const { supabaseClient, getCurrentUser, formatCurrency, parseBalanceText, getAccountNumber, showModal, close } = ctx;
 
   const statementsList = root.querySelector('#statementsList');
   const generateStatementBtn = root.querySelector('#generateStatementBtn');
@@ -220,7 +220,7 @@ export function init(root, ctx, options = null) {
       const user = await getCurrentUser();
       if (!user) throw new Error('Not signed in');
       const endingBalance = parseBalanceText(document.getElementById('investmentsBalance')?.textContent || '$0.00');
-      const acctNum = getOrCreateTempNumber('investments', 'account');
+      const acctNum = getAccountNumber('investments', 'account') || '';
       const now = new Date();
       const periodLabels = {
         monthly: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),

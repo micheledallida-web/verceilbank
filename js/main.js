@@ -48,46 +48,30 @@ export function parseBalanceText(text) {
   return Number(String(text).replace(/[^0-9.-]/g, '')) || 0;
 }
 
-// The routing number belongs to the bank. The account number is the account's
-// own: a permanent one is issued server-side once identity is verified and the
-// account has been active thirty days, and until then the account carries a
-// temporary eleven-digit number so there is something to quote.
+// The two numbers on an account are not the same kind of thing, and the
+// difference is the whole rule here.
 //
-// Neither is rolled at random on the device any more. The name is kept because
-// callers across six screens use it.
-export function getOrCreateTempNumber(type, kind) {
+// The routing number belongs to the bank. Every account holder has the same
+// one, it exists before any account does, and it is safe to print anywhere — so
+// it is returned for every deposit account, always, with nothing to look up.
+//
+// The account number belongs to the account, and an account that has not been
+// opened does not have one. Nothing is derived, hashed or invented on the
+// device: a number appears only once the account exists server-side and the
+// server has issued it. Until then this returns an empty string and the screens
+// say so in words, rather than showing a placeholder somebody might quote to
+// their employer.
+export function getAccountNumber(type, kind) {
   if (kind === 'routing') {
     return NO_ROUTING_ACCOUNT_TYPES.includes(type) ? '' : bankRoutingNumber;
   }
-  // A permanent, server-issued number always wins. Until one is issued the
-  // account still needs something to show, so it carries a temporary one.
-  return accountNumbersByType[type] || temporaryAccountNumber(type);
+  return accountNumbersByType[type] || '';
 }
 
-// A temporary account number has to be the same number wherever you sign in.
-// The old one was eleven random digits cached in localStorage, so the same
-// account read differently on a phone and a laptop. This derives the digits
-// from the account holder's id and the account type instead: same user, same
-// account, same number, on every device and with nothing stored. Each account
-// type seeds differently, so investments never shares checking's number.
-function temporaryAccountNumber(type) {
-  if (!currentUserId) return '';
-  const seed = `${currentUserId}:${type}`;
-
-  // Two independent FNV-1a passes, so the eleven digits are drawn from more
-  // entropy than a single 32-bit hash would give.
-  let h1 = 0x811c9dc5;
-  let h2 = 0x01000193;
-  for (let i = 0; i < seed.length; i++) {
-    const code = seed.charCodeAt(i);
-    h1 = Math.imul(h1 ^ code, 0x01000193) >>> 0;
-    h2 = Math.imul(h2 ^ code, 0x85ebca6b) >>> 0;
-  }
-
-  // Stays inside Number's safe range: 99999 * 1e6 + 999999 is well under 2^53.
-  const digits = (h1 % 100000) * 1000000 + (h2 % 1000000);
-  return String(digits).padStart(11, '0');
-}
+// What a screen shows in place of an account number it does not have. Both are
+// exported so every screen words it the same way.
+export const NO_ACCOUNT_NUMBER_TEXT = 'Issued when your account is opened';
+export const NO_ACCOUNT_NUMBER_SHORT = 'Not yet issued';
 
 // ---------- Bank reference data ----------
 // Read once per session and shared by every screen that prints these, rather
@@ -104,9 +88,10 @@ const DEFAULT_ROUTING_NUMBER = '856919671';
 const NO_ROUTING_ACCOUNT_TYPES = ['investments'];
 
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
+// Only what the server has actually issued. An account type missing from this
+// map has no number, which is the honest answer for an account nobody has
+// opened yet.
 let accountNumbersByType = {};
-// Seeds the temporary account numbers above, so they are stable per person.
-let currentUserId = '';
 
 // Whether the user holds a card at all. Card Services is left out of the menu
 // entirely when they do not, rather than shown and then apologised for.
@@ -130,7 +115,6 @@ async function loadBankReference() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
-    currentUserId = user.id;
     const { data: rows, error } = await supabaseClient
       .from('accounts')
       .select('*')
@@ -151,16 +135,21 @@ async function loadBankReference() {
 }
 
 // The masked numbers on the account cards were literals in the markup, so every
-// account read •4892 or •9104 no matter what its real number was. They show the
-// account's own number now — permanent if one has been issued, temporary until
-// then — and each account type carries its own, so investments never borrows
-// the checking account's last four.
+// account read •4892 or •9104 no matter what its real number was — including
+// accounts that did not exist. They show the account's own server-issued number
+// now, and an account without one shows nothing at all rather than four digits
+// that belong to nobody.
 function renderAccountNumberMasks() {
-  const masks = { checkingNumber: 'checking', savingsNumber: 'savings', investmentsNumber: 'investments' };
+  const masks = {
+    checkingNumber: 'checking',
+    savingsNumber: 'savings',
+    investmentsNumber: 'investments',
+    creditNumber: 'credit',
+  };
   Object.keys(masks).forEach((id) => {
     const el = document.getElementById(id);
     if (!el) return;
-    const number = getOrCreateTempNumber(masks[id], 'account');
+    const number = getAccountNumber(masks[id], 'account');
     el.textContent = number ? `•${String(number).slice(-4)}` : '';
   });
 }
@@ -170,6 +159,11 @@ function renderAccountNumberMasks() {
 // device's colour scheme to decide for itself — a bank that opens dark because
 // the television happens to be dark is a surprise, not a preference. It opens
 // light, and only an explicit choice moves it, which is then remembered.
+//
+// The theme is already on <html> by the time this module runs: the inline
+// script in dashboard.html's <head> put it there before the first paint, which
+// is what stops a dark session from flashing white on every refresh. This
+// module owns the theme from then on — toggling it, and storing the choice.
 const htmlElement = document.documentElement;
 const THEME_KEY = 'vercel_bank_theme';
 
@@ -186,9 +180,80 @@ function storedTheme() {
   try { return localStorage.getItem(THEME_KEY) || ''; } catch (err) { return ''; }
 }
 
-// Only a stored 'dark' turns it dark. Anything else — no preference at all, an
-// unreadable store, a value from some older build — lands on light.
+// Mirrors the head script's decision onto <body> and re-stores it. Only a
+// stored 'dark' is dark; anything else — no preference, an unreadable store, a
+// value from some older build — is light, exactly as the head script read it.
 applyTheme(storedTheme() === 'dark');
+
+// The boot class suppressed the app's colour transitions so the first frame
+// could not animate in from the wrong theme. The page is painted by now, so
+// release it — after a frame, or a toggle made in that same tick would jump
+// rather than fade.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => htmlElement.classList.remove('theme-boot'));
+});
+
+// ---------- App settings ----------
+// The handful of preferences the Settings screen owns. They are device
+// settings, not account settings — how this browser behaves, not what the bank
+// holds on file — so localStorage is the right home for them and no server
+// round-trip stands between a tap and the thing happening.
+//
+// Anything that belongs to the account rather than the device already has its
+// own screen: alerts on Notification Preferences, data sharing on Privacy &
+// Data Settings, the record itself on Profile. Nothing is repeated here.
+export const SETTINGS_KEY = 'verceil_settings';
+
+const DEFAULT_SETTINGS = {
+  // Minutes of inactivity before this device signs itself out. 0 is off.
+  autoSignOutMinutes: 15,
+  // Blurs every balance on screen, for reading the app somewhere public.
+  hideBalances: false,
+};
+
+export function readSettings() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+  } catch (err) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+// Takes a patch rather than the whole object, so two screens writing different
+// settings can never clobber each other's.
+export function writeSettings(patch) {
+  const next = { ...readSettings(), ...patch };
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(next)); } catch (err) {}
+  applySettings(next);
+  return next;
+}
+
+export function applySettings(settings = readSettings()) {
+  htmlElement.classList.toggle('hide-balances', !!settings.hideBalances);
+  restartIdleTimer(settings.autoSignOutMinutes);
+}
+
+// ---------- Automatic sign-out ----------
+// A banking session left open on a shared laptop is the plainest security
+// problem there is. The timer restarts on any sign of a person — a tap, a key,
+// a scroll — so it only ever fires on a session nobody is using.
+const IDLE_EVENTS = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'visibilitychange'];
+let idleTimerId = null;
+let idleMinutes = 0;
+
+function restartIdleTimer(minutes) {
+  idleMinutes = Number(minutes) || 0;
+  if (idleTimerId) { clearTimeout(idleTimerId); idleTimerId = null; }
+  if (idleMinutes <= 0) return;
+  idleTimerId = setTimeout(() => {
+    handleSignOut(`You were signed out after ${idleMinutes} minutes of inactivity.`);
+  }, idleMinutes * 60000);
+}
+
+IDLE_EVENTS.forEach((evt) => {
+  window.addEventListener(evt, () => { if (idleMinutes > 0) restartIdleTimer(idleMinutes); }, { passive: true });
+});
 
 // ---------- Shared modal (every page module can call this) ----------
 const actionModal = document.getElementById('actionModal');
@@ -253,11 +318,17 @@ export async function loadPage(name, ...args) {
     genRef,
     formatCurrency,
     parseBalanceText,
-    getOrCreateTempNumber,
+    getAccountNumber,
+    NO_ACCOUNT_NUMBER_TEXT,
+    NO_ACCOUNT_NUMBER_SHORT,
     showModal,
     openSupportMessage,
     refreshAlertsBadge,
     getCardEligibility,
+    applyTheme,
+    isDarkTheme: () => htmlElement.classList.contains('dark'),
+    readSettings,
+    writeSettings,
     signOut: () => handleSignOut(),
   }, ...args);
 
@@ -295,9 +366,14 @@ const greetingLine2 = document.getElementById('greetingLine2');
 
 // ---------- Header dropdown (More / Appearance / Messages / Profile) ----------
 const headerMenus = {
+  // Quick Actions holds what is not already reachable from the home screen.
+  // "Download all statements" was the Statements action in the row below the
+  // balance under a second name, so it is gone; Card Services is filtered out
+  // below for anyone without a card, which leaves Settings as the one thing
+  // here that exists nowhere else.
   more: {
     title: 'Quick Actions',
-    items: ['Download all statements', 'Card Services', 'Settings'],
+    items: ['Card Services', 'Settings'],
   },
   appearance: { title: 'Appearance', items: ['Light Mode', 'Dark Mode'] },
   messages: { title: 'Messages', items: ['Contact Support', 'Schedule an Appointment'] },
@@ -316,19 +392,27 @@ const headerDropdownList = document.getElementById('headerDropdownList');
 function clearCachedUserData() {
   try {
     Object.keys(localStorage)
+      // The app's own settings are this device's, not this session's — an
+      // automatic sign-out interval that reset itself every time it fired
+      // would be a setting that never held.
+      .filter((key) => key !== SETTINGS_KEY)
       .filter((key) => key.startsWith('verceil_') || (key.startsWith('sb-') && key.includes('auth-token')))
       .forEach((key) => localStorage.removeItem(key));
   } catch (err) {}
   try { sessionStorage.clear(); } catch (err) {}
 }
 
-function goToSignIn() {
+function goToSignIn(reason) {
   // The standalone sign-in page, which is the current one. This used to go to
   // index.html?signin=1, the landing page's older Sign In modal.
-  window.location.href = 'signin.html';
+  //
+  // A reason rides along in the query string when there is one. Being returned
+  // to a sign-in page with no explanation reads as a fault; "you were signed
+  // out after 15 minutes" reads as the security feature it is.
+  window.location.href = reason ? `signin.html?reason=${encodeURIComponent(reason)}` : 'signin.html';
 }
 
-async function handleSignOut() {
+async function handleSignOut(reason) {
   try {
     if (!supabaseClient) throw new Error('Supabase client is unavailable — signing out locally only.');
 
@@ -350,7 +434,7 @@ async function handleSignOut() {
     // Runs whether or not the revoke succeeded: the token is gone from this
     // browser either way, so the user is never left half signed-in.
     clearCachedUserData();
-    goToSignIn();
+    goToSignIn(reason);
   }
 }
 
@@ -511,9 +595,17 @@ document.getElementById('cardSavings').addEventListener('click', () => loadPage(
 document.getElementById('cardInvestments').addEventListener('click', () => loadPage('account-detail', 'investments'));
 document.getElementById('cardCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 document.getElementById('cardInterestChecking').addEventListener('click', () => loadPage('account-detail', 'interest_checking'));
+document.getElementById('cardRetirement').addEventListener('click', () => loadPage('retirement'));
 document.getElementById('promoBanner').addEventListener('click', () => loadPage('interest-checking'));
 // ---------- Signature Card eligibility ----------
+// The card is for established members, and that is two conditions rather than
+// one: the account has to have been open eight whole months, and it has to have
+// been used. An account that was opened and then sat still for eight months is
+// not a banking history, so it does not qualify — and neither, at all, does
+// someone signing up today, which is why the card is not among the products
+// offered at sign-up.
 const CARD_ELIGIBILITY_MONTHS = 8;
+const CARD_ELIGIBILITY_MIN_TRANSACTIONS = 1;
 
 // Whole months only, so someone who joined on the 30th is not credited with a
 // month on the 1st.
@@ -529,11 +621,13 @@ function eligibilityMonthLabel(from) {
 }
 
 // Everything the credit account screen needs to state its own terms: how long
-// the account has been open, whether that clears the threshold, and the month
-// it does. Computed here so membership length has one definition, and handed to
-// page modules through their context object.
+// the account has been open, whether it has been used, whether that clears the
+// threshold, and the month it does. Computed here so membership length has one
+// definition, and handed to page modules through their context object.
 export async function getCardEligibility() {
   let joined = null;
+  let transactionCount = 0;
+
   try {
     const user = await getCurrentUser();
     if (user) {
@@ -541,12 +635,22 @@ export async function getCardEligibility() {
       // created_at is the fallback, since that one always exists.
       let profileCreated = null;
       if (supabaseClient) {
-        const { data } = await supabaseClient
-          .from('user_profile')
-          .select('created_at')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (data && data.created_at) profileCreated = data.created_at;
+        // Both reads at once — the join date and the activity count are
+        // independent of each other and the screen waits on both.
+        const [profileRes, txRes] = await Promise.all([
+          supabaseClient
+            .from('user_profile')
+            .select('created_at')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          // head:true — only the number is wanted, never the rows.
+          supabaseClient
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+        ]);
+        if (profileRes.data && profileRes.data.created_at) profileCreated = profileRes.data.created_at;
+        transactionCount = txRes.count || 0;
       }
       const candidate = new Date(profileCreated || user.created_at);
       if (!isNaN(candidate)) joined = candidate;
@@ -556,12 +660,19 @@ export async function getCardEligibility() {
   }
 
   const months = joined ? wholeMonthsSince(joined, new Date()) : 0;
+  const monthsMet = !!joined && months >= CARD_ELIGIBILITY_MONTHS;
+  const activityMet = transactionCount >= CARD_ELIGIBILITY_MIN_TRANSACTIONS;
+
   return {
     // An unknown join date reads as not yet eligible. Guessing in the user's
     // favour would promise an application the bank cannot honour.
-    eligible: !!joined && months >= CARD_ELIGIBILITY_MONTHS,
+    eligible: monthsMet && activityMet,
+    monthsMet,
+    activityMet,
     months,
+    transactionCount,
     thresholdMonths: CARD_ELIGIBILITY_MONTHS,
+    minTransactions: CARD_ELIGIBILITY_MIN_TRANSACTIONS,
     eligibleFrom: joined ? eligibilityMonthLabel(joined) : '',
   };
 }
@@ -576,9 +687,19 @@ document.getElementById('homeQuickStatements').addEventListener('click', () => l
 
 // ---------- Bottom nav dropdown menu sheet (Citi-style) ----------
 const navMenus = {
+  // Accounts lists accounts, and nothing else. Statements had a row here and a
+  // Quick Action on the home screen, and Account Details / Routing & Account
+  // Numbers were a third and fourth way to the same numbers already printed on
+  // every account's own screen — one way to each destination, so nothing in
+  // this app is reachable by two names.
+  //
+  // Interest Checking is not on this list either. It is a product you open, not
+  // one you already hold: it appears here as an account once it has been opened
+  // through the offer on the home screen, which requires identity verification
+  // first. Until then there is no account to look at.
   navAccounts: {
     title: 'Accounts',
-    items: ['Account Summary', 'Checking', 'Savings', 'Interest Checking', 'Credit Cards', 'Investment Accounts', 'Statements & Documents', 'Account Details', 'Routing & Account Numbers'],
+    items: ['Account Summary', 'Checking', 'Savings', 'Credit Cards', 'Investment Accounts'],
   },
   navPayments: {
     title: 'Payments',
@@ -616,12 +737,8 @@ const navMenuRoutes = {
   'Account Summary': () => showHome(),
   'Checking': () => loadPage('account-detail', 'checking'),
   'Savings': () => loadPage('account-detail', 'savings'),
-  'Interest Checking': () => loadPage('account-detail', 'interest_checking'),
   'Credit Cards': () => loadPage('account-detail', 'credit'),
   'Investment Accounts': () => loadPage('account-detail', 'investments'),
-  'Statements & Documents': () => loadPage('docs-hub'),
-  'Account Details': () => loadPage('account-details'),
-  'Routing & Account Numbers': () => loadPage('routing-numbers'),
 
   // Payments
   'Transfer Between Accounts': () => loadPage('transfer'),
@@ -635,6 +752,7 @@ const navMenuRoutes = {
   'Portfolio Overview': () => loadPage('portfolio'),
   'Watchlist': () => loadPage('watchlist'),
   'Buy & Sell Investments': () => loadPage('trade'),
+  'Retirement Accounts': () => loadPage('retirement'),
   'Wealth Insights': () => loadPage('wealth-insights'),
   'Investment Statements': () => loadPage('statements'),
   'Financial Advisor': () => loadPage('advisor'),
@@ -664,11 +782,9 @@ const navMenuRoutes = {
 
 // Labels in the header "quick actions" dropdown that map to a ported screen.
 const headerMenuRoutes = {
-  // Quick actions. Settings has no screen of its own yet, so it opens the
-  // shared placeholder rather than doing nothing.
-  'Download all statements': () => loadPage('docs-hub'),
+  // Quick actions.
   'Card Services': () => loadPage('card-services'),
-  'Settings': () => loadPage('coming-soon', 'Settings'),
+  'Settings': () => loadPage('settings'),
   'Contact Support': () => loadPage('contact-support'),
   'My Profile': () => loadPage('profile'),
   'Linked Accounts': () => loadPage('linked-accounts'),
@@ -901,6 +1017,15 @@ async function initSupabaseData() {
 
   const DEPOSIT_TYPES = ['checking', 'savings', 'interest_checking'];
 
+  // An IRA is not a deposit account and not the brokerage account either: the
+  // money is locked away for retirement under its own tax rules, so it is never
+  // added into either total. It is reported on its own card.
+  const RETIREMENT_TYPES = ['ira_traditional', 'ira_roth'];
+  const RETIREMENT_LABELS = {
+    ira_traditional: 'Traditional IRA',
+    ira_roth: 'Roth IRA',
+  };
+
   // A card counts as real once it is approved or has any activity against it.
   function isActiveCard(acc) {
     return acc.account_type === 'credit'
@@ -960,6 +1085,20 @@ async function initSupabaseData() {
     // total, not inside it; a card balance is money owed to the issuer, so it
     // is shown as its own line rather than netted off cash on hand.
     setText('homeTotalBalance', deposits);
+
+    // Retirement money is neither a deposit nor part of the brokerage account,
+    // so it is totalled and shown on its own — the way a bank reports an IRA.
+    const retirement = sumCents(acc => RETIREMENT_TYPES.includes(acc.account_type));
+    const retirementAccount = firstMatch(acc => RETIREMENT_TYPES.includes(acc.account_type));
+    setText('retirementBalance', retirement);
+    const retirementSection = document.getElementById('sectionRetirement');
+    if (retirementSection) retirementSection.classList.toggle('hidden', !retirementAccount);
+    if (retirementAccount) {
+      const nameEl = document.getElementById('retirementName');
+      // Named for the one they hold, unless they hold both.
+      const both = RETIREMENT_TYPES.every(type => !!firstMatch(acc => acc.account_type === type));
+      if (nameEl) nameEl.textContent = both ? 'Retirement Accounts' : RETIREMENT_LABELS[retirementAccount.account_type];
+    }
 
     const hasInterestChecking = !!firstMatch(acc => acc.account_type === 'interest_checking');
     const card = firstMatch(isActiveCard);
@@ -1078,6 +1217,10 @@ async function initSupabaseData() {
 
 initSupabaseData();
 refreshAlertsBadge();
+// Starts the automatic sign-out timer and re-asserts hide-balances. The head
+// script already put the class on <html> before the first paint; this is what
+// keeps the two in step after a change made on the Settings screen.
+applySettings();
 // The routing number, the server-issued account numbers and whether a card is
 // held are all read once here, then reused by every screen that needs them.
 loadBankReference();

@@ -1,0 +1,97 @@
+<div class="min-h-full w-full bg-[#F8F9FB] dark:bg-[#060B14] pb-[40px]">
+<div class="w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[40px]">
+
+  <div class="w-full bg-white dark:bg-[#0D1728] border-b border-[#E5E7EB] dark:border-white/[0.06] -mx-[16px] px-[16px] -mt-[14px] mb-[20px]">
+    <div class="h-[56px] flex items-center relative">
+      <button data-action="close" class="w-[36px] h-[36px] flex items-center justify-center text-[#0F172A] dark:text-white cursor-pointer" aria-label="Back">
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <div class="absolute left-1/2 -translate-x-1/2 text-[16px] font-semibold text-[#0F172A] dark:text-white">Settings</div>
+    </div>
+  </div>
+
+  <!-- ================= SIGN-IN & SECURITY ================= -->
+  <div class="text-[11px] font-bold tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] uppercase mb-[8px]">SIGN-IN &amp; SECURITY</div>
+  <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[16px]">
+
+    <!-- Change password -->
+    <button id="stPasswordRow" class="w-full flex items-center justify-between py-[10px] cursor-pointer text-left">
+      <span>
+        <span class="block text-[14px] font-medium text-[#111827] dark:text-white">Change password</span>
+        <span class="block text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">Update the password you use to sign in</span>
+      </span>
+      <svg id="stPasswordChevron" class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+
+    <div id="stPasswordForm" class="hidden pb-[12px]">
+      <input id="stNewPassword" type="password" autocomplete="new-password" placeholder="New password" class="w-full h-[44px] px-[14px] rounded-[12px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[14px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none mb-[8px]">
+      <input id="stConfirmPassword" type="password" autocomplete="new-password" placeholder="Confirm new password" class="w-full h-[44px] px-[14px] rounded-[12px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[14px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none mb-[8px]">
+      <div id="stPasswordMsg" class="hidden text-[12px] font-medium mb-[8px]"></div>
+      <button id="stSavePasswordBtn" class="w-full h-[44px] rounded-[12px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer">Update Password</button>
+    </div>
+
+    <!-- Automatic sign-out -->
+    <div class="py-[10px] border-t border-gray-100 dark:border-white/[0.06]">
+      <div class="text-[14px] font-medium text-[#111827] dark:text-white">Automatic sign-out</div>
+      <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px] mb-[10px]">Sign this device out after a period of inactivity</div>
+      <div id="stTimeoutOptions" class="flex items-center gap-[6px]"></div>
+    </div>
+
+    <!-- Sign out everywhere -->
+    <button id="stSignOutAllBtn" class="w-full flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06] cursor-pointer text-left">
+      <span>
+        <span class="block text-[14px] font-medium text-[#DC2626]">Sign out of all devices</span>
+        <span class="block text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">Ends every signed-in session, including this one</span>
+      </span>
+      <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+  </div>
+
+  <!-- ================= APP PREFERENCES ================= -->
+  <div class="text-[11px] font-bold tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] uppercase mb-[8px]">APP PREFERENCES</div>
+  <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[16px]">
+
+    <div class="py-[10px]">
+      <div class="text-[14px] font-medium text-[#111827] dark:text-white">Appearance</div>
+      <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px] mb-[10px]">Applies to this device and is remembered</div>
+      <div id="stThemeOptions" class="flex items-center gap-[6px]"></div>
+    </div>
+
+    <div class="flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06]">
+      <span class="pr-[12px]">
+        <span class="block text-[14px] font-medium text-[#111827] dark:text-white">Hide balances</span>
+        <span class="block text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">Blur every amount until you choose to show it</span>
+      </span>
+      <button id="stHideBalancesToggle" class="w-[44px] h-[24px] rounded-full relative cursor-pointer flex-shrink-0" aria-label="Hide balances">
+        <span class="st-thumb absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white transition-all"></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= ABOUT ================= -->
+  <div class="text-[11px] font-bold tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] uppercase mb-[8px]">ABOUT</div>
+  <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[16px]">
+    <div class="flex items-center justify-between py-[10px]">
+      <span class="text-[14px] font-medium text-[#111827] dark:text-white">App version</span>
+      <span id="stAppVersion" class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]"></span>
+    </div>
+    <div class="flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06]">
+      <span class="text-[14px] font-medium text-[#111827] dark:text-white">Routing number</span>
+      <span id="stRoutingNumber" class="text-[13px] font-semibold text-[#111827] dark:text-white tracking-wide"></span>
+    </div>
+    <button id="stLegalBtn" class="w-full flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06] cursor-pointer text-left">
+      <span class="text-[14px] font-medium text-[#111827] dark:text-white">Terms &amp; disclosures</span>
+      <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+    <button id="stFdicBtn" class="w-full flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06] cursor-pointer text-left">
+      <span class="text-[14px] font-medium text-[#111827] dark:text-white">FDIC insurance</span>
+      <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    </button>
+  </div>
+
+  <div class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] text-center leading-relaxed px-[8px]">
+    Verceil Bank, N.A. Member FDIC. Equal Housing Lender.
+  </div>
+
+</div>
+</div>

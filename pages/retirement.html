@@ -1,0 +1,90 @@
+<div class="w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[40px]">
+
+  <div class="flex items-center gap-3 mb-[16px]">
+    <button data-action="close" class="w-[40px] h-[40px] rounded-full bg-white/15 dark:bg-[#0D182E] border border-white/10 flex items-center justify-center text-white cursor-pointer shadow-sm flex-shrink-0" aria-label="Back">
+      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <div class="text-[20px] font-bold text-white truncate">Retirement Accounts</div>
+  </div>
+
+  <!-- ================= ACCOUNTS YOU ALREADY HOLD ================= -->
+  <div id="retAccountsSection" class="hidden mb-[20px]">
+    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mb-[8px]">YOUR IRAs</div>
+    <div id="retAccountsList" class="flex flex-col gap-[10px]"></div>
+  </div>
+
+  <!-- ================= OPEN AN IRA ================= -->
+  <div id="retOpenSection">
+    <div class="text-[13px] font-normal text-white/85 dark:text-[#8E9CBA] mb-[16px] leading-relaxed">
+      An Individual Retirement Account lets you invest for retirement with tax advantages. Choose the one that fits how you want to be taxed.
+    </div>
+
+    <div id="retProducts" class="flex flex-col gap-[12px] mb-[16px]"></div>
+
+    <!-- Contribution limits -->
+    <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[16px]">
+      <div class="text-[13px] font-bold text-[#111827] dark:text-white mb-[10px]" id="retLimitTitle">Contribution limits</div>
+      <div class="flex items-center justify-between py-[6px] text-[13px]">
+        <span class="text-[#6B7280] dark:text-[#8E9CBA]">Under 50</span>
+        <span id="retLimitStandard" class="font-semibold text-[#111827] dark:text-white"></span>
+      </div>
+      <div class="flex items-center justify-between py-[6px] text-[13px] border-t border-gray-100 dark:border-white/[0.06]">
+        <span class="text-[#6B7280] dark:text-[#8E9CBA]">50 or older</span>
+        <span id="retLimitCatchUp" class="font-semibold text-[#111827] dark:text-white"></span>
+      </div>
+      <div class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed mt-[10px] pt-[10px] border-t border-gray-100 dark:border-white/[0.06]">
+        The limit is the combined total across all of your IRAs. Roth contributions are further limited by your income.
+      </div>
+    </div>
+
+    <button id="retOpenBtn" class="w-full h-[50px] rounded-[14px] bg-[#2563EB] text-white text-[15px] font-semibold cursor-pointer shadow-lg">Open an IRA</button>
+    <div id="retCtaHelper" class="hidden text-[12px] font-normal text-white/80 dark:text-[#8E9CBA] text-center mt-[10px]"></div>
+  </div>
+
+  <!-- ================= MORE WAYS TO SAVE ================= -->
+  <div id="retExtras" class="mt-[20px]">
+    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mb-[8px]">MORE OPTIONS</div>
+    <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg">
+      <button id="retRolloverBtn" class="w-full flex items-center justify-between py-[10px] cursor-pointer text-left">
+        <span class="pr-[12px]">
+          <span class="block text-[14px] font-medium text-[#111827] dark:text-white">Roll over an old 401(k)</span>
+          <span class="block text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">Move a workplace plan from a previous employer into an IRA</span>
+        </span>
+        <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button id="retAdvisorBtn" class="w-full flex items-center justify-between py-[10px] border-t border-gray-100 dark:border-white/[0.06] cursor-pointer text-left">
+        <span class="pr-[12px]">
+          <span class="block text-[14px] font-medium text-[#111827] dark:text-white">Talk to a financial advisor</span>
+          <span class="block text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">Get help choosing between a Traditional and a Roth IRA</span>
+        </span>
+        <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+
+    <div class="text-[11px] text-white/70 dark:text-[#8E9CBA] leading-relaxed mt-[14px] px-[4px]">
+      Investment products are not deposits, are not FDIC insured and may lose value. Verceil Bank does not provide tax advice — talk to a tax professional about your own situation.
+    </div>
+  </div>
+
+  <!-- ================= CONFIRMATION ================= -->
+  <div id="retConfirmStep" class="hidden">
+    <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[22px] p-[20px] shadow-lg text-center mb-[16px]">
+      <div class="w-[56px] h-[56px] rounded-full bg-emerald-100 dark:bg-[#10B981]/20 text-emerald-700 dark:text-[#10B981] flex items-center justify-center mx-auto mb-[14px]">
+        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <div id="retConfirmTitle" class="text-[18px] font-bold text-[#111827] dark:text-white mb-[6px]"></div>
+      <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed mb-[16px]">Your account is open. Add funds whenever you're ready — contributions count toward the tax year they're made in.</div>
+      <div class="flex items-center justify-between py-[8px] text-[13px] border-t border-gray-100 dark:border-white/[0.06]">
+        <span class="text-[#6B7280] dark:text-[#8E9CBA]">Confirmation</span>
+        <span id="retConfirmRef" class="font-semibold text-[#111827] dark:text-white"></span>
+      </div>
+      <div class="flex items-center justify-between py-[8px] text-[13px] border-t border-gray-100 dark:border-white/[0.06]">
+        <span class="text-[#6B7280] dark:text-[#8E9CBA]">Opening balance</span>
+        <span id="retConfirmBalance" class="font-semibold text-[#111827] dark:text-white"></span>
+      </div>
+    </div>
+    <button id="retFundBtn" class="w-full h-[50px] rounded-[14px] bg-[#2563EB] text-white text-[15px] font-semibold cursor-pointer shadow-lg mb-[10px]">Add Funds</button>
+    <button id="retDoneBtn" class="w-full h-[50px] rounded-[14px] bg-white dark:bg-[#0D1728] border border-gray-200 dark:border-white/10 text-[#111827] dark:text-white text-[15px] font-semibold cursor-pointer">Return to Dashboard</button>
+  </div>
+
+</div>

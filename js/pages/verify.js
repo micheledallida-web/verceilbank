@@ -97,6 +97,28 @@ export function init(root, ctx) {
   const formView = root.querySelector('#vfFormView');
   const subline = root.querySelector('#vfSubline');
 
+  // The product picked at sign-up, so the screen names the account this
+  // verification is actually for rather than saying "your account".
+  const REQUESTED_PRODUCT_NAMES = {
+    checking: 'Verceil Checking',
+    interest_checking: 'Verceil Interest Checking',
+    investments: 'your Investment Account',
+  };
+
+  async function nameRequestedAccount() {
+    if (!subline) return;
+    try {
+      const user = await getCurrentUser();
+      const requested = user && user.user_metadata && user.user_metadata.requested_account_type;
+      const name = REQUESTED_PRODUCT_NAMES[requested];
+      if (!name) return;
+      subline.textContent = `We need this to open ${name}. Your information is encrypted and reviewed by a representative.`;
+    } catch (err) {
+      console.error('Requested account lookup error:', err);
+    }
+  }
+  nameRequestedAccount();
+
   const submitBtn = root.querySelector('#vfSubmitBtn');
   const submitLabel = root.querySelector('#vfSubmitLabel');
   const submitSpinner = root.querySelector('#vfSubmitSpinner');
