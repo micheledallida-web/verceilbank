@@ -55,23 +55,71 @@ export function parseBalanceText(text) {
 // one, it exists before any account does, and it is safe to print anywhere — so
 // it is returned for every deposit account, always, with nothing to look up.
 //
-// The account number belongs to the account, and an account that has not been
-// opened does not have one. Nothing is derived, hashed or invented on the
-// device: a number appears only once the account exists server-side and the
-// server has issued it. Until then this returns an empty string and the screens
-// say so in words, rather than showing a placeholder somebody might quote to
-// their employer.
+// The account number belongs to the account. Every account somebody actually
+// holds has one — eleven digits, issued the moment the account is open — and a
+// product they have only been offered does not. That is the line: a card that
+// has never been applied for has no number to show, while every open account
+// does, and shows it.
 export function getAccountNumber(type, kind) {
   if (kind === 'routing') {
     return NO_ROUTING_ACCOUNT_TYPES.includes(type) ? '' : bankRoutingNumber;
   }
-  return accountNumbersByType[type] || '';
+  // What the server issued always wins.
+  if (accountNumbersByType[type]) return accountNumbersByType[type];
+  // Otherwise the account gets the number assigned to it at opening — but only
+  // if it is an account the customer holds.
+  return heldAccountTypes.has(type) ? assignAccountNumber(type) : '';
 }
 
-// What a screen shows in place of an account number it does not have. Both are
-// exported so every screen words it the same way.
+// What a screen shows in place of an account number it does not have — which
+// now only happens for a product that has not been opened.
 export const NO_ACCOUNT_NUMBER_TEXT = 'Issued when your account is opened';
 export const NO_ACCOUNT_NUMBER_SHORT = 'Not yet issued';
+
+// ---------- Assigning an account number ----------
+// Eleven digits, and they have to be the same eleven wherever the account
+// holder signs in — an account that reads one number on a phone and another on
+// a laptop is not an account number, it is a random number.
+//
+// So they are derived rather than rolled: from the account holder's id and the
+// account type, which makes them stable per device and unique per account.
+// Every account type seeds differently, so savings never shares checking's
+// number, and two customers never collide because their ids differ. The first
+// digit is forced non-zero so the number is always eleven digits long rather
+// than ten with a leading nought.
+//
+// Derivation is the fallback, not the record: assignAccountNumber() writes the
+// number back to the accounts table the first time it is needed (see
+// persistAssignedNumbers below), so from then on it is the server's number and
+// the branch above returns it.
+function deriveAccountNumber(type) {
+  if (!currentUserId) return '';
+  const seed = `${currentUserId}:${type}`;
+
+  // Two independent FNV-1a passes, so eleven digits are drawn from more entropy
+  // than a single 32-bit hash would give.
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < seed.length; i++) {
+    const code = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ code, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ code, 0x85ebca6b) >>> 0;
+  }
+
+  // Stays inside Number's safe range: 9 * 1e10 is well under 2^53.
+  const lead = 1 + (h1 % 9);
+  const rest = String((h1 % 100000) * 100000 + (h2 % 100000)).padStart(10, '0');
+  return `${lead}${rest}`;
+}
+
+function assignAccountNumber(type) {
+  if (!accountNumbersByType[type]) {
+    const number = deriveAccountNumber(type);
+    if (!number) return '';
+    accountNumbersByType[type] = number;
+  }
+  return accountNumbersByType[type];
+}
 
 // ---------- Bank reference data ----------
 // Read once per session and shared by every screen that prints these, rather
@@ -108,10 +156,21 @@ export const MINIMUM_OPENING_DEPOSIT_LABEL = `$${MINIMUM_OPENING_DEPOSIT.toLocal
 export const COMPULSORY_ACCOUNT_TYPE = 'savings';
 
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
-// Only what the server has actually issued. An account type missing from this
-// map has no number, which is the honest answer for an account nobody has
-// opened yet.
+// Every account number known for this customer, server-issued or assigned at
+// opening. Keyed by account type, because an account holder has one of each.
 let accountNumbersByType = {};
+// Seeds the assigned numbers, so they are the same on every device.
+let currentUserId = '';
+
+// The accounts opened at sign-up. Every customer holds all three from the day
+// they join — savings compulsorily, see COMPULSORY_ACCOUNT_TYPE — so all three
+// carry a number whether or not a row has appeared in the table yet.
+const CORE_ACCOUNT_TYPES = ['checking', 'savings', 'investments'];
+
+// Which accounts this customer actually holds, and therefore which have a
+// number. A product that has only been offered — the Signature Card before it
+// is applied for — is deliberately absent, so it shows no digits.
+let heldAccountTypes = new Set(CORE_ACCOUNT_TYPES);
 
 // Whether the user holds a card at all. Card Services is left out of the menu
 // entirely when they do not, rather than shown and then apologised for.
@@ -145,6 +204,8 @@ async function loadBankReference() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
+    currentUserId = user.id;
+
     // The accounts and the verification status are wanted together — the
     // opening-terms notice needs both — so they are asked for together.
     const [accountsRes, profileRes] = await Promise.all([
@@ -155,7 +216,12 @@ async function loadBankReference() {
     const rows = accountsRes.data;
 
     (rows || []).forEach((row) => {
-      if (row && row.account_type && row.account_number) {
+      if (!row || !row.account_type) return;
+      // A row in this table is an account the customer holds, so it gets a
+      // number — the one the server issued if there is one, otherwise the one
+      // assigned to it below.
+      heldAccountTypes.add(row.account_type);
+      if (row.account_number) {
         accountNumbersByType[row.account_type] = String(row.account_number);
       }
     });
@@ -167,9 +233,40 @@ async function loadBankReference() {
     accountsOpenedAt = earliestOpenDate(rows, user);
     openingTermsLoaded = true;
     renderAccountStatus();
+
+    // Last, and deliberately not awaited by anything above: writing the
+    // assigned numbers back is what turns them from derived into issued, but
+    // no screen should wait on it to draw a number it can already work out.
+    persistAssignedNumbers(rows);
   } catch (err) {
     console.error('Account reference error:', err);
   }
+}
+
+// An account number is the bank's record, not a value each device recomputes,
+// so the first client to notice a row without one writes it back. Derivation
+// makes that safe to do from the client: every device would compute the same
+// eleven digits for the same account, so two of them racing here write the
+// same number rather than two different ones.
+async function persistAssignedNumbers(rows) {
+  const missing = (rows || []).filter((row) => row && row.id != null && row.account_type && !row.account_number);
+  if (!missing.length) return;
+
+  await Promise.all(missing.map(async (row) => {
+    const number = assignAccountNumber(row.account_type);
+    if (!number) return;
+    try {
+      const { error } = await supabaseClient
+        .from('accounts')
+        .update({ account_number: number })
+        .eq('id', row.id);
+      if (error) throw error;
+    } catch (err) {
+      // Not fatal, and not worth retrying: the number is already on screen and
+      // the next load derives the same one again.
+      console.error('Account number assignment error:', err);
+    }
+  }));
 }
 
 // The funding clock starts when the first account was opened. Before any
@@ -301,9 +398,17 @@ function renderAccountStatus() {
     action = () => loadPage('fund-account');
   }
 
-  document.getElementById('accountStatusTitle').textContent = title;
-  document.getElementById('accountStatusBody').textContent = body;
-  document.getElementById('accountStatusActionLabel').textContent = actionLabel;
+  // Each line is only replaced when there is something to replace it with, so
+  // a missing element or an empty string leaves the markup's own copy standing
+  // rather than blanking the card.
+  const setLine = (id, text) => {
+    const el = document.getElementById(id);
+    if (el && text) el.textContent = text;
+  };
+  setLine('accountStatusTitle', title);
+  setLine('accountStatusBody', body);
+  setLine('accountStatusActionLabel', actionLabel);
+
   notice.onclick = action;
   notice.classList.remove('hidden');
 
@@ -1074,20 +1179,21 @@ const headerMenuRoutes = {
 // The personal information rows show what is currently on file beside their
 // label, read from the same `user_profile` row the individual profile screens
 // write to — so the sheet answers "what is my address?" without a tap.
-const PROFILE_VALUE_ROWS = ['Full Legal Name', 'Date of Birth', 'Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
+//
+// A legal name and a date of birth are not on that list, deliberately. They are
+// the two pieces of the record that identify a person rather than describe
+// them, and the profile sheet slides up over the dashboard — in a cafe, on a
+// train, in front of whoever is next to you. They live on their own screens,
+// behind a tap, and nowhere else in the app.
+const PROFILE_VALUE_ROWS = ['Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
 
-// Locked once identity has been verified. These two are facts on the record
-// rather than something to edit, so they lose their chevron and their tap.
-const LOCKED_PROFILE_ROWS = ['Full Legal Name', 'Date of Birth'];
+// Rows with nothing to edit. Name and date of birth are not here any more: with
+// their values off the sheet, the row has to be tappable or there would be no
+// way left to read your own name — the screen behind the tap is where both now
+// live, and where editing is governed.
+const LOCKED_PROFILE_ROWS = [];
 
 let profileRowValues = {};
-
-// Enough of the date to recognise it as yours, not enough to be worth reading
-// over your shoulder — the year is the part people check.
-function maskDateOfBirth(value) {
-  const year = String(value || '').slice(0, 4);
-  return /^\d{4}$/.test(year) ? `••/••/${year}` : '';
-}
 
 function maskPhoneNumber(digitsSource) {
   const digits = String(digitsSource || '').replace(/\D/g, '');
@@ -1099,32 +1205,16 @@ function cityAndCountry(city, country) {
   return [String(city || '').trim(), String(country || '').trim()].filter(Boolean).join(', ');
 }
 
-// Name and date of birth live in three places and are written by three
-// different flows, so the sheet reads all three rather than the one that
-// happens to be empty. `user_profile` first because it is the one the profile
-// screens edit, then the verification record's legal name, then what was typed
-// at sign-up. Whichever is on file is what the row shows.
-function buildProfileRowValues(profile, user, verification) {
+// Only what the sheet is allowed to print. Name and date of birth are read
+// here no longer — not masked, not truncated, not fetched: the sheet has no
+// use for them, so it does not ask for them.
+function buildProfileRowValues(profile, verification) {
   // `mail_same_as_res` is only false once someone has explicitly said the two
   // differ, which is the same default the Mailing Address screen applies.
   const mailingDiffers = profile.mail_same_as_res === false;
-  const meta = (user && user.user_metadata) || {};
   const ver = verification || {};
 
-  // Sign-up stores these under whichever keys the form used, so every shape it
-  // could have taken is tried rather than one guess.
-  const joinName = (source, keys) => keys.map((k) => source[k]).filter(Boolean).join(' ');
-
-  const nameFromProfile = joinName(profile, ['first_name', 'middle_name', 'last_name', 'suffix']) || profile.full_name || '';
-  const nameFromVerification = joinName(ver, ['legal_first_name', 'legal_middle_name', 'legal_last_name']);
-  const nameFromSignUp = joinName(meta, ['first_name', 'middle_name', 'last_name', 'suffix'])
-    || meta.full_name || meta.name || '';
-
-  const dob = profile.date_of_birth || ver.date_of_birth || meta.date_of_birth || meta.dob || '';
-
   return {
-    'Full Legal Name': nameFromProfile || nameFromVerification || nameFromSignUp,
-    'Date of Birth': maskDateOfBirth(dob),
     'Residential Address': cityAndCountry(profile.res_city || ver.city, profile.res_country || ver.state),
     // Nothing when the mailing address simply matches the residential one —
     // saying so on the list is noise, and the detail screen says it anyway.
@@ -1150,13 +1240,13 @@ async function refreshProfileRowValues() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
-    // Both reads in parallel: the sheet needs whichever of them has the name.
+    // Both reads in parallel: the address on file may be on either record.
     const [{ data: profile }, { data: verification }] = await Promise.all([
       supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle(),
       supabaseClient.from('verification_requests').select('*').eq('user_id', user.id)
         .order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ]);
-    profileRowValues = buildProfileRowValues(profile || {}, user, verification || {});
+    profileRowValues = buildProfileRowValues(profile || {}, verification || {});
     applyProfileRowValues();
   } catch (err) {
     console.error('Profile row values error:', err);
