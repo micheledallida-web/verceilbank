@@ -1072,7 +1072,7 @@ const navMenus = {
   },
   navInvest: {
     title: 'Invest',
-    items: ['Portfolio Overview', 'Market Performance', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
+    items: ['Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
   },
   navSupport: {
     title: 'Support',
@@ -1151,6 +1151,7 @@ const headerMenuRoutes = {
   'Card Services': () => loadPage('card-services'),
   'Settings': () => loadPage('settings'),
   'Contact Support': () => loadPage('contact-support'),
+  'Schedule an Appointment': () => loadPage('advisor'),
   'My Profile': () => loadPage('profile'),
   'Linked Accounts': () => loadPage('linked-accounts'),
   'Notification Preferences': () => loadPage('notification-prefs'),
@@ -1519,19 +1520,11 @@ async function initSupabaseData() {
     offers.classList.toggle('hidden', !anyVisible);
   }
 
-  // Demo-mode fallback: if the Interest Checking account was opened while
-  // Supabase was unavailable, reveal it from the locally cached flag. Applied
-  // only when the server returned nothing — otherwise a stale cached figure
-  // would sit in the deposits total next to the real accounts.
-  function applyCachedInterestChecking() {
-    try {
-      if (localStorage.getItem('verceil_interest_checking_opened') !== '1') return;
-      const cachedBalance = Number(localStorage.getItem('verceil_interest_checking_balance') || 0);
-      applyAccountRow({ account_type: 'interest_checking', balance: cachedBalance });
-    } catch (err) {}
-  }
-
-  if (!supabaseClient) applyCachedInterestChecking();
+  // An account is a row in the accounts table and nothing else. There used to
+  // be a demo fallback here that revealed Interest Checking — and folded a
+  // cached figure into the deposits total — on the strength of a localStorage
+  // flag, which is a value anybody can set from a browser console. Whether
+  // somebody holds an account is the bank's answer to give, not the device's.
 
   if (supabaseClient) {
     try {
@@ -1551,7 +1544,6 @@ async function initSupabaseData() {
         if (accountsData && !accountsError) {
           accountsData.forEach(applyAccountRow);
         }
-        if (!accountsById.size) applyCachedInterestChecking();
 
         // Scoped to this user. An unfiltered subscription hands you every
         // other account holder's updates, and applyAccountRow would happily
@@ -1568,8 +1560,6 @@ async function initSupabaseData() {
             else if (payload.new) applyAccountRow(payload.new);
           })
           .subscribe();
-      } else {
-        applyCachedInterestChecking();
       }
     } catch (err) {
       console.error('Supabase data fetch error:', err);

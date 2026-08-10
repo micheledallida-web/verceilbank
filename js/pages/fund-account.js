@@ -25,10 +25,37 @@
 // ---------------------------------------------------------------------------
 const DEPOSIT = {
   address: 'bc1qh4kl29xf7ejm3wvp8dz6ncrt5aygu0svq2xlpe',
+  // A bitcoin price hardcoded in a bundle is wrong the day after it ships, and
+  // more wrong every day after that — and it is the number somebody's deposit
+  // is converted at. It is a starting value now, not the answer: loadRate()
+  // replaces it from bank_settings.btc_usd_rate before the screen quotes
+  // anything. Keep this figure roughly current anyway, since it is what a
+  // customer sees if that read fails.
   rate: 106468.20,
   lockMinutes: 30,
   expiryKey: 'verceil_fund_deposit_expiry',
 };
+
+// The rate the bank is currently honouring. Read once per opening of this
+// screen, so the figure quoted and the figure locked into the countdown are
+// the same one.
+async function loadRate(ctx) {
+  if (!ctx.supabaseClient) return;
+  try {
+    const { data, error } = await ctx.supabaseClient
+      .from('bank_settings')
+      .select('btc_usd_rate')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error) throw error;
+    const rate = Number(data && data.btc_usd_rate);
+    if (rate > 0) DEPOSIT.rate = rate;
+  } catch (err) {
+    // The built-in figure stands. Quoting a slightly stale rate is better than
+    // a screen that cannot tell anybody what their deposit is worth.
+    console.error('Deposit rate read error:', err);
+  }
+}
 
 // The floor is the opening deposit every account is held to, not a separate
 // rule this screen invented — a screen that accepted $25 while the rest of the
@@ -84,6 +111,11 @@ function clearExpiry() {
 
 export function init(root, ctx) {
   const { close } = ctx;
+
+  // Fetched as the screen opens rather than awaited: the amount step does not
+  // quote bitcoin, so nothing on screen is wrong in the meantime, and by the
+  // time anyone reaches the deposit step the real rate has landed.
+  loadRate(ctx);
 
   // Why someone is most likely on this screen at all: the opening deposit.
   // Stated here so the amount they need is in front of them while they type
