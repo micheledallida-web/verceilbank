@@ -14,7 +14,7 @@ function on(el, evt, fn) {
 }
 
 export function init(root, ctx) {
-  const { supabaseClient, getCurrentUser, formatCurrency, parseBalanceText, getOrCreateTempNumber, showModal, loadPage, close } = ctx;
+  const { supabaseClient, getCurrentUser, formatCurrency, parseBalanceText, getAccountNumber, showModal, loadPage, close } = ctx;
 
   let latestReport = null;
 
@@ -270,7 +270,7 @@ export function init(root, ctx) {
 
     latestReport = {
       periodLabel: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      accountNumber: getOrCreateTempNumber('investments', 'account'),
+      accountNumber: getAccountNumber('investments', 'account') || ctx.NO_ACCOUNT_NUMBER_SHORT,
       netWorth,
       investValue,
       cashHoldings,

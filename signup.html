@@ -210,6 +210,111 @@
       color: #6b7280;
     }
 
+    /* ==========================================================================
+       ACCOUNT CHOICE (STEP 1)
+       Which account is being opened is the first thing a bank asks, before it
+       asks who you are — so it is step one here too. The card is not on this
+       list: it is a credit product for established members, not something a
+       brand-new customer can sign up for.
+       ========================================================================== */
+    .product-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .product-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      width: 100%;
+      text-align: left;
+      background: #ffffff;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .product-card:hover {
+      border-color: #93b4ff;
+    }
+
+    .product-card.selected {
+      border-color: #0044ff;
+      background: #f5f8ff;
+    }
+
+    .product-radio {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid #cbd5e1;
+      flex-shrink: 0;
+      margin-top: 2px;
+      position: relative;
+    }
+
+    .product-card.selected .product-radio {
+      border-color: #0044ff;
+    }
+
+    .product-card.selected .product-radio::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      background: #0044ff;
+    }
+
+    .product-name {
+      display: block;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .product-desc {
+      display: block;
+      font-size: 0.85rem;
+      color: #4b5563;
+      margin-top: 0.15rem;
+      line-height: 1.35;
+    }
+
+    .product-note {
+      display: block;
+      font-size: 0.78rem;
+      color: #6b7280;
+      margin-top: 0.35rem;
+    }
+
+    .step-note {
+      font-size: 0.8rem;
+      color: #6b7280;
+      line-height: 1.45;
+      background: #f9fafb;
+      border-left: 3px solid #d1d5db;
+      padding: 0.7rem 0.85rem;
+      border-radius: 0 4px 4px 0;
+      margin-bottom: 1.25rem;
+    }
+
+    .btn-back-link {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: #0044ff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0.85rem;
+      margin-top: 0.35rem;
+    }
+
     .error-msg {
       background-color: #fef2f2;
       border: 1px solid #f87171;
@@ -251,19 +356,62 @@
     <div class="signup-card">
       
       <div class="progress-container">
-        <span class="progress-label">Your information</span>
+        <span class="progress-label" id="progressLabel">Choose your account</span>
         <div class="progress-bar-track">
           <div class="progress-bar-fill" id="progressBarFill"></div>
         </div>
       </div>
 
-      <h1>Let's get to know you</h1>
-      <p class="subtitle">Tell us your full legal name as it appears on your government ID, along with your secure credentials and date of birth.</p>
+      <!-- ================= STEP 1 — WHICH ACCOUNT ================= -->
+      <div id="stepProduct">
+        <h1>Which account would you like to open?</h1>
+        <p class="subtitle">Pick the account to open today. You can add another one later from your dashboard, once your identity has been verified.</p>
 
-      <div id="errorBanner" class="error-msg"></div>
-      <div id="successBanner" class="success-msg">Account created successfully! Launching dashboard...</div>
+        <div class="product-list" id="productList">
+          <button type="button" class="product-card selected" data-product="checking">
+            <span class="product-radio"></span>
+            <span>
+              <span class="product-name">Verceil Checking</span>
+              <span class="product-desc">Everyday banking for spending, direct deposit and transfers.</span>
+              <span class="product-note">No monthly maintenance fee</span>
+            </span>
+          </button>
 
-      <form id="signupForm">
+          <button type="button" class="product-card" data-product="interest_checking">
+            <span class="product-radio"></span>
+            <span>
+              <span class="product-name">Verceil Interest Checking</span>
+              <span class="product-desc">A checking account that earns interest on your balance.</span>
+              <span class="product-note">Up to 4.00% APY · No monthly fees</span>
+            </span>
+          </button>
+
+          <button type="button" class="product-card" data-product="investments">
+            <span class="product-radio"></span>
+            <span>
+              <span class="product-name">Investment Account</span>
+              <span class="product-desc">Buy and hold stocks, ETFs and mutual funds.</span>
+              <span class="product-note">Not FDIC insured · May lose value</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="step-note">
+          The Verceil Signature Card is not opened at sign-up. It becomes available to members after eight months of account history and regular activity, and you can apply from your dashboard once you qualify.
+        </div>
+
+        <button type="button" id="productNextBtn" class="btn-next-full">Continue</button>
+      </div>
+
+      <!-- ================= STEP 2 — WHO YOU ARE ================= -->
+      <div id="stepDetails" style="display:none;">
+        <h1>Let's get to know you</h1>
+        <p class="subtitle">Tell us your full legal name as it appears on your government ID, along with your secure credentials and date of birth.</p>
+
+        <div id="errorBanner" class="error-msg"></div>
+        <div id="successBanner" class="success-msg">Account created successfully! Launching dashboard...</div>
+
+        <form id="signupForm">
         
         <div class="input-group">
           <label for="firstName">First name</label>
@@ -313,7 +461,10 @@
 
         <button type="submit" id="submitBtn" class="btn-next-full">Next</button>
 
-      </form>
+        </form>
+
+        <button type="button" id="backToProductBtn" class="btn-back-link">Back to account choice</button>
+      </div>
     </div>
   </main>
 
@@ -343,6 +494,41 @@
     const successBanner = document.getElementById('successBanner');
     const submitBtn = document.getElementById('submitBtn');
     const progressBarFill = document.getElementById('progressBarFill');
+    const progressLabel = document.getElementById('progressLabel');
+
+    // ---------- Step 1: which account ----------
+    // The choice is carried on the new user's metadata rather than opening an
+    // account outright. Nothing is opened by signing up: identity has to be
+    // verified first, and this is what tells the bank which product to open
+    // once it has been. The credit card is not among the options — it is a
+    // product for members with account history, so a new customer cannot pick
+    // it here at all.
+    const stepProduct = document.getElementById('stepProduct');
+    const stepDetails = document.getElementById('stepDetails');
+    const productCards = Array.from(document.querySelectorAll('.product-card'));
+
+    let selectedProduct = 'checking';
+
+    productCards.forEach((card) => {
+      card.addEventListener('click', () => {
+        selectedProduct = card.getAttribute('data-product');
+        productCards.forEach((other) => other.classList.toggle('selected', other === card));
+      });
+    });
+
+    function showStep(step) {
+      const onProduct = step === 'product';
+      stepProduct.style.display = onProduct ? '' : 'none';
+      stepDetails.style.display = onProduct ? 'none' : '';
+      progressLabel.textContent = onProduct ? 'Choose your account' : 'Your information';
+      progressBarFill.style.width = onProduct ? '40%' : '75%';
+      window.scrollTo(0, 0);
+    }
+
+    showStep('product');
+
+    document.getElementById('productNextBtn').addEventListener('click', () => showStep('details'));
+    document.getElementById('backToProductBtn').addEventListener('click', () => showStep('product'));
 
     signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -396,7 +582,11 @@
               middle_name: middleName,
               last_name: lastName,
               suffix: suffix,
-              date_of_birth: dob
+              date_of_birth: dob,
+              // The product chosen in step one. It is a request, not an
+              // account: it tells the bank what to open once this person has
+              // been identity-verified.
+              requested_account_type: selectedProduct
             }
           }
         });

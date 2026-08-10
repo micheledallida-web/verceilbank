@@ -4,6 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Verceil Bank | Premium Mobile Dashboard</title>
+
+  <!-- Theme, applied before anything is painted.
+       This is a plain blocking script on purpose: it has to run before the
+       browser draws the first frame, which rules out js/main.js (a module, and
+       therefore deferred). It writes the same class js/main.js toggles, from
+       the same localStorage key, so the two can never disagree — this one just
+       gets there first, and dark stays dark from the very first pixel.
+       `theme-boot` suppresses the app's colour transitions for that first
+       frame, then js/main.js removes it. -->
+  <script>
+    (function () {
+      var stored = '';
+      try { stored = localStorage.getItem('vercel_bank_theme') || ''; } catch (err) {}
+      var root = document.documentElement;
+      root.classList.add('theme-boot');
+      // Light is the default: only an explicit stored 'dark' turns it dark.
+      if (stored === 'dark') root.classList.add('dark');
+
+      // Hide-balances is applied here for the same reason the theme is: if it
+      // waited for js/main.js, every amount on the home screen would be legible
+      // for a frame first, which is exactly what the setting exists to prevent.
+      try {
+        var settings = JSON.parse(localStorage.getItem('verceil_settings') || '{}');
+        if (settings && settings.hideBalances) root.classList.add('hide-balances');
+      } catch (err) {}
+    })();
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -135,7 +163,7 @@
         <div class="home-grid">
           <span class="home-n">Verceil Checking</span>
           <span class="home-b" id="checkingBalance">$150.00</span>
-          <span class="home-num" id="checkingNumber">•4892</span>
+          <span class="home-num" id="checkingNumber"></span>
           <span class="home-sl">Available Balance</span>
         </div>
         <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
@@ -171,7 +199,7 @@
         <div class="home-grid">
           <span class="home-n">High-Yield Savings</span>
           <span class="home-b" id="savingsBalance">$25,000.00</span>
-          <span class="home-num" id="savingsNumber">•9104</span>
+          <span class="home-num" id="savingsNumber"></span>
           <span class="home-sl">4.00% APY</span>
         </div>
         <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
@@ -188,7 +216,7 @@
         <div class="home-grid">
           <span class="home-n">Investment Portfolio</span>
           <span class="home-b" id="investmentsBalance">$0.00</span>
-          <span class="home-num" id="investmentsNumber">•7721</span>
+          <span class="home-num" id="investmentsNumber"></span>
           <span class="home-sl">Total Value</span>
         </div>
         <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
@@ -225,6 +253,25 @@
       </div>
     </div>
 
+    <!-- ================= RETIREMENT (hidden until an IRA is opened) ================= -->
+    <div id="sectionRetirement" class="hidden">
+      <p class="home-lab">Retirement</p>
+      <div id="cardRetirement" class="home-acct">
+        <div class="home-arow">
+          <div class="home-ic home-ic-p">
+            <svg viewBox="0 0 24 24"><path d="M12 3l8 5v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8z"></path><path d="M10 20v-6h4v6"></path></svg>
+          </div>
+          <div class="home-grid">
+            <span class="home-n" id="retirementName">Individual Retirement Account</span>
+            <span class="home-b" id="retirementBalance">$0.00</span>
+            <span class="home-num">Tax-advantaged</span>
+            <span class="home-sl">Total Value</span>
+          </div>
+          <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+        </div>
+      </div>
+    </div>
+
     <!-- ================= CREDIT CARD (hidden until approved) ================= -->
     <div id="sectionCredit" class="hidden">
       <p class="home-lab">Credit Cards</p>
@@ -236,7 +283,7 @@
           <div class="home-grid">
             <span class="home-n">Verceil Signature Card</span>
             <span class="home-b" id="creditBalance">$0.00</span>
-            <span class="home-num" id="creditNumber">Signature</span>
+            <span class="home-num" id="creditNumber"></span>
             <span class="home-sl" id="creditSublabel">Current Balance</span>
           </div>
           <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>

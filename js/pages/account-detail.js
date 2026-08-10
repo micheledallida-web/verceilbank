@@ -9,7 +9,6 @@ const accountConfigs = {
     balanceSourceId: 'checkingBalance',
     iconBg: '#1D61F2',
     iconSvg: '<svg class="w-[26px] h-[26px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="6" width="18" height="12" rx="3"></rect><path d="M3 10h18"></path></svg>',
-    number: '•4892',
   },
   interest_checking: {
     title: 'Vercel Interest Checking',
@@ -17,7 +16,6 @@ const accountConfigs = {
     balanceSourceId: 'interestCheckingBalance',
     iconBg: '#1D61F2',
     iconSvg: '<svg class="w-[26px] h-[26px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="6" width="18" height="12" rx="3"></rect><path d="M3 10h18"></path></svg>',
-    number: '•2461',
   },
   savings: {
     title: 'High-Yield Savings',
@@ -25,7 +23,6 @@ const accountConfigs = {
     balanceSourceId: 'savingsBalance',
     iconBg: '#10B981',
     iconSvg: '<svg class="w-[26px] h-[26px]" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 9.5c-0.7 0-1.3 0.3-1.8 0.7-1.2-1.3-2.9-2.2-4.7-2.2H11C8.2 8 6 10.2 6 13c0 0.8 0.2 1.5 0.5 2.2L5 17h3v1c0 0.6 0.4 1 1 1h2c0.6 0 1-0.4 1-1v-1h4v1c0 0.6 0.4 1 1 1h2c0.6 0 1-0.4 1-1v-1.2c1.8-1 3-2.9 3-5.1 0-1.8-1.5-3.3-3.5-3.3zM16 11c0.6 0 1 0.4 1 1s-0.4 1-1 1-1-0.4-1-1 0.4-1 1-1z"/></svg>',
-    number: '•9104',
   },
   investments: {
     title: 'Investment Portfolio',
@@ -33,7 +30,6 @@ const accountConfigs = {
     balanceSourceId: 'investmentsBalance',
     iconBg: '#8B5CF6',
     iconSvg: '<svg class="w-[26px] h-[26px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>',
-    number: '•7721',
   },
   credit: {
     title: 'Verceil Signature Card',
@@ -52,7 +48,6 @@ const qaIcons = {
   transfer: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h11m0 0l-4-4m4 4l-4 4M17 17H6m0 0l4 4m-4-4l4-4"></path></svg>',
   sendMoney: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M22 2L11 13"></path><path stroke-linecap="round" stroke-linejoin="round" d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>',
   deposit: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>',
-  accountDetails: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path stroke-linecap="round" d="M8 10h8M8 14h5"></path></svg>',
   goal: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="4"></circle><circle cx="12" cy="12" r="0.5"></circle></svg>',
   interest: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M6 18L18 6"></path><circle cx="7.5" cy="7.5" r="2"></circle><circle cx="16.5" cy="16.5" r="2"></circle></svg>',
   directDeposit: '<svg class="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10l9-6 9 6"></path><path stroke-linecap="round" d="M5 10v9h14v-9M10 19v-6h4v6"></path></svg>',
@@ -67,7 +62,7 @@ const quickActionConfigs = {
     { icon: qaIcons.transfer, title: 'Transfer', subtitle: 'Move money between Vercel accounts or external banks.', action: (ctx) => ctx.loadPage('transfer') },
     { icon: qaIcons.sendMoney, title: 'Send Money', subtitle: 'Send money using Zelle® or internal bank transfers.', action: (ctx) => ctx.loadPage('send-money') },
     { icon: qaIcons.deposit, title: 'Deposit Funds', subtitle: 'Add money to your checking account.', action: (ctx) => ctx.loadPage('fund-account') },
-    { icon: qaIcons.accountDetails, title: 'Account Details', subtitle: 'View routing number, account number, and direct deposit information.', action: (ctx) => ctx.loadPage('account-details') },
+    { icon: qaIcons.directDeposit, title: 'Direct Deposit', subtitle: 'View and share your routing and account details for direct deposit.', action: (ctx) => ctx.loadPage('direct-deposit', 'checking') },
   ],
   savings: [
     { icon: qaIcons.transfer, title: 'Transfer', subtitle: 'Move money to or from your savings account.', action: (ctx) => ctx.loadPage('transfer') },
@@ -93,7 +88,9 @@ let listeners = [];
 function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el.removeEventListener(evt, fn)); }
 
 export function init(root, ctx, type) {
-  const { supabaseClient, getCurrentUser, getOrCreateTempNumber, loadPage, close } = ctx;
+  const { supabaseClient, getCurrentUser, getAccountNumber, loadPage, close } = ctx;
+  const NO_NUMBER_TEXT = ctx.NO_ACCOUNT_NUMBER_TEXT;
+  const NO_NUMBER_SHORT = ctx.NO_ACCOUNT_NUMBER_SHORT;
 
   const cfg = accountConfigs[type] || accountConfigs.checking;
 
@@ -143,13 +140,13 @@ export function init(root, ctx, type) {
   detailAccountTitle.textContent = cfg.title;
   detailAccountIcon.style.background = cfg.iconBg;
   detailAccountIcon.innerHTML = cfg.iconSvg;
-  // The masked number was a literal in the config too. The server-assigned one
-  // wins when there is one; the config text stays for accounts that have no
-  // number to show, like a card that has not been applied for.
-  const maskedAccountNumber = getOrCreateTempNumber(type, 'account');
-  detailAccountNumber.textContent = maskedAccountNumber
-    ? `•${String(maskedAccountNumber).slice(-4)}`
-    : cfg.number;
+  // Only a number the server has issued is ever shown. An account nobody has
+  // opened yet has none — it says so, rather than wearing four digits from a
+  // hardcoded config that were never its own.
+  const issuedAccountNumber = getAccountNumber(type, 'account');
+  detailAccountNumber.textContent = issuedAccountNumber
+    ? `•${String(issuedAccountNumber).slice(-4)}`
+    : (cfg.number || NO_NUMBER_SHORT);
   detailAccountBalanceLabel.textContent = cfg.balanceLabel;
 
   const balanceSourceEl = cfg.balanceSourceId ? document.getElementById(cfg.balanceSourceId) : null;
@@ -232,15 +229,24 @@ export function init(root, ctx, type) {
     const body = root.querySelector('#detailCardEligibilityBody');
     if (!card || !title || !body || !ctx.getCardEligibility) return;
 
-    const { eligible, months, thresholdMonths, eligibleFrom } = await ctx.getCardEligibility();
+    const {
+      eligible, monthsMet, activityMet, months, transactionCount, thresholdMonths, eligibleFrom,
+    } = await ctx.getCardEligibility();
 
     if (eligible) {
       title.textContent = 'Ready to apply';
       body.textContent = 'If you meet eligibility, message Support to begin your application. A representative will guide you through the next steps.';
     } else {
-      title.textContent = `Available after ${thresholdMonths} months of membership`;
-      const when = eligibleFrom || 'a later date';
-      body.textContent = `You've been a member for ${months} months — eligible ${when}.`;
+      // Two conditions, so the screen says which one is outstanding rather than
+      // quoting a date to someone whose account has simply never been used.
+      title.textContent = `Available after ${thresholdMonths} months of membership and account activity`;
+      const membership = monthsMet
+        ? `You've been a member for ${months} months.`
+        : `You've been a member for ${months} months — eligible ${eligibleFrom || 'a later date'}.`;
+      const activity = activityMet
+        ? ''
+        : ` Your account also needs transaction history; there ${transactionCount === 1 ? 'is' : 'are'} ${transactionCount} so far.`;
+      body.textContent = membership + activity;
     }
 
     card.classList.remove('hidden');
@@ -253,9 +259,19 @@ export function init(root, ctx, type) {
     detailQuickActionsSection.classList.add('hidden');
     detailTransactionsSection.classList.add('hidden');
   } else {
-    const routingNumber = getOrCreateTempNumber(type, 'routing');
+    // The routing number is the bank's and exists from the moment you are a
+    // customer, so it is always here. The account number is the account's own
+    // and is issued when the account is opened — until then the row says that
+    // in words instead of showing digits.
+    const routingNumber = getAccountNumber(type, 'routing');
     detailFullRoutingNumber.textContent = routingNumber;
-    detailFullAccountNumber.textContent = getOrCreateTempNumber(type, 'account');
+    detailFullAccountNumber.textContent = issuedAccountNumber || NO_NUMBER_TEXT;
+    // A sentence is not a number: the pending state drops to body weight so it
+    // never reads as digits you could quote. Set inline rather than by class,
+    // because these override Tailwind utilities already on the element.
+    detailFullAccountNumber.style.fontSize = issuedAccountNumber ? '' : '12px';
+    detailFullAccountNumber.style.fontWeight = issuedAccountNumber ? '' : '400';
+    detailFullAccountNumber.style.opacity = issuedAccountNumber ? '' : '0.7';
 
     // Investments have no routing number to give, so the row goes rather than
     // sitting there empty — and the account number below it loses the divider

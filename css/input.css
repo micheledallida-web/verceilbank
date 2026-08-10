@@ -6,20 +6,72 @@
 *, *::before, *::after {
   transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
 }
+
+/* ===================== THEME, BEFORE THE FIRST PAINT =====================
+   Dark used to arrive late. The theme was applied by js/main.js, a module —
+   deferred by definition — so the browser painted a light page first and only
+   then swapped it, and with the 250ms transition above on everything, that
+   swap was a white flash on every refresh.
+
+   Two things fix it, and both live here rather than in script:
+
+   1. The theme is carried by a class on <html>, not on <body>. The inline
+      script at the top of dashboard.html's <head> sets it from localStorage
+      before the body element even exists, so the very first paint is already
+      the right colour. Every rule below keys off `html.dark` / `html:not(.dark)`
+      for that reason.
+   2. <html> paints the background itself. The browser uses the root element's
+      background for the canvas, so the page is the correct colour from the
+      first frame — before body has been laid out at all.
+
+   `.theme-boot` is on <html> for the first frame only; it kills the transitions
+   above so nothing can animate its way in from the previous theme. */
+html {
+  background: #0B4CC2;
+  color-scheme: light;
+}
+
+html.dark {
+  background: #060B14;
+  color-scheme: dark;
+}
+
+html.theme-boot *,
+html.theme-boot *::before,
+html.theme-boot *::after {
+  transition: none !important;
+}
+
+/* ---- Hide balances (Settings > App preferences) ----
+   Blurred rather than replaced with dots: the shape of the number stays where
+   it was, so nothing on the screen moves when it is switched on or off, and a
+   glance over your shoulder still gets nothing. Set on <html> by the same head
+   script that sets the theme, so a balance is never legible for a frame before
+   it is covered. */
+html.hide-balances .home-hero-amt,
+html.hide-balances .home-hero-v,
+html.hide-balances .home-b,
+html.hide-balances .home-delta,
+html.hide-balances #detailAccountBalance {
+  filter: blur(8px);
+  user-select: none;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   padding-top: 12px;
   padding-bottom: 90px;
 }
 /* Light Mode: Blue background (#0B4CC2) */
-body:not(.dark) {
+html:not(.dark) body {
   background: #0B4CC2;
   color: #111827;
 }
 /* Dark Mode: Deep banking dark navy aesthetic matching screenshot */
-body.dark {
+html.dark body {
   background: #060B14;
   background-attachment: fixed;
   color: #FFFFFF;
@@ -1597,32 +1649,32 @@ body.dark {
 
    Written as overrides appended after the block above rather than as edits to
    it, so the dark treatment stays the base and nothing already there moves. */
-body:not(.dark) .fund-method:not(.fund-sel) {
+html:not(.dark) body .fund-method:not(.fund-sel) {
   background: #FFFFFF;
   border-color: transparent;
   box-shadow: 0 1px 3px rgba(8, 20, 50, 0.08);
 }
 
-body:not(.dark) .fund-method:not(.fund-sel) .fund-m-t { color: #111827; }
-body:not(.dark) .fund-method:not(.fund-sel) .fund-m-s { color: #6B7280; }
-body:not(.dark) .fund-method:not(.fund-sel) .fund-chev { stroke: #9AA4B8; }
+html:not(.dark) body .fund-method:not(.fund-sel) .fund-m-t { color: #111827; }
+html:not(.dark) body .fund-method:not(.fund-sel) .fund-m-s { color: #6B7280; }
+html:not(.dark) body .fund-method:not(.fund-sel) .fund-chev { stroke: #9AA4B8; }
 
 /* The Coming Soon card is a white card at every theme, which left it glaring
    against the near-black background once the rows above it started following
    the theme. Its muted ink is kept — unavailability still reads as unavailable,
    just in the other direction. */
-body.dark .fund-cs-card {
+html.dark body .fund-cs-card {
   background: #0F1523;
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: none;
 }
 
-body.dark .fund-cs-ico { background: rgba(255, 255, 255, 0.06); }
-body.dark .fund-cs-ico svg { stroke: rgba(255, 255, 255, 0.4); }
-body.dark .fund-cs-t { color: rgba(255, 255, 255, 0.72); }
-body.dark .fund-cs-s { color: rgba(255, 255, 255, 0.4); }
+html.dark body .fund-cs-ico { background: rgba(255, 255, 255, 0.06); }
+html.dark body .fund-cs-ico svg { stroke: rgba(255, 255, 255, 0.4); }
+html.dark body .fund-cs-t { color: rgba(255, 255, 255, 0.72); }
+html.dark body .fund-cs-s { color: rgba(255, 255, 255, 0.4); }
 
-body.dark .fund-cs-pill {
+html.dark body .fund-cs-pill {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.5);
 }
@@ -1637,105 +1689,216 @@ body.dark .fund-cs-pill {
    .fund-cs-note) are left alone on purpose: they are translucent panels on the
    page background rather than cards, and read correctly on blue and on navy
    alike. */
-body:not(.dark) .fund-timer-wrap,
-body:not(.dark) .fund-amt,
-body:not(.dark) .fund-qr-card,
-body:not(.dark) .fund-buy,
-body:not(.dark) .fund-status {
+html:not(.dark) body .fund-timer-wrap,
+html:not(.dark) body .fund-amt,
+html:not(.dark) body .fund-qr-card,
+html:not(.dark) body .fund-buy,
+html:not(.dark) body .fund-status {
   background: #FFFFFF;
   border-color: transparent;
   box-shadow: 0 1px 3px rgba(8, 20, 50, 0.08);
 }
 
 /* Primary ink on those cards. */
-body:not(.dark) .fund-timer-val,
-body:not(.dark) .fund-amt-btc,
-body:not(.dark) .fund-addr,
-body:not(.dark) .fund-buy-t,
-body:not(.dark) .fund-p-n,
-body:not(.dark) .fund-status-t { color: #111827; }
+html:not(.dark) body .fund-timer-val,
+html:not(.dark) body .fund-amt-btc,
+html:not(.dark) body .fund-addr,
+html:not(.dark) body .fund-buy-t,
+html:not(.dark) body .fund-p-n,
+html:not(.dark) body .fund-status-t { color: #111827; }
 
 /* Secondary ink. */
-body:not(.dark) .fund-amt-usd { color: #6B7280; }
+html:not(.dark) body .fund-amt-usd { color: #6B7280; }
 
 /* Muted ink — labels and asides. */
-body:not(.dark) .fund-timer-lab,
-body:not(.dark) .fund-amt-lab,
-body:not(.dark) .fund-addr-lab,
-body:not(.dark) .fund-net,
-body:not(.dark) .fund-buy-s,
-body:not(.dark) .fund-p-d,
-body:not(.dark) .fund-buy-tip,
-body:not(.dark) .fund-status-s { color: #8B95AB; }
+html:not(.dark) body .fund-timer-lab,
+html:not(.dark) body .fund-amt-lab,
+html:not(.dark) body .fund-addr-lab,
+html:not(.dark) body .fund-net,
+html:not(.dark) body .fund-buy-s,
+html:not(.dark) body .fund-p-d,
+html:not(.dark) body .fund-buy-tip,
+html:not(.dark) body .fund-status-s { color: #8B95AB; }
 
-body:not(.dark) .fund-amt-rate { color: #9AA4B8; border-top-color: #EEF1F7; }
-body:not(.dark) .fund-net b { color: #6B7280; }
+html:not(.dark) body .fund-amt-rate { color: #9AA4B8; border-top-color: #EEF1F7; }
+html:not(.dark) body .fund-net b { color: #6B7280; }
 
 /* Insets — the address strip and the provider rows sit inside a card, so they
    need a surface a step down from white rather than a step up from black. */
-body:not(.dark) .fund-addr-row,
-body:not(.dark) .fund-prov {
+html:not(.dark) body .fund-addr-row,
+html:not(.dark) body .fund-prov {
   background: #F7F8FB;
   border-color: #EEF1F7;
 }
 
-body:not(.dark) .fund-prov:active { background: #EEF1F7; }
+html:not(.dark) body .fund-prov:active { background: #EEF1F7; }
 
 /* Icon strokes. The Bitcoin row carries no chevron — it has .fund-m-check —
    so this cannot reach it. */
-body:not(.dark) .fund-chev { stroke: #9AA4B8; }
-body:not(.dark) .fund-p-ext { stroke: #9AA4B8; }
+html:not(.dark) body .fund-chev { stroke: #9AA4B8; }
+html:not(.dark) body .fund-p-ext { stroke: #9AA4B8; }
 
 /* The timer bar's track, and the red it turns when time runs short: #F87171 is
    pitched for a dark surface and goes weak on white. */
-body:not(.dark) .fund-bar { background: #EEF1F7; }
-body:not(.dark) .fund-timer-val.fund-warn { color: #EF4444; }
-body:not(.dark) .fund-bar-f.fund-warn { background: #EF4444; }
+html:not(.dark) body .fund-bar { background: #EEF1F7; }
+html:not(.dark) body .fund-timer-val.fund-warn { color: #EF4444; }
+html:not(.dark) body .fund-bar-f.fund-warn { background: #EF4444; }
 
 /* ---- fund amount screen · theme ----
    The amount card is the mirror image of the problem above: a white card at
    every theme, which left it glaring on the near-black background. Its ink
    flips with it, since near-black digits on a near-black card are no digits
    at all. The focus ring is left to the rule above so it still fires. */
-body.dark .fund-amount-card {
+html.dark body .fund-amount-card {
   background: #0F1523;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-body.dark .fund-amount-cur,
-body.dark .fund-amount-field input { color: #F5F7FA; }
+html.dark body .fund-amount-cur,
+html.dark body .fund-amount-field input { color: #F5F7FA; }
 
-body.dark .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
+html.dark body .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); }
 
 /* The dimmed state of the currency mark is a two-class rule, which the theme
    rule above would otherwise outrank on specificity — restated so an empty
    field still reads as empty in dark mode. */
-body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
+html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
+
+/* ================= ONE COLUMN, FOUR SIZES OF SCREEN =================
+   The app is a column. What changes between a phone, a tablet, a laptop and a
+   television is how wide that column is allowed to get — not how the app is
+   built. Three custom properties carry those widths, every rule that needs a
+   width reads them, and a new breakpoint is four numbers rather than a rewrite:
+
+     --app-col   the dashboard's own width
+     --page-col  the width of a screen opened over it, and of the bars pinned
+                 to the column (bottom navigation, the support composer)
+     --app-pad   the gutter either side
+
+   The dashboard and an opened screen part company above a laptop's width on
+   purpose. A dashboard wants to be wide — it is a board of cards and reads
+   better in columns. A detail screen is one column of prose and controls, and
+   a line of text a thousand pixels long is unreadable no matter how much room
+   the screen has, so it keeps a reading width and stays centred. */
+:root {
+  --app-col: 430px;
+  --page-col: 430px;
+  --app-pad: 16px;
+}
+
+/* Tablets, and phones held sideways. */
+@media (min-width: 768px) {
+  :root {
+    --app-col: 640px;
+    --page-col: 640px;
+    --app-pad: 24px;
+  }
+}
+
+/* Laptops and desktops. */
+@media (min-width: 1024px) {
+  :root {
+    --app-col: 1120px;
+    --page-col: 760px;
+    --app-pad: 32px;
+  }
+}
+
+/* Large desktops and televisions. */
+@media (min-width: 1600px) {
+  :root {
+    --app-col: 1320px;
+    --page-col: 860px;
+    --app-pad: 40px;
+  }
+}
+
+/* The shell's own width. Tailwind's max-w-[430px] on the element is what
+   applies below this file; these override it, because custom CSS is emitted
+   after @tailwind utilities. */
+.app-shell {
+  max-width: var(--app-col);
+  padding-left: var(--app-pad);
+  padding-right: var(--app-pad);
+}
+
+/* Every screen fragment is authored as a 430px column and widened here, so a
+   new screen inherits this without knowing about it. */
+#page-root .max-w-\[430px\] {
+  max-width: var(--page-col);
+}
+
+/* An opened screen is the app's only long scroll, so it gets the treatment a
+   scroll container needs: momentum on iOS, no scroll chaining into the page
+   underneath it, and clearance for a phone's home indicator. */
+#page-root {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* The home indicator and the notch. Zero on everything that has neither. */
+body {
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+}
+
+.home-nav {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
 
 /* ---- screens wider than the app itself ----
-   This is a 430px app. Two pieces of chrome were fixed to the viewport rather
-   than to that column — the bottom navigation and the support reply composer —
-   so on anything wider than a phone they stretched the full width of the
-   screen while the content stayed a narrow strip down the middle. On a laptop
-   that reads as unfinished; on a TV it is a white band two thousand pixels
-   across with five icons huddled in the centre of it.
+   Two pieces of chrome are fixed to the viewport rather than to the column —
+   the bottom navigation and the support reply composer — so on anything wider
+   than a phone they stretched the full width of the screen while the content
+   stayed a narrow strip down the middle. On a laptop that reads as unfinished;
+   on a television it is a white band two thousand pixels across with five icons
+   huddled in the centre of it.
 
-   Above the column's own width they are pinned to the column instead, and
-   given the corners and lift a bar needs once it no longer touches the edges
-   of the screen. Below that nothing changes at all: on a phone the bar still
-   runs edge to edge, which is exactly where it belongs. */
-@media (min-width: 431px) {
+   Above the column's own width they are pinned to the column instead, and given
+   the corners and lift a bar needs once it no longer touches the edges of the
+   screen. Below that nothing changes at all: on a phone the bar still runs edge
+   to edge, which is exactly where it belongs. The upper bound is there because
+   at 1024px the navigation stops being a bottom bar altogether. */
+@media (min-width: 431px) and (max-width: 1023.98px) {
   .home-nav,
   #supComposer {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
-    width: 430px;
+    width: var(--page-col);
     border-top-left-radius: 20px;
     border-top-right-radius: 20px;
   }
 
   .home-nav { box-shadow: 0 -2px 22px rgba(8, 20, 50, 0.22); }
+}
+
+/* ---- tablets ----
+   Wide enough for the balance and the actions to share a band, the way they do
+   on a laptop, but not for two columns of account cards — at 640px those would
+   be two narrow strips rather than two columns. */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .home-top {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .home-hero {
+    border-bottom: 0;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* ---- the smallest phones ----
+   Four actions across is right at 390px and cramped at 320. The labels give up
+   a little rather than the row giving up a column, because a Quick Actions row
+   that reflows to two lines stops being a row you can hit without looking. */
+@media (max-width: 359px) {
+  .home-acts { padding: 14px 2px; }
+  .home-act span { font-size: 10px; }
 }
 
 /* ================= DESKTOP, LAPTOP AND TV =================
@@ -1753,12 +1916,6 @@ body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
     padding-bottom: 48px;
   }
 
-  .app-shell {
-    max-width: 1120px;
-    padding-left: 32px;
-    padding-right: 32px;
-  }
-
   /* ---- navigation moves to the top ---- */
   .home-nav {
     top: 0;
@@ -1773,8 +1930,8 @@ body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   }
 
   .home-nav > div {
-    max-width: 1120px;
-    padding: 0 32px;
+    max-width: var(--app-col);
+    padding: 0 var(--app-pad);
     display: flex;
     gap: 6px;
   }
@@ -1822,15 +1979,45 @@ body.dark .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   }
 
   /* ---- the screens that open over the dashboard ---- */
-  /* Every page fragment is built as a 430px column. On a wide screen that is a
-     ribbon of text down the middle, so they are given a reading width instead.
-     Still centred, still one column — a detail screen does not want to be as
-     wide as a dashboard. */
-  #page-root .max-w-\[430px\] {
-    max-width: 760px;
+  /* Their width comes from --page-col, set at the top of this section. What
+     they need here is breathing room from the edge of a large screen, which a
+     fragment written for a phone has no reason to carry itself. */
+  /* The top navigation is fixed above an opened screen rather than covered by
+     it, so the screen starts below the bar instead of underneath it — the same
+     clearance the dashboard gives itself. */
+  #page-root {
+    padding-top: 96px;
   }
 
+  /* The composer keeps the centring the narrower screens gave it; only its
+     width changes here. Without this it would snap back to the left edge. */
   #supComposer {
-    width: 760px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: var(--page-col);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+  }
+}
+
+/* ================= LARGE DESKTOPS AND TELEVISIONS =================
+   At this size two columns of cards leave a third of the screen empty, and a
+   living-room screen is read from across the room rather than at arm's length —
+   so the board gains a column and the type comes up with it. Everything else is
+   inherited from the desktop block above. */
+@media (min-width: 1600px) {
+  .home-columns {
+    column-count: 3;
+    column-gap: 32px;
+  }
+
+  .home-hero-amt {
+    font-size: 52px;
+  }
+
+  .home-nv {
+    padding: 22px 18px;
+    font-size: 15px;
   }
 }

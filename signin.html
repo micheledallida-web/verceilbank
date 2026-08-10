@@ -432,6 +432,17 @@
     const successBanner = document.getElementById('successBanner');
     const submitBtn = document.getElementById('submitBtn');
 
+    // Why the dashboard sent you here, when it did. An automatic sign-out that
+    // drops you on a bare sign-in page reads as a fault rather than as the
+    // security feature it is, so the dashboard passes its reason along and this
+    // states it. Rendered as text, never as markup.
+    (function showSignOutReason() {
+      const reason = new URLSearchParams(window.location.search).get('reason');
+      if (!reason) return;
+      errorBanner.textContent = reason;
+      errorBanner.style.display = 'block';
+    })();
+
     signinForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       errorBanner.style.display = 'none';
