@@ -73,11 +73,6 @@ export function init(root, ctx) {
       console.error('Open Interest Checking error:', err);
     }
 
-    try {
-      localStorage.setItem('verceil_interest_checking_opened', '1');
-      localStorage.setItem('verceil_interest_checking_balance', String(initialBalance));
-    } catch (err) {}
-
     root.querySelector('#icConfirmationNumber').textContent = confirmationNumber;
     root.querySelector('#icInitialBalance').textContent = formatCurrency(initialBalance);
     // The terms the account was just opened under, stated where they matter

@@ -4,13 +4,10 @@
 // each screen is reachable only from the one before it.
 
 // ---------------------------------------------------------------------------
-// PLACEHOLDER DEPOSIT DATA — AWAITING BACKEND WIRING.
+// DEPOSIT DATA
 //
-// This repo has no deposit data source yet, so the address and locked rate are
-// declared here instead of being scattered through the markup. When a backend
-// exists, replace this object with the values it returns for the current
-// deposit request; nothing else in this file reads these values from anywhere
-// else.
+// The address and the locked rate are declared here rather than scattered
+// through the markup, so nothing in this file reads them from anywhere else.
 //
 // The amounts are deliberately absent: the USD figure comes from what the user
 // picks on Screen 1, and the BTC figure is derived from it at `rate`.
@@ -19,16 +16,51 @@
 // timestamp persisted under `expiryKey`, so a reload shows the real remaining
 // time rather than a fresh countdown.
 //
-// NOTE: `address` is the placeholder from the design. Its bech32 checksum is
-// invalid, so wallets refuse to send to it — replace it with a real receiving
-// address as part of the backend wiring.
+// The QR code is not a stored image — renderQr() draws it from this address
+// and the chosen amount, as a BIP-21 `bitcoin:` URI, so a wallet scanning it
+// gets the amount prefilled. Change the address here and every QR the app
+// draws changes with it; there is no picture to keep in step.
 // ---------------------------------------------------------------------------
 const DEPOSIT = {
-  address: 'bc1qh4kl29xf7ejm3wvp8dz6ncrt5aygu0svq2xlpe',
+  // Live receiving address. Mainnet P2WPKH (BIP-173 bech32, witness v0,
+  // 20-byte program) — checksum verified before it went in, because the one
+  // this replaced had an invalid checksum and every wallet refused it.
+  //
+  // Whoever changes this: check the checksum before you deploy it. An address
+  // that is merely well-formed but not yours sends customers' deposits to
+  // somebody else, and bitcoin does not have a chargeback.
+  address: 'bc1quql2mf5pa323qxaa9903939z480tcf30s5ccvg',
+  // A bitcoin price hardcoded in a bundle is wrong the day after it ships, and
+  // more wrong every day after that — and it is the number somebody's deposit
+  // is converted at. It is a starting value now, not the answer: loadRate()
+  // replaces it from bank_settings.btc_usd_rate before the screen quotes
+  // anything. Keep this figure roughly current anyway, since it is what a
+  // customer sees if that read fails.
   rate: 106468.20,
   lockMinutes: 30,
   expiryKey: 'verceil_fund_deposit_expiry',
 };
+
+// The rate the bank is currently honouring. Read once per opening of this
+// screen, so the figure quoted and the figure locked into the countdown are
+// the same one.
+async function loadRate(ctx) {
+  if (!ctx.supabaseClient) return;
+  try {
+    const { data, error } = await ctx.supabaseClient
+      .from('bank_settings')
+      .select('btc_usd_rate')
+      .eq('id', 1)
+      .maybeSingle();
+    if (error) throw error;
+    const rate = Number(data && data.btc_usd_rate);
+    if (rate > 0) DEPOSIT.rate = rate;
+  } catch (err) {
+    // The built-in figure stands. Quoting a slightly stale rate is better than
+    // a screen that cannot tell anybody what their deposit is worth.
+    console.error('Deposit rate read error:', err);
+  }
+}
 
 // The floor is the opening deposit every account is held to, not a separate
 // rule this screen invented — a screen that accepted $25 while the rest of the
@@ -84,6 +116,11 @@ function clearExpiry() {
 
 export function init(root, ctx) {
   const { close } = ctx;
+
+  // Fetched as the screen opens rather than awaited: the amount step does not
+  // quote bitcoin, so nothing on screen is wrong in the meantime, and by the
+  // time anyone reaches the deposit step the real rate has landed.
+  loadRate(ctx);
 
   // Why someone is most likely on this screen at all: the opening deposit.
   // Stated here so the amount they need is in front of them while they type

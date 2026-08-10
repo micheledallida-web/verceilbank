@@ -275,6 +275,145 @@ select policyname, cmd from pg_policies
 
 ---
 
+## 5c. Balances — make the ledger the source of truth
+
+**This is the most important thing left to do.**
+
+A transfer writes a `transfers` row, writes its two `transactions` rows, and
+updates the number on screen — but nothing updates `accounts.balance`. Refresh
+the page and the old balance is back, because the balance column has never
+moved. Every figure in the app is honest about what the server holds; the
+server is just not being told.
+
+The fix is not to have the client write balances — two devices doing arithmetic
+on the same account is how money goes missing. Let the database derive the
+balance from the ledger, in one trigger:
+
+```sql
+create or replace function public.apply_transaction_to_balance()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- A pending row is not money that has moved yet: a wire under review or an
+  -- unsettled trade leaves the balance alone until its status becomes
+  -- 'completed'. Only completed rows touch the balance.
+  if new.status <> 'completed' then
+    return new;
+  end if;
+
+  update public.accounts
+     set balance = coalesce(balance, 0) + new.amount
+   where user_id = new.user_id
+     and account_type = new.account_type;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists apply_transaction_to_balance on public.transactions;
+create trigger apply_transaction_to_balance
+  after insert on public.transactions
+  for each row execute function public.apply_transaction_to_balance();
+```
+
+And the same when a pending row later settles:
+
+```sql
+create or replace function public.apply_settled_transaction()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.status <> 'completed' and new.status = 'completed' then
+    update public.accounts
+       set balance = coalesce(balance, 0) + new.amount
+     where user_id = new.user_id
+       and account_type = new.account_type;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists apply_settled_transaction on public.transactions;
+create trigger apply_settled_transaction
+  after update on public.transactions
+  for each row execute function public.apply_settled_transaction();
+```
+
+Once this is in, everything else already works: `accounts` is on the Realtime
+publication, so the dashboard's balances move the moment a row lands — on this
+device and on every other one the customer has open.
+
+### Rebuilding a balance from scratch
+
+Because the ledger is now the record, a balance can always be recomputed. Useful
+after a correction, or to check the trigger is keeping up:
+
+```sql
+select a.user_id,
+       a.account_type,
+       a.balance                             as stored,
+       coalesce(sum(t.amount) filter (where t.status = 'completed'), 0) as from_ledger
+  from public.accounts a
+  left join public.transactions t
+    on t.user_id = a.user_id and t.account_type = a.account_type
+ group by a.user_id, a.account_type, a.balance
+having a.balance is distinct from
+       coalesce(sum(t.amount) filter (where t.status = 'completed'), 0);
+```
+
+Any row this returns is an account whose stored balance and ledger disagree.
+
+### Posting a credit by hand
+
+A deposit that has cleared, an adjustment, a correction — insert the ledger row
+and the balance follows:
+
+```sql
+insert into public.transactions
+  (local_id, user_id, account_type, amount, title, category, status)
+values
+  (gen_random_uuid()::text, '<uuid>', 'checking', 500.00,
+   'Deposit received', 'deposit', 'completed');
+```
+
+---
+
+## 5d. The deposit rate
+
+Fund Account now reads the bitcoin rate from `bank_settings` rather than a
+figure compiled into the JavaScript, which was wrong the day after it shipped
+and is the number a customer's deposit gets converted at:
+
+```sql
+alter table public.bank_settings
+  add column if not exists btc_usd_rate numeric(14,2);
+
+update public.bank_settings set btc_usd_rate = 106468.20 where id = 1;
+```
+
+Keep it current from wherever you take a price feed. If the column is absent or
+the read fails, the app falls back to its built-in figure rather than leaving
+the screen unable to quote anything.
+
+The receiving address on that screen is live — a mainnet P2WPKH address in
+`js/pages/fund-account.js`, checksum verified. The QR is drawn from it at
+render time as a BIP-21 `bitcoin:` URI with the amount prefilled, so changing
+the address changes every QR the app draws; there is no image to keep in step.
+
+What is still outstanding there, and is not something SQL alone can fix:
+nothing watches that address. A customer can send funds and the app will never
+notice, because no service is reconciling incoming payments against deposit
+requests. Until one exists, credit deposits by hand with the ledger insert in
+section 5c — the balance follows automatically.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -337,4 +476,6 @@ Never put the service key in these variables.
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
+- [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
+- [ ] `bank_settings.btc_usd_rate` added and set (section 5d)
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)
