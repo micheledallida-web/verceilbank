@@ -28,7 +28,7 @@ function revealDashboardAccount(formatCurrency, balance) {
 }
 
 export function init(root, ctx) {
-  const { close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency } = ctx;
+  const { close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency, openCompulsorySavings } = ctx;
 
   const offerStep = root.querySelector('#icOfferStep');
   const confirmStep = root.querySelector('#icConfirmStep');
@@ -63,6 +63,9 @@ export function init(root, ctx) {
             balance: initialBalance,
             status: 'approved',
           }, { onConflict: 'user_id,account_type' });
+          // Savings is opened with every account, not offered beside it.
+          // Whoever already holds one keeps the one they have.
+          await openCompulsorySavings();
         }
       }
     } catch (err) {
@@ -76,6 +79,10 @@ export function init(root, ctx) {
 
     root.querySelector('#icConfirmationNumber').textContent = confirmationNumber;
     root.querySelector('#icInitialBalance').textContent = formatCurrency(initialBalance);
+    // The terms the account was just opened under, stated where they matter
+    // most — on the screen that says the account now exists.
+    root.querySelector('#icOpeningTerms').textContent =
+      `Your accounts open with limited access. Deposit at least ${ctx.MINIMUM_OPENING_DEPOSIT_LABEL} within ${ctx.FUNDING_DEADLINE_DAYS} days for full access — an account left unfunded past that is closed.`;
 
     revealDashboardAccount(formatCurrency, initialBalance);
 

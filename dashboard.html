@@ -151,6 +151,29 @@
 
     </div>
 
+    <!-- ================= ACTION NEEDED =================
+         One notice, three states, written by renderAccountStatus() in
+         js/main.js: verify your identity, fund the opening deposit, or
+         nothing at all once both are done. Hidden until it has something
+         to say. -->
+    <button id="accountStatusNotice" class="home-notice hidden" type="button">
+      <span class="home-notice-ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 8v5"></path>
+          <path d="M12 16.5v.01"></path>
+        </svg>
+      </span>
+      <span class="home-notice-body">
+        <span class="home-notice-t" id="accountStatusTitle"></span>
+        <span class="home-notice-s" id="accountStatusBody"></span>
+      </span>
+      <span class="home-notice-go" id="accountStatusAction">
+        <span id="accountStatusActionLabel"></span>
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </span>
+    </button>
+
     <div class="home-columns">
 
     <!-- ================= CHECKING ================= -->

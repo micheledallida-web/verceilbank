@@ -87,6 +87,26 @@ const DEFAULT_ROUTING_NUMBER = '856919671';
 // show, so asking for one returns nothing rather than the bank's.
 const NO_ROUTING_ACCOUNT_TYPES = ['investments'];
 
+// ---------- Opening terms ----------
+// The terms every account is opened under, in one place, because they are
+// quoted on four screens — sign-up, the dashboard notice, Fund Account and
+// verification — and four screens quoting three different numbers is how a
+// bank ends up promising something it does not do.
+export const MINIMUM_OPENING_DEPOSIT = 100;
+export const FUNDING_DEADLINE_DAYS = 60;
+
+// The same figure written the way a policy is written. formatCurrency() is for
+// balances, where the cents are the point; "$100.00 minimum deposit" reads like
+// a total owed rather than a threshold, so a round rule gets a round number.
+export const MINIMUM_OPENING_DEPOSIT_LABEL = `$${MINIMUM_OPENING_DEPOSIT.toLocaleString('en-US')}`;
+
+// A savings account is not optional. Whichever account someone opens —
+// checking, interest checking or an investment account — savings is opened
+// alongside it, so this is the product every customer holds. It is exported
+// because the sign-up copy, the open flows and the dashboard all have to agree
+// on that being true.
+export const COMPULSORY_ACCOUNT_TYPE = 'savings';
+
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
 // Only what the server has actually issued. An account type missing from this
 // map has no number, which is the honest answer for an account nobody has
@@ -96,6 +116,16 @@ let accountNumbersByType = {};
 // Whether the user holds a card at all. Card Services is left out of the menu
 // entirely when they do not, rather than shown and then apologised for.
 let hasOpenCreditCard = false;
+
+// What the opening-terms notice needs to know: whether identity has been
+// confirmed, and when the clock started. Both are read once, with the account
+// rows, rather than by the notice itself.
+let kycStatus = null;
+let accountsOpenedAt = null;
+// Nothing is shown until both of those are known — a notice that says "verify
+// your identity" to somebody already verified, for the half second before the
+// read lands, is worse than no notice at all.
+let openingTermsLoaded = false;
 
 async function loadBankReference() {
   if (!supabaseClient) return;
@@ -115,11 +145,14 @@ async function loadBankReference() {
   try {
     const user = await getCurrentUser();
     if (!user) return;
-    const { data: rows, error } = await supabaseClient
-      .from('accounts')
-      .select('*')
-      .eq('user_id', user.id);
-    if (error) throw error;
+    // The accounts and the verification status are wanted together — the
+    // opening-terms notice needs both — so they are asked for together.
+    const [accountsRes, profileRes] = await Promise.all([
+      supabaseClient.from('accounts').select('*').eq('user_id', user.id),
+      supabaseClient.from('profiles').select('kyc_status').eq('id', user.id).maybeSingle(),
+    ]);
+    if (accountsRes.error) throw accountsRes.error;
+    const rows = accountsRes.data;
 
     (rows || []).forEach((row) => {
       if (row && row.account_type && row.account_number) {
@@ -129,9 +162,123 @@ async function loadBankReference() {
 
     hasOpenCreditCard = (rows || []).some((row) => row && row.product_type === 'credit_card' && row.status === 'open');
     renderAccountNumberMasks();
+
+    kycStatus = profileRes.data ? profileRes.data.kyc_status : null;
+    accountsOpenedAt = earliestOpenDate(rows, user);
+    openingTermsLoaded = true;
+    renderAccountStatus();
   } catch (err) {
     console.error('Account reference error:', err);
   }
+}
+
+// The funding clock starts when the first account was opened. Before any
+// account exists it starts at sign-up, which is the same moment from the
+// customer's point of view and the only date there is to go on.
+function earliestOpenDate(rows, user) {
+  const dates = (rows || [])
+    .map((row) => row && row.created_at && new Date(row.created_at))
+    .filter((date) => date && !isNaN(date));
+  if (dates.length) return new Date(Math.min(...dates.map((d) => d.getTime())));
+  const joined = new Date(user.created_at);
+  return isNaN(joined) ? null : joined;
+}
+
+// Savings comes with whatever else is opened, so every flow that opens an
+// account calls this rather than each one remembering to. Upserted on
+// (user_id, account_type), so someone who already holds savings keeps the one
+// they have and its balance — this can be called as often as it likes.
+export async function openCompulsorySavings() {
+  if (!supabaseClient) return;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return;
+    const { data: existing } = await supabaseClient
+      .from('accounts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('account_type', COMPULSORY_ACCOUNT_TYPE)
+      .limit(1);
+    if (existing && existing.length) return;
+
+    const { error } = await supabaseClient.from('accounts').upsert({
+      user_id: user.id,
+      account_type: COMPULSORY_ACCOUNT_TYPE,
+      balance: 0,
+      status: 'approved',
+    }, { onConflict: 'user_id,account_type' });
+    if (error) throw error;
+  } catch (err) {
+    console.error('Compulsory savings error:', err);
+  }
+}
+
+// ---------- Opening terms notice ----------
+// Two things stand between a new customer and a working account: confirming
+// who they are, and the opening deposit. This is the one place either is
+// asked for on the home screen, it asks for one at a time in the order they
+// have to happen, and it takes itself off the screen when both are done.
+let depositBalanceCents = 0;
+// The balances and the verification status arrive on two independent requests.
+// Whichever lands first must not draw the notice on its own: a funded account
+// would be told to fund itself for as long as the other request took.
+let depositBalanceLoaded = false;
+
+function daysLeftToFund() {
+  if (!accountsOpenedAt) return FUNDING_DEADLINE_DAYS;
+  const elapsed = Math.floor((Date.now() - accountsOpenedAt.getTime()) / 86400000);
+  return FUNDING_DEADLINE_DAYS - elapsed;
+}
+
+function renderAccountStatus() {
+  const notice = document.getElementById('accountStatusNotice');
+  if (!notice) return;
+
+  const funded = depositBalanceCents >= MINIMUM_OPENING_DEPOSIT * 100;
+  const verified = kycStatus === 'verified';
+
+  // Nothing outstanding, or nothing known yet.
+  if (!openingTermsLoaded || !depositBalanceLoaded || (funded && verified)) {
+    notice.classList.add('hidden');
+    return;
+  }
+
+  const days = daysLeftToFund();
+  const dayWord = days === 1 ? 'day' : 'days';
+  const minimum = MINIMUM_OPENING_DEPOSIT_LABEL;
+
+  let title;
+  let body;
+  let actionLabel;
+  let action;
+
+  if (days <= 0) {
+    // Past the deadline the account is the bank's to close, so the notice
+    // stops asking for a deposit — taking one now would not save the account
+    // on its own — and points at the people who can actually keep it open.
+    title = 'Funding deadline passed';
+    body = `This account went ${FUNDING_DEADLINE_DAYS} days without its ${minimum} opening deposit and is due to be closed. Contact support if you want to keep it.`;
+    actionLabel = 'Support';
+    action = () => loadPage('contact-support');
+  } else if (!verified) {
+    // Identity first: a deposit into an account the bank cannot yet attach to
+    // a verified person does not unlock anything.
+    title = 'Verify your identity';
+    body = `Your accounts, savings included, have limited access until we confirm who you are. Fund at least ${minimum} within ${days} ${dayWord} to keep them open.`;
+    actionLabel = kycStatus === 'pending' ? 'In review' : 'Verify';
+    action = () => loadPage('verify');
+  } else {
+    title = `Add ${minimum} to activate your accounts`;
+    body = `Full access starts at a ${minimum} balance. ${days} ${dayWord} left before an unfunded account is closed.`;
+    actionLabel = 'Fund';
+    action = () => loadPage('fund-account');
+  }
+
+  document.getElementById('accountStatusTitle').textContent = title;
+  document.getElementById('accountStatusBody').textContent = body;
+  document.getElementById('accountStatusActionLabel').textContent = actionLabel;
+  notice.onclick = action;
+  notice.classList.remove('hidden');
 }
 
 // The masked numbers on the account cards were literals in the markup, so every
@@ -327,6 +474,10 @@ export async function loadPage(name, ...args) {
     getCardEligibility,
     applyTheme,
     isDarkTheme: () => htmlElement.classList.contains('dark'),
+    openCompulsorySavings,
+    MINIMUM_OPENING_DEPOSIT,
+    MINIMUM_OPENING_DEPOSIT_LABEL,
+    FUNDING_DEADLINE_DAYS,
     readSettings,
     writeSettings,
     signOut: () => handleSignOut(),
@@ -1085,6 +1236,13 @@ async function initSupabaseData() {
     // total, not inside it; a card balance is money owed to the issuer, so it
     // is shown as its own line rather than netted off cash on hand.
     setText('homeTotalBalance', deposits);
+
+    // The opening deposit is measured against deposit money, not the market
+    // value of an investment account — you cannot meet a cash minimum with
+    // something whose worth changes overnight.
+    depositBalanceCents = deposits;
+    depositBalanceLoaded = true;
+    renderAccountStatus();
 
     // Retirement money is neither a deposit nor part of the brokerage account,
     // so it is totalled and shown on its own — the way a bank reports an IRA.
