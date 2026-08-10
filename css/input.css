@@ -1327,12 +1327,80 @@ html.dark body {
 .dark .home-chev { stroke: #52607D; }
 
 /* ---- investment extras ---- */
+/* The day's movement and the Sell button share a row. The figure sits on the
+   left where a number belongs and the button at the far right end, so the two
+   are read as a pair — this is what it is worth, and this is what you can do
+   about it — rather than as a line of text with a control tacked onto it. */
+.home-invest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 9px;
+}
+
 .home-delta {
-  text-align: right;
+  text-align: left;
   color: #10B981;
   font-size: 13.5px;
   font-weight: 700;
-  margin: 9px 0 0;
+  margin: 0;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Purple, because that is the investments accent everywhere else on this card —
+   the icon tile and the sparkline are already this colour, and a blue button
+   here would read as belonging to the deposit accounts above. */
+.home-sell {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: #8B5CF6;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  box-shadow: 0 6px 14px -6px rgba(139, 92, 246, 0.75);
+  transition: transform 0.12s ease, background-color 0.15s ease;
+}
+
+.home-sell:hover { background: #7C4DEF; }
+.home-sell:active { transform: scale(0.96); }
+
+.home-sell svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+html.dark body .home-sell {
+  box-shadow: 0 6px 14px -8px rgba(139, 92, 246, 0.9);
+}
+
+/* On the narrowest phones the delta and the button cannot share a row without
+   the figure wrapping mid-number. The button keeps the right end; the delta
+   takes the line above it. */
+@media (max-width: 359px) {
+  .home-invest-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .home-invest-row .home-delta {
+    flex: 1 0 100%;
+  }
 }
 
 .home-delta span { color: #6B7280; font-weight: 400; }
