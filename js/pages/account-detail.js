@@ -89,8 +89,6 @@ function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el
 
 export function init(root, ctx, type) {
   const { supabaseClient, getCurrentUser, getAccountNumber, loadPage, close } = ctx;
-  const NO_NUMBER_TEXT = ctx.NO_ACCOUNT_NUMBER_TEXT;
-  const NO_NUMBER_SHORT = ctx.NO_ACCOUNT_NUMBER_SHORT;
 
   const cfg = accountConfigs[type] || accountConfigs.checking;
 
@@ -140,13 +138,13 @@ export function init(root, ctx, type) {
   detailAccountTitle.textContent = cfg.title;
   detailAccountIcon.style.background = cfg.iconBg;
   detailAccountIcon.innerHTML = cfg.iconSvg;
-  // Only a number the server has issued is ever shown. An account nobody has
-  // opened yet has none — it says so, rather than wearing four digits from a
-  // hardcoded config that were never its own.
-  const issuedAccountNumber = getAccountNumber(type, 'account');
-  detailAccountNumber.textContent = issuedAccountNumber
-    ? `•${String(issuedAccountNumber).slice(-4)}`
-    : (cfg.number || NO_NUMBER_SHORT);
+  // The account's own number, masked to its last four. Only a product that has
+  // not been opened has none, and those carry their own line in the config —
+  // the card's "Subject to credit approval".
+  const accountNumber = getAccountNumber(type, 'account');
+  detailAccountNumber.textContent = accountNumber
+    ? `•${String(accountNumber).slice(-4)}`
+    : (cfg.number || '');
   detailAccountBalanceLabel.textContent = cfg.balanceLabel;
 
   const balanceSourceEl = cfg.balanceSourceId ? document.getElementById(cfg.balanceSourceId) : null;
@@ -259,19 +257,12 @@ export function init(root, ctx, type) {
     detailQuickActionsSection.classList.add('hidden');
     detailTransactionsSection.classList.add('hidden');
   } else {
-    // The routing number is the bank's and exists from the moment you are a
-    // customer, so it is always here. The account number is the account's own
-    // and is issued when the account is opened — until then the row says that
-    // in words instead of showing digits.
+    // The routing number belongs to the bank and is the same on every account
+    // it applies to; the account number belongs to the account. Both are simply
+    // printed.
     const routingNumber = getAccountNumber(type, 'routing');
     detailFullRoutingNumber.textContent = routingNumber;
-    detailFullAccountNumber.textContent = issuedAccountNumber || NO_NUMBER_TEXT;
-    // A sentence is not a number: the pending state drops to body weight so it
-    // never reads as digits you could quote. Set inline rather than by class,
-    // because these override Tailwind utilities already on the element.
-    detailFullAccountNumber.style.fontSize = issuedAccountNumber ? '' : '12px';
-    detailFullAccountNumber.style.fontWeight = issuedAccountNumber ? '' : '400';
-    detailFullAccountNumber.style.opacity = issuedAccountNumber ? '' : '0.7';
+    detailFullAccountNumber.textContent = accountNumber;
 
     // Investments have no routing number to give, so the row goes rather than
     // sitting there empty — and the account number below it loses the divider

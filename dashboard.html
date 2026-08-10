@@ -256,7 +256,17 @@
         <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
       </div>
 
-      <p class="home-delta">▲ $0.00 (0.00%) <span>Today</span></p>
+      <!-- The day's movement, and the one action that belongs on this card.
+           Selling is what you reach for when you are looking at what the
+           portfolio is worth today, so it sits across the row from that figure
+           rather than three taps away inside the Invest menu. -->
+      <div class="home-invest-row">
+        <p class="home-delta">▲ $0.00 (0.00%) <span>Today</span></p>
+        <button id="homeSellInvestments" class="home-sell" type="button">
+          <span>Sell</span>
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
 
       <!-- Purple Sparkline SVG. The `d` attributes are written every frame
            by createLiveSparkline() in js/main.js; the values below are the

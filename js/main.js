@@ -71,11 +71,6 @@ export function getAccountNumber(type, kind) {
   return heldAccountTypes.has(type) ? assignAccountNumber(type) : '';
 }
 
-// What a screen shows in place of an account number it does not have — which
-// now only happens for a product that has not been opened.
-export const NO_ACCOUNT_NUMBER_TEXT = 'Issued when your account is opened';
-export const NO_ACCOUNT_NUMBER_SHORT = 'Not yet issued';
-
 // ---------- Assigning an account number ----------
 // Eleven digits, and they have to be the same eleven wherever the account
 // holder signs in — an account that reads one number on a phone and another on
@@ -91,10 +86,10 @@ export const NO_ACCOUNT_NUMBER_SHORT = 'Not yet issued';
 // Derivation is the fallback, not the record: assignAccountNumber() writes the
 // number back to the accounts table the first time it is needed (see
 // persistAssignedNumbers below), so from then on it is the server's number and
-// the branch above returns it.
+// the branch above returns it. A permanent number set by hand once a member is
+// confirmed lands in the same column and takes over from there.
 function deriveAccountNumber(type) {
-  if (!currentUserId) return '';
-  const seed = `${currentUserId}:${type}`;
+  const seed = `${currentUserId || localSeed()}:${type}`;
 
   // Two independent FNV-1a passes, so eleven digits are drawn from more entropy
   // than a single 32-bit hash would give.
@@ -110,6 +105,29 @@ function deriveAccountNumber(type) {
   const lead = 1 + (h1 % 9);
   const rest = String((h1 % 100000) * 100000 + (h2 % 100000)).padStart(10, '0');
   return `${lead}${rest}`;
+}
+
+// Before the account holder's id is known — the session still loading, the
+// network down — the number is seeded from a value kept on the device instead,
+// so an account card is never blank and never changes its number between one
+// refresh and the next. Once the id arrives the derivation switches to it,
+// which is the seed the stored number is actually built from.
+const LOCAL_SEED_KEY = 'verceil_number_seed';
+
+function localSeed() {
+  try {
+    let seed = localStorage.getItem(LOCAL_SEED_KEY);
+    if (!seed) {
+      seed = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem(LOCAL_SEED_KEY, seed);
+    }
+    return seed;
+  } catch (err) {
+    // Storage blocked. The number still has to be the same for the whole
+    // session, so it is held in memory for as long as the page is open.
+    if (!localSeed.fallback) localSeed.fallback = Math.random().toString(36).slice(2);
+    return localSeed.fallback;
+  }
 }
 
 function assignAccountNumber(type) {
@@ -685,8 +703,6 @@ export async function loadPage(name, ...args) {
     formatCurrency,
     parseBalanceText,
     getAccountNumber,
-    NO_ACCOUNT_NUMBER_TEXT,
-    NO_ACCOUNT_NUMBER_SHORT,
     showModal,
     openSupportMessage,
     refreshAlertsBadge,
@@ -979,6 +995,14 @@ document.getElementById('cardInvestments').addEventListener('click', () => loadP
 document.getElementById('cardCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 document.getElementById('cardInterestChecking').addEventListener('click', () => loadPage('account-detail', 'interest_checking'));
 document.getElementById('cardRetirement').addEventListener('click', () => loadPage('retirement'));
+
+// Sell sits inside the Investments card, which is itself a link to the account.
+// Without stopping the event here, selling would open the account screen behind
+// the trade screen and land you on the wrong one when you closed it.
+document.getElementById('homeSellInvestments').addEventListener('click', (event) => {
+  event.stopPropagation();
+  loadPage('trade', 'sell');
+});
 document.getElementById('promoBanner').addEventListener('click', () => loadPage('interest-checking'));
 // ---------- Signature Card eligibility ----------
 // The card is for established members, and that is two conditions rather than
@@ -1589,6 +1613,11 @@ async function initSupabaseData() {
   greetingLine1.textContent = `${timeOfDay},`;
   greetingLine2.textContent = userName;
 }
+
+// The account cards carry their numbers from the first paint. loadBankReference()
+// re-runs this the moment the account holder's id and any server-issued numbers
+// arrive; until then the placeholders stand, so no card is ever blank.
+renderAccountNumberMasks();
 
 initSupabaseData();
 refreshAlertsBadge();

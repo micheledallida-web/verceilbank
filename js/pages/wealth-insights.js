@@ -270,7 +270,7 @@ export function init(root, ctx) {
 
     latestReport = {
       periodLabel: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      accountNumber: getAccountNumber('investments', 'account') || ctx.NO_ACCOUNT_NUMBER_SHORT,
+      accountNumber: getAccountNumber('investments', 'account'),
       netWorth,
       investValue,
       cashHoldings,

@@ -33,31 +33,12 @@ export function init(root, ctx, type = 'interest_checking') {
   root.querySelector('#ddAccountName').textContent = `${label} Direct Deposit`;
   root.querySelector('#ddAccountType').textContent = label;
 
-  // The routing number is the bank's and is always available. The account
-  // number is issued when the account is opened, so a form built before that
-  // would send an employer a payment instruction with nowhere to send it —
-  // the numbers row says so, and the form buttons stay off until there is one.
+  // The routing number is the bank's; the account number is the account's own.
+  // Every account carries both, so the form is always complete.
   const routing = getAccountNumber(type, 'routing');
   const accountNumber = getAccountNumber(type, 'account');
   root.querySelector('#ddRoutingNumber').textContent = routing;
-  root.querySelector('#ddAccountNumber').textContent = accountNumber || ctx.NO_ACCOUNT_NUMBER_SHORT;
-
-  if (!accountNumber) {
-    const notice = document.createElement('div');
-    notice.className = 'text-[12px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed pt-[10px] mt-[6px] border-t border-gray-100 dark:border-white/[0.06]';
-    notice.textContent = `${ctx.NO_ACCOUNT_NUMBER_TEXT}. Your routing number is already yours to share — the direct deposit form becomes available once your account number has been issued.`;
-    root.querySelector('#ddAccountType').closest('.rounded-\\[22px\\]').appendChild(notice);
-
-    ['#ddShareBtn', '#ddDownloadFormBtn', '#ddEmailFormBtn', '#ddPrintFormBtn'].forEach((sel) => {
-      const btn = root.querySelector(sel);
-      if (!btn) return;
-      btn.disabled = true;
-      btn.classList.add('opacity-50', 'cursor-not-allowed');
-      btn.classList.remove('cursor-pointer');
-    });
-    const acctCopy = root.querySelector('.dd-copy[data-target="ddAccountNumber"]');
-    if (acctCopy) acctCopy.remove();
-  }
+  root.querySelector('#ddAccountNumber').textContent = accountNumber;
 
   function buildFormHtml() {
     return `
