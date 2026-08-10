@@ -1358,6 +1358,11 @@ async function initSupabaseData() {
   // instead of the second overwriting the first.
   const accountsById = new Map();
 
+  // Flipped once the accounts request has settled — with rows, with none, or
+  // with an error. Every path below sets it, because a screen stuck shimmering
+  // forever is worse than one showing a zero it can stand behind.
+  let balancesReady = false;
+
   // Money is summed in cents. Adding dollars as floats drifts — .10 + .20
   // lands on 0.30000000000000004 — and a balance that is a cent out is worse
   // than no balance at all.
@@ -1401,9 +1406,16 @@ async function initSupabaseData() {
     return cents;
   }
 
+  // Nothing is written into an amount until the server has answered. Before
+  // that the element keeps its shimmer, which is the honest state: the app does
+  // not know this number yet. Writing a zero in the meantime would be a claim
+  // about somebody's money that happens to be wrong.
   function setText(id, cents) {
+    if (!balancesReady) return;
     const el = document.getElementById(id);
-    if (el) el.textContent = formatCurrency(cents / 100);
+    if (!el) return;
+    el.textContent = formatCurrency(cents / 100);
+    el.classList.remove('amount-pending');
   }
 
   function firstMatch(matches) {
@@ -1564,6 +1576,7 @@ async function initSupabaseData() {
     }
   }
 
+  balancesReady = true;
   renderTotals();
   refreshOffersLabel();
 

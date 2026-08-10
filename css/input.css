@@ -2506,3 +2506,64 @@ html.dark body .pf-locked-note-t { color: #FFFFFF; }
 }
 
 html.dark body .pf-locked-note-s { color: #8E9CBA; }
+
+/* ===================== AMOUNTS, BEFORE THEY ARE KNOWN =====================
+   The home screen used to ship with balances written into the markup — $150.00
+   on Checking, $25,000.00 on Savings — which every customer saw for a moment
+   before their own figures replaced them. Somebody else's number, or a number
+   belonging to nobody, is worse than no number: for that half second the app is
+   lying about how much money is in the account.
+
+   The zeros were the same problem in a quieter form. A balance that reads
+   $0.00 and then becomes $5,000 has still told you, briefly, that your account
+   is empty.
+
+   So no amount is written in the markup at all now. Each one carries
+   `amount-pending` until js/main.js has an answer from the server, and until
+   then it is a shimmer the width of a figure — the layout does not move when
+   the real number lands, and nothing false is ever on screen. */
+.amount-pending {
+  display: inline-block;
+  min-width: 4.5em;
+  border-radius: 6px;
+  color: transparent !important;
+  user-select: none;
+  background-image: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.16) 0%,
+    rgba(148, 163, 184, 0.30) 50%,
+    rgba(148, 163, 184, 0.16) 100%
+  );
+  background-size: 200% 100%;
+  animation: amount-pending-sheen 1.25s ease-in-out infinite;
+}
+
+/* On the blue hero the grey shimmer disappears, so it gets a lighter one. */
+.home-hero .amount-pending {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.30) 50%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+}
+
+html.dark body .amount-pending {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+}
+
+@keyframes amount-pending-sheen {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* A shimmer that never stops is a distraction for anyone who finds motion
+   difficult, and the placeholder still reads as "not yet" without it. */
+@media (prefers-reduced-motion: reduce) {
+  .amount-pending { animation: none; }
+}
