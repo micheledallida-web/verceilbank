@@ -469,17 +469,20 @@
 
   <!-- INTERACTIVE MODAL OVERLAY -->
   <div id="actionModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#0D1728] text-[#111827] dark:text-white border border-gray-200 dark:border-white/10 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center space-y-4">
-      <h3 id="modalTitle" class="text-base font-bold">Secure Action</h3>
-      <p id="modalDesc" class="text-xs text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed">Connecting securely to your Verceil Private Banking session...</p>
+    <!-- Left-aligned, and roomier than it was. A centred paragraph in 12px
+         inside a 320px box is a system alert; a bank telling somebody what to
+         do next writes it as a sentence they can read. -->
+    <div class="vb-modal">
+      <h3 id="modalTitle" class="vb-modal-title">Secure Action</h3>
+      <p id="modalDesc" class="vb-modal-desc">Connecting securely to your Verceil Private Banking session...</p>
       <!-- The action button only exists when showModal() is given something to
            do. Without one the modal is a message with an acknowledgement, which
            is what most callers want; with one it becomes a decision, and the
            dismiss button below re-labels itself accordingly. -->
-      <button id="modalActionBtn" class="hidden w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer"></button>
-      <button id="modalCloseBtn" class="w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer">
-        Continue
-      </button>
+      <div class="vb-modal-actions">
+        <button id="modalActionBtn" class="hidden vb-modal-btn vb-modal-btn-primary"></button>
+        <button id="modalCloseBtn" class="vb-modal-btn vb-modal-btn-primary">Continue</button>
+      </div>
     </div>
   </div>
 

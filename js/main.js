@@ -362,19 +362,25 @@ function allowFullAccess(name) {
 
   if (!verified) {
     showModal(
-      'Verify your identity first',
+      'Two steps to unlock this',
       kycStatus === 'pending'
-        ? "Your documents are with a representative. We'll notify you within 1 business day, and this unlocks as soon as you're verified."
-        : 'Moving money needs a confirmed identity. It takes about 3 minutes, and unlocks every account you hold.',
+        // Even here the deposit is named. Verification is with a
+        // representative, so it is out of the customer's hands — but funding
+        // is not, and they can get it done while they wait.
+        ? `Your ID is with a representative — about 1 business day. Then add ${MINIMUM_OPENING_DEPOSIT_LABEL} to start moving money.`
+        // The old copy asked for an ID and stopped, so the deposit arrived as a
+        // surprise on the next screen. Both steps are named up front now, in
+        // the order they happen, in one line each.
+        : `Verify your ID — about 3 minutes. Then add ${MINIMUM_OPENING_DEPOSIT_LABEL} to start moving money.`,
       kycStatus === 'pending' ? undefined : { label: 'Verify now', run: () => loadPage('verify') },
     );
     return false;
   }
 
   showModal(
-    `Add ${MINIMUM_OPENING_DEPOSIT_LABEL} to continue`,
-    `Your accounts need their ${MINIMUM_OPENING_DEPOSIT_LABEL} opening deposit before money can move in or out. It takes a minute, and it is what keeps the account open.`,
-    { label: 'Fund account', run: () => loadPage('fund-account') },
+    'One step to unlock this',
+    `Add ${MINIMUM_OPENING_DEPOSIT_LABEL} to your account and you're ready to move money. It takes a minute.`,
+    { label: `Add ${MINIMUM_OPENING_DEPOSIT_LABEL}`, run: () => loadPage('fund-account') },
   );
   return false;
 }
@@ -525,12 +531,12 @@ export function showModal(title, desc, action) {
     modalCloseBtn.textContent = action.cancelLabel || 'Not now';
     // A secondary button that looks like the primary one is how people agree
     // to things they meant to decline.
-    modalCloseBtn.className = 'w-full py-2.5 rounded-xl bg-transparent border border-gray-200 dark:border-white/10 hover:opacity-90 text-[#6B7280] dark:text-[#8E9CBA] font-semibold text-xs transition-all cursor-pointer';
+    modalCloseBtn.className = 'vb-modal-btn vb-modal-btn-quiet';
   } else {
     modalActionBtn.classList.add('hidden');
     modalActionBtn.onclick = null;
     modalCloseBtn.textContent = 'Continue';
-    modalCloseBtn.className = 'w-full py-2.5 rounded-xl bg-[#0B4CC2] dark:bg-[#2563EB] hover:opacity-90 text-white font-semibold text-xs transition-all shadow-md cursor-pointer';
+    modalCloseBtn.className = 'vb-modal-btn vb-modal-btn-primary';
   }
 
   actionModal.classList.remove('hidden');

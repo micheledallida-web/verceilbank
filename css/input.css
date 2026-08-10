@@ -1898,11 +1898,21 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
 /* An opened screen is the app's only long scroll, so it gets the treatment a
    scroll container needs: momentum on iOS, no scroll chaining into the page
-   underneath it, and clearance for a phone's home indicator. */
+   underneath it, and — the part that was missing — room at the bottom for the
+   navigation bar.
+
+   The bar is fixed to the viewport and painted above these screens, so the last
+   eighty-odd pixels of every one of them sat underneath it. Scrolled all the
+   way down, the end of the page was still behind the bar; on a short screen
+   like Checking there was no scroll to reach it with at all, which is what made
+   those pages feel like they stopped early. The bar's own height is reserved
+   here, so every screen can be scrolled clear of it. */
 #page-root {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  /* Anything scrolled to with an anchor clears the bar too. */
+  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 /* The home indicator and the notch. Zero on everything that has neither. */
@@ -2052,9 +2062,12 @@ body {
      fragment written for a phone has no reason to carry itself. */
   /* The top navigation is fixed above an opened screen rather than covered by
      it, so the screen starts below the bar instead of underneath it — the same
-     clearance the dashboard gives itself. */
+     clearance the dashboard gives itself. The bar is no longer at the bottom
+     here, so the clearance reserved for it there is released. */
   #page-root {
     padding-top: 96px;
+    padding-bottom: 48px;
+    scroll-padding-bottom: 0;
   }
 
   /* The composer keeps the centring the narrower screens gave it; only its
@@ -2298,3 +2311,92 @@ html.dark body .rc-btn-secondary .rc-btn-s { color: #8E9CBA; }
 }
 
 html.dark body .rc-foot { color: #8E9CBA; }
+
+/* ===================== SHARED MODAL =====================
+   The one dialog every screen borrows. It was a 320px box of centred 12px
+   type, which reads as a system alert — fine for "copied to clipboard", wrong
+   for a bank explaining what somebody has to do before they can move money.
+   It is left-aligned now, at a size meant to be read, with the buttons stacked
+   full width the way every banking app ends a sheet. */
+.vb-modal {
+  width: 100%;
+  max-width: 380px;
+  background: #FFFFFF;
+  color: #111827;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  text-align: left;
+  box-shadow: 0 24px 48px -12px rgba(8, 20, 50, 0.45);
+}
+
+html.dark body .vb-modal {
+  background: #0D1728;
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vb-modal-title {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.vb-modal-desc {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #4B5563;
+  margin: 0;
+}
+
+html.dark body .vb-modal-desc { color: #8E9CBA; }
+
+.vb-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.vb-modal-btn {
+  width: 100%;
+  height: 46px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease, transform 0.12s ease;
+}
+
+.vb-modal-btn:active { transform: scale(0.99); }
+
+.vb-modal-btn-primary {
+  background: #2563EB;
+  color: #FFFFFF;
+  box-shadow: 0 8px 16px -8px rgba(37, 99, 235, 0.7);
+}
+
+.vb-modal-btn-primary:hover { background: #1D4ED8; }
+
+/* The way out of a decision. Present, legible, and plainly not the button the
+   dialog is asking you to press. */
+.vb-modal-btn-quiet {
+  background: transparent;
+  border-color: #E5E7EB;
+  color: #4B5563;
+  box-shadow: none;
+}
+
+.vb-modal-btn-quiet:hover { background: #F8FAFC; }
+
+html.dark body .vb-modal-btn-quiet {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #8E9CBA;
+}
+
+html.dark body .vb-modal-btn-quiet:hover { background: rgba(255, 255, 255, 0.05); }
