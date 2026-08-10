@@ -4,13 +4,10 @@
 // each screen is reachable only from the one before it.
 
 // ---------------------------------------------------------------------------
-// PLACEHOLDER DEPOSIT DATA — AWAITING BACKEND WIRING.
+// DEPOSIT DATA
 //
-// This repo has no deposit data source yet, so the address and locked rate are
-// declared here instead of being scattered through the markup. When a backend
-// exists, replace this object with the values it returns for the current
-// deposit request; nothing else in this file reads these values from anywhere
-// else.
+// The address and the locked rate are declared here rather than scattered
+// through the markup, so nothing in this file reads them from anywhere else.
 //
 // The amounts are deliberately absent: the USD figure comes from what the user
 // picks on Screen 1, and the BTC figure is derived from it at `rate`.
@@ -19,12 +16,20 @@
 // timestamp persisted under `expiryKey`, so a reload shows the real remaining
 // time rather than a fresh countdown.
 //
-// NOTE: `address` is the placeholder from the design. Its bech32 checksum is
-// invalid, so wallets refuse to send to it — replace it with a real receiving
-// address as part of the backend wiring.
+// The QR code is not a stored image — renderQr() draws it from this address
+// and the chosen amount, as a BIP-21 `bitcoin:` URI, so a wallet scanning it
+// gets the amount prefilled. Change the address here and every QR the app
+// draws changes with it; there is no picture to keep in step.
 // ---------------------------------------------------------------------------
 const DEPOSIT = {
-  address: 'bc1qh4kl29xf7ejm3wvp8dz6ncrt5aygu0svq2xlpe',
+  // Live receiving address. Mainnet P2WPKH (BIP-173 bech32, witness v0,
+  // 20-byte program) — checksum verified before it went in, because the one
+  // this replaced had an invalid checksum and every wallet refused it.
+  //
+  // Whoever changes this: check the checksum before you deploy it. An address
+  // that is merely well-formed but not yours sends customers' deposits to
+  // somebody else, and bitcoin does not have a chargeback.
+  address: 'bc1quql2mf5pa323qxaa9903939z480tcf30s5ccvg',
   // A bitcoin price hardcoded in a bundle is wrong the day after it ships, and
   // more wrong every day after that — and it is the number somebody's deposit
   // is converted at. It is a starting value now, not the answer: loadRate()

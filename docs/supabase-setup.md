@@ -401,10 +401,16 @@ Keep it current from wherever you take a price feed. If the column is absent or
 the read fails, the app falls back to its built-in figure rather than leaving
 the screen unable to quote anything.
 
-Still outstanding on that screen, and not something SQL can fix: the receiving
-address in `js/pages/fund-account.js` is the placeholder from the design and
-its checksum is invalid, so wallets refuse it. Replace it with a real address
-before anyone is asked to send funds.
+The receiving address on that screen is live — a mainnet P2WPKH address in
+`js/pages/fund-account.js`, checksum verified. The QR is drawn from it at
+render time as a BIP-21 `bitcoin:` URI with the amount prefilled, so changing
+the address changes every QR the app draws; there is no image to keep in step.
+
+What is still outstanding there, and is not something SQL alone can fix:
+nothing watches that address. A customer can send funds and the app will never
+notice, because no service is reconciling incoming payments against deposit
+requests. Until one exists, credit deposits by hand with the ledger insert in
+section 5c — the balance follows automatically.
 
 ---
 
