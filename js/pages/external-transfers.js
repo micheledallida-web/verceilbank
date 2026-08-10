@@ -110,6 +110,15 @@ export function init(root, ctx) {
 
       if (error) throw error;
 
+      ctx.recordTransaction({
+        accountType: extFromAccount.value,
+        amount: -Math.abs(amount),
+        title: `External transfer to ${selectedExtAccount.bank_name || 'linked account'}`,
+        iconText: '↑',
+        category: 'external_transfer',
+        reference: ref,
+      });
+
       if (fromEl) {
         fromEl.textContent = formatCurrency(parseBalanceText(fromEl.textContent) - amount);
       }

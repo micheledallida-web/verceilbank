@@ -65,6 +65,13 @@ export function init(root, ctx) {
       });
       if (error) throw error;
 
+      ctx.recordEvent(permanent ? 'card.closed' : 'card.locked', {
+        card_type: root.querySelector('#reportCardType').value,
+        reason: root.querySelector('#reportReason').value,
+        replacement,
+        reference: ref,
+      });
+
       close();
       showModal(
         permanent ? 'Card closed' : 'Card locked',

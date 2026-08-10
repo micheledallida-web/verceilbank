@@ -1,5 +1,4 @@
 <div class="min-h-full w-full bg-[#F8F9FB] dark:bg-[#060B14] pb-[60px]">
-  <!-- White nav bar -->
   <div class="w-full bg-white dark:bg-[#0D1728] border-b border-[#E5E7EB] dark:border-white/[0.06]">
     <div class="w-full max-w-[430px] mx-auto px-[16px] h-[56px] flex items-center relative">
       <button data-action="back" class="w-[36px] h-[36px] flex items-center justify-center text-[#0F172A] dark:text-white cursor-pointer" aria-label="Back">
@@ -11,52 +10,51 @@
 
   <div class="w-full max-w-[430px] mx-auto px-[20px] pt-[28px]">
 
-    <div id="pdFormView">
-      <div class="flex flex-col items-center text-center mb-[28px]">
-        <span class="w-[72px] h-[72px] rounded-full bg-blue-50 flex items-center justify-center mb-[18px]">
-          <svg class="w-[34px] h-[34px] text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5.5 21a6.5 6.5 0 0113 0M12 11a4 4 0 100-8 4 4 0 000 8z"></path></svg>
-        </span>
-        <div class="text-[24px] font-bold text-[#0F172A] dark:text-white mb-[6px]">Full Legal Name</div>
-        <div class="text-[15px] text-[#6B7280] dark:text-[#8E9CBA]">View and update your full legal name.</div>
+    <!-- Read-only by design, exactly as the date of birth screen is. A legal
+         name is checked against a government ID at verification; it is the
+         bank's record of who this account belongs to, not a display preference. -->
+    <div class="flex flex-col items-center text-center mb-[28px]">
+      <span class="w-[72px] h-[72px] rounded-full bg-blue-50 dark:bg-white/5 flex items-center justify-center mb-[18px]">
+        <svg class="w-[34px] h-[34px] text-[#2563EB]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8.5" r="4"></circle><path stroke-linecap="round" d="M4.5 20.5c0-4 3.5-6 7.5-6s7.5 2 7.5 6"></path></svg>
+      </span>
+      <div class="text-[24px] font-bold text-[#0F172A] dark:text-white mb-[6px]">Full Legal Name</div>
+      <div class="text-[15px] text-[#6B7280] dark:text-[#8E9CBA]">The name on your account record.</div>
+    </div>
+
+    <div class="pf-locked-card">
+      <div class="pf-locked-row">
+        <div class="pf-locked-label">First name</div>
+        <div id="pnFirstName" class="pf-locked-value">—</div>
       </div>
-
-      <div class="bg-white dark:bg-[#0D1728] rounded-[20px] border border-[#E5E7EB] dark:border-white/[0.06] shadow-sm p-[20px] mb-[24px]">
-        <div class="mb-[20px]">
-          <div class="text-[13px] font-bold uppercase tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Current Full Legal Name</div>
-          <div id="pdCurrentName" class="text-[16px] font-semibold text-[#0F172A] dark:text-white">Mercy Johnson</div>
-        </div>
-
-        <div class="flex flex-col gap-[14px]">
-          <div>
-            <label class="block text-[13px] font-medium text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">First Name</label>
-            <input id="pnFirstName" type="text" placeholder="First Name" class="w-full h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
-          </div>
-          <div>
-            <label class="block text-[13px] font-medium text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Middle Name (Optional)</label>
-            <input id="pnMiddleName" type="text" placeholder="Middle Name" class="w-full h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
-          </div>
-          <div>
-            <label class="block text-[13px] font-medium text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Last Name</label>
-            <input id="pnLastName" type="text" placeholder="Last Name" class="w-full h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
-          </div>
-          <div>
-            <label class="block text-[13px] font-medium text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Suffix (Optional)</label>
-            <input id="pnSuffix" type="text" placeholder="e.g. Jr., Sr., III" class="w-full h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
-          </div>
-        </div>
+      <div class="pf-locked-row">
+        <div class="pf-locked-label">Middle name</div>
+        <div id="pnMiddleName" class="pf-locked-value">—</div>
       </div>
-
-      <div class="bg-blue-50 dark:bg-white/5 rounded-[16px] p-[16px] mb-[28px]">
-        <div class="text-[14px] font-semibold text-[#0F172A] dark:text-white mb-[6px]">Important Information</div>
-        <div class="text-[13px] text-[#374151] dark:text-[#8E9CBA] leading-relaxed">To update your legal name, you may be required to verify your identity and provide supporting documentation.</div>
+      <div class="pf-locked-row">
+        <div class="pf-locked-label">Last name</div>
+        <div id="pnLastName" class="pf-locked-value">—</div>
       </div>
-
-      <div class="flex flex-col gap-[12px] pb-[20px]">
-        <button id="pdSaveBtn" type="button" class="w-full h-[56px] rounded-[16px] bg-[#2563EB] text-white text-[16px] font-semibold cursor-pointer">Update Name</button>
-        <button data-action="back" type="button" class="w-full h-[44px] text-[15px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] cursor-pointer">Cancel</button>
+      <div class="pf-locked-row">
+        <div class="pf-locked-label">Suffix</div>
+        <div id="pnSuffix" class="pf-locked-value">—</div>
+      </div>
+      <div class="pf-locked-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4.5" y="10.5" width="15" height="9.5" rx="2.5"></rect>
+          <path d="M8 10.5V7.5a4 4 0 018 0v3"></path>
+        </svg>
+        <span>Verified and locked</span>
       </div>
     </div>
 
-    <div id="pdConfirmView" class="hidden"></div>
+    <div class="pf-locked-note">
+      <div class="pf-locked-note-t">Why this can't be edited</div>
+      <div class="pf-locked-note-s">Your legal name was checked against your government ID when your identity was verified. A change — after a marriage or a court order, for instance — needs supporting documents and a review by the bank. Contact support and a representative will handle it with you.</div>
+    </div>
+
+    <div class="flex flex-col gap-[12px] pb-[20px]">
+      <button id="pnContactBtn" type="button" class="w-full h-[52px] rounded-[16px] bg-white dark:bg-[#0D1728] border border-[#E5E7EB] dark:border-white/10 text-[#0F172A] dark:text-white text-[15px] font-semibold cursor-pointer">Contact support</button>
+      <button data-action="back" type="button" class="w-full h-[44px] text-[15px] font-semibold text-[#6B7280] dark:text-[#8E9CBA] cursor-pointer">Back to profile</button>
+    </div>
   </div>
 </div>

@@ -66,6 +66,7 @@ export function init(root, ctx) {
           // Savings is opened with every account, not offered beside it.
           // Whoever already holds one keeps the one they have.
           await openCompulsorySavings();
+          ctx.recordEvent('account.opened', { account_type: 'interest_checking', with_savings: true, reference: confirmationNumber });
         }
       }
     } catch (err) {

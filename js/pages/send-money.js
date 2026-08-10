@@ -79,6 +79,15 @@ export function init(root, ctx) {
       });
       if (error) throw error;
 
+      ctx.recordTransaction({
+        accountType: 'checking',
+        amount: -Math.abs(pendingZelle.amount),
+        title: `Zelle® to ${pendingZelle.name}`,
+        iconText: '↑',
+        category: 'zelle',
+        reference: pendingZelle.ref,
+      });
+
       const checkingEl = document.getElementById('checkingBalance');
       if (checkingEl) checkingEl.textContent = formatCurrency(parseBalanceText(checkingEl.textContent) - pendingZelle.amount);
 

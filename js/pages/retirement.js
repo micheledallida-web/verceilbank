@@ -178,6 +178,8 @@ export function init(root, ctx) {
       return;
     }
 
+    ctx.recordEvent('account.opened', { account_type: product.key, product: product.name, reference: confirmationNumber });
+
     root.querySelector('#retConfirmTitle').textContent = `${product.name} opened`;
     root.querySelector('#retConfirmRef').textContent = confirmationNumber;
     root.querySelector('#retConfirmBalance').textContent = formatCurrency(openingBalance);

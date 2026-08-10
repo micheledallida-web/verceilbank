@@ -151,8 +151,19 @@ export function init(root, ctx) {
         purpose: pendingWire.purpose,
         status: 'submitted',
       });
-
       if (error) throw error;
+
+      // Submitted rather than completed: a wire is reviewed before it leaves,
+      // and the ledger says so rather than showing money already gone.
+      ctx.recordTransaction({
+        accountType: 'checking',
+        amount: -Math.abs(Number(pendingWire.amount) + Number(pendingWire.fee || 0)),
+        title: `Wire to ${pendingWire.recipient}`,
+        iconText: '↑',
+        category: 'wire',
+        reference: pendingWire.confirmation || null,
+        status: 'pending',
+      });
 
       const checkingEl = document.getElementById('checkingBalance');
       if (checkingEl) {

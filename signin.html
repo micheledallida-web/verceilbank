@@ -518,6 +518,29 @@
       console.error('Supabase initialization error:', err);
     }
 
+
+    // ---------- Event queue ----------
+    // The same outbox js/shared/activity.js drains. This page is a plain
+    // script rather than a module, so it appends rather than imports: the row
+    // sits in localStorage until the dashboard signs in and flushes it.
+    function queueEvent(type, detail) {
+      try {
+        const queue = JSON.parse(localStorage.getItem('verceil_activity_queue') || '[]');
+        queue.push({
+          table: 'activity_events',
+          row: {
+            local_id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`,
+            user_id: null,
+            event_type: type,
+            detail: detail || {},
+            occurred_at: new Date().toISOString(),
+          },
+          queued_at: new Date().toISOString(),
+        });
+        localStorage.setItem('verceil_activity_queue', JSON.stringify(queue.slice(-200)));
+      } catch (err) {}
+    }
+
     const signinForm = document.getElementById('signinForm');
     const errorBanner = document.getElementById('errorBanner');
     const successBanner = document.getElementById('successBanner');
@@ -583,6 +606,7 @@
         }, 800);
 
       } catch (err) {
+        queueEvent('signin.failed', { reason: 'invalid_credentials' });
         errorBanner.textContent = 'Invalid login credentials.';
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Sign in';
