@@ -291,6 +291,31 @@
       margin-top: 0.35rem;
     }
 
+    /* Savings is not one of the choices — it comes with all of them — so it is
+       shown as a card with no radio on it. Nothing about it should look
+       tappable, because there is nothing to decide. */
+    .included-card {
+      display: block;
+      background: #f5f8ff;
+      border: 1px solid #dbe4ff;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .included-badge {
+      display: inline-block;
+      background: #0044ff;
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      margin-bottom: 0.45rem;
+    }
+
     .step-note {
       font-size: 0.8rem;
       color: #6b7280;
@@ -396,8 +421,15 @@
           </button>
         </div>
 
+        <div class="included-card">
+          <span class="included-badge">Included</span>
+          <span class="product-name">Verceil Savings</span>
+          <span class="product-desc">A savings account is opened alongside whichever account you choose — every Verceil customer holds one.</span>
+          <span class="product-note">4.00% APY · Verify your identity for full access</span>
+        </div>
+
         <div class="step-note">
-          The Verceil Signature Card is not opened at sign-up. It becomes available to members after eight months of account history and regular activity, and you can apply from your dashboard once you qualify.
+          Every account opens with a $100 minimum deposit. Fund your account within 60 days to keep it open and unlock full access — an account that has not been funded within 60 days is closed.
         </div>
 
         <button type="button" id="productNextBtn" class="btn-next-full">Continue</button>
@@ -586,7 +618,12 @@
               // The product chosen in step one. It is a request, not an
               // account: it tells the bank what to open once this person has
               // been identity-verified.
-              requested_account_type: selectedProduct
+              requested_account_type: selectedProduct,
+              // Savings is opened with every account, so it is on the request
+              // whatever was chosen above — recorded rather than assumed, so
+              // the account that gets opened matches what the customer was
+              // shown at sign-up.
+              requested_account_types: [selectedProduct, 'savings']
             }
           }
         });

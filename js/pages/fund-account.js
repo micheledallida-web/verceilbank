@@ -82,6 +82,15 @@ function clearExpiry() {
 export function init(root, ctx) {
   const { close } = ctx;
 
+  // Why someone is most likely on this screen at all: the opening deposit.
+  // Stated here so the amount they need is in front of them while they type
+  // one, rather than only on the home screen that sent them.
+  const openingTerms = root.querySelector('#fundOpeningTerms');
+  if (openingTerms && ctx.MINIMUM_OPENING_DEPOSIT) {
+    openingTerms.textContent = `Your accounts need a ${ctx.MINIMUM_OPENING_DEPOSIT_LABEL} opening deposit within ${ctx.FUNDING_DEADLINE_DAYS} days of opening for full access. An account left unfunded past that is closed.`;
+    openingTerms.classList.remove('hidden');
+  }
+
   const backBtn = root.querySelector('[data-action="close"]');
   // The header markup is shared by every screen, so the title is the back
   // button's sibling rather than a screen-specific element.

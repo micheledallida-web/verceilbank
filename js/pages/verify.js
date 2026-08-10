@@ -112,7 +112,9 @@ export function init(root, ctx) {
       const requested = user && user.user_metadata && user.user_metadata.requested_account_type;
       const name = REQUESTED_PRODUCT_NAMES[requested];
       if (!name) return;
-      subline.textContent = `We need this to open ${name}. Your information is encrypted and reviewed by a representative.`;
+      // Savings is named too, because it is being opened as well and someone
+      // should not first learn about an account of theirs from a statement.
+      subline.textContent = `We need this to open ${name} and your Verceil Savings account. Your information is encrypted and reviewed by a representative.`;
     } catch (err) {
       console.error('Requested account lookup error:', err);
     }

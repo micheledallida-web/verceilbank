@@ -1764,6 +1764,114 @@ html.dark body .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); 
    field still reads as empty in dark mode. */
 html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
+/* ===================== ACTION NEEDED NOTICE =====================
+   The one thing on the home screen that is not an account or an offer: what
+   the account holder still has to do before their accounts are fully theirs.
+   Amber rather than red — an account inside its funding window is not in
+   trouble, it is unfinished, and red would say the wrong thing about it. It
+   sits directly under the balance because it outranks everything below it
+   until it is dealt with, and it disappears entirely once it is. */
+.home-notice {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 18px;
+  padding: 14px 14px 14px 16px;
+  margin: 18px 0 4px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.home-notice:active { transform: scale(0.99); }
+
+html.dark body .home-notice {
+  background: rgba(180, 83, 9, 0.16);
+  border-color: rgba(251, 191, 36, 0.30);
+}
+
+.home-notice-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FEF3C7;
+  color: #B45309;
+}
+
+html.dark body .home-notice-ic {
+  background: rgba(251, 191, 36, 0.18);
+  color: #FBBF24;
+}
+
+.home-notice-ic svg { width: 20px; height: 20px; }
+
+.home-notice-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-notice-t {
+  font-size: 14px;
+  font-weight: 700;
+  color: #92400E;
+  line-height: 1.2;
+}
+
+.home-notice-s {
+  font-size: 12px;
+  font-weight: 400;
+  color: #A16207;
+  line-height: 1.35;
+}
+
+html.dark body .home-notice-t { color: #FDE68A; }
+html.dark body .home-notice-s { color: rgba(253, 230, 138, 0.72); }
+
+.home-notice-go {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #B45309;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+html.dark body .home-notice-go { background: #FBBF24; color: #1F2937; }
+
+.home-notice-go svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* On the narrowest phones the pill and the two lines of text cannot share a
+   row without one of them being squeezed to nothing, so the pill drops out and
+   the whole card becomes the tap target it already was. */
+@media (max-width: 359px) {
+  .home-notice-go span { display: none; }
+  .home-notice-go { padding: 0 8px; }
+}
+
 /* ================= ONE COLUMN, FOUR SIZES OF SCREEN =================
    The app is a column. What changes between a phone, a tablet, a laptop and a
    television is how wide that column is allowed to get — not how the app is
