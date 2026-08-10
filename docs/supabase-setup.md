@@ -200,6 +200,81 @@ what the anon key can read.
 
 ---
 
+## 5b. `user_profile` — why saving an address fails
+
+If a customer edits their mailing address, phone or email and the save does not
+stick, this is why. The app upserts on `user_id`, and **Postgres needs a unique
+constraint on that column for an upsert to work.** Without one every profile
+save fails, for every customer, with error `42P10`.
+
+The app now falls back to update-then-insert when it sees that error, so saving
+works either way — but the constraint is what makes it a single round trip and
+what stops two rows ever existing for one person.
+
+```sql
+-- One profile row per customer. Deduplicate first if any user already has two.
+delete from public.user_profile a
+ using public.user_profile b
+ where a.user_id = b.user_id
+   and a.ctid > b.ctid;
+
+alter table public.user_profile
+  add constraint user_profile_user_id_key unique (user_id);
+```
+
+Then make sure every column the app writes actually exists:
+
+```sql
+alter table public.user_profile
+  add column if not exists res_street       text,
+  add column if not exists res_apt          text,
+  add column if not exists res_city         text,
+  add column if not exists res_state        text,
+  add column if not exists res_zip          text,
+  add column if not exists res_country      text,
+  add column if not exists mail_same_as_res boolean default true,
+  add column if not exists mail_street      text,
+  add column if not exists mail_city        text,
+  add column if not exists mail_state       text,
+  add column if not exists mail_zip         text,
+  add column if not exists phone_country_code text,
+  add column if not exists phone_number     text,
+  add column if not exists phone_verified   boolean default false,
+  add column if not exists email            text,
+  add column if not exists email_verified   boolean default false;
+```
+
+And that the customer is allowed to write their own row:
+
+```sql
+alter table public.user_profile enable row level security;
+
+create policy "own profile read"
+  on public.user_profile for select using (auth.uid() = user_id);
+create policy "own profile insert"
+  on public.user_profile for insert with check (auth.uid() = user_id);
+create policy "own profile update"
+  on public.user_profile for update using (auth.uid() = user_id);
+```
+
+The identity-freeze trigger in section 4 still applies on top of this — the
+update policy lets a customer change their address, and the trigger stops that
+same update touching their name or date of birth.
+
+### Checking it from the SQL editor
+
+```sql
+-- Should return one row: user_profile_user_id_key
+select conname from pg_constraint
+ where conrelid = 'public.user_profile'::regclass and contype = 'u';
+
+-- Should list select, insert and update
+select policyname, cmd from pg_policies
+ where schemaname = 'public' and tablename = 'user_profile';
+```
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -261,4 +336,5 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
+- [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

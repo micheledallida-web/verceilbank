@@ -1,4 +1,5 @@
 import { showConfirmation } from '../shared/profile-confirmation.js';
+import { readProfile, writeProfile } from '../shared/profile-store.js';
 
 let listeners = [];
 function on(el, evt, fn) {
@@ -7,25 +8,6 @@ function on(el, evt, fn) {
   listeners.push(() => el.removeEventListener(evt, fn));
 }
 
-async function getOrCreateUserProfile({ supabaseClient, getCurrentUser }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  if (!supabaseClient) return { user_id: user.id };
-  try {
-    const { data } = await supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle();
-    return data || { user_id: user.id };
-  } catch (err) {
-    console.error('Load profile error:', err);
-    return { user_id: user.id };
-  }
-}
-
-async function saveUserProfile({ supabaseClient, getCurrentUser }, patch) {
-  const user = await getCurrentUser();
-  if (!user || !supabaseClient) throw new Error('Not signed in');
-  const { error } = await supabaseClient.from('user_profile').upsert({ user_id: user.id, ...patch }, { onConflict: 'user_id' });
-  if (error) throw error;
-}
 
 function toggleFields(root, sameAsResidential) {
   const fields = root.querySelector('#maFields');
@@ -39,7 +21,7 @@ export async function init(root, ctx) {
   root.querySelectorAll('[data-action="back"]').forEach((btn) => on(btn, 'click', () => loadPage('profile')));
   on(root.querySelector('#maSame'), 'change', (e) => toggleFields(root, e.target.checked));
 
-  const profile = await getOrCreateUserProfile(ctx);
+  const profile = await readProfile(ctx);
   if (profile) {
     const same = profile.mail_same_as_res !== false;
     root.querySelector('#maSame').checked = same;
@@ -62,7 +44,7 @@ export async function init(root, ctx) {
     const zip = root.querySelector('#maZip').value.trim();
 
     try {
-      await saveUserProfile(ctx, {
+      await writeProfile(ctx, {
         mail_same_as_res: same,
         mail_street: same ? null : street,
         mail_city: same ? null : city,
@@ -73,7 +55,10 @@ export async function init(root, ctx) {
       showConfirmation(root, ctx, { fieldLabel: 'Mailing Address', valueText });
     } catch (err) {
       console.error(err);
-      showModal('Could Not Save', 'Please try again.');
+      // The store's message says what actually went wrong — a missing column,
+      // a policy refusal, a lost connection — rather than asking somebody to
+      // repeat an action that cannot succeed until something is fixed.
+      showModal('Could not save', err.message);
     }
   });
 }

@@ -1,4 +1,5 @@
 import { showConfirmation } from '../shared/profile-confirmation.js';
+import { readProfile, writeProfile } from '../shared/profile-store.js';
 
 let listeners = [];
 function on(el, evt, fn) {
@@ -7,25 +8,6 @@ function on(el, evt, fn) {
   listeners.push(() => el.removeEventListener(evt, fn));
 }
 
-async function getOrCreateUserProfile({ supabaseClient, getCurrentUser }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
-  if (!supabaseClient) return { user_id: user.id };
-  try {
-    const { data } = await supabaseClient.from('user_profile').select('*').eq('user_id', user.id).maybeSingle();
-    return data || { user_id: user.id };
-  } catch (err) {
-    console.error('Load profile error:', err);
-    return { user_id: user.id };
-  }
-}
-
-async function saveUserProfile({ supabaseClient, getCurrentUser }, patch) {
-  const user = await getCurrentUser();
-  if (!user || !supabaseClient) throw new Error('Not signed in');
-  const { error } = await supabaseClient.from('user_profile').upsert({ user_id: user.id, ...patch }, { onConflict: 'user_id' });
-  if (error) throw error;
-}
 
 function formatAddress({ street, apt, city, state, zip }) {
   const line1 = [street, apt].filter(Boolean).join(' ');
@@ -38,7 +20,7 @@ export async function init(root, ctx) {
 
   root.querySelectorAll('[data-action="back"]').forEach((btn) => on(btn, 'click', () => loadPage('profile')));
 
-  const profile = await getOrCreateUserProfile(ctx);
+  const profile = await readProfile(ctx);
   if (profile) {
     root.querySelector('#raStreet').value = profile.res_street || '';
     root.querySelector('#raApt').value = profile.res_apt || '';
@@ -61,12 +43,15 @@ export async function init(root, ctx) {
     const country = root.querySelector('#raCountry').value.trim();
 
     try {
-      await saveUserProfile(ctx, { res_street: street, res_apt: apt, res_city: city, res_state: state, res_zip: zip, res_country: country });
+      await writeProfile(ctx, { res_street: street, res_apt: apt, res_city: city, res_state: state, res_zip: zip, res_country: country });
       const valueText = formatAddress({ street, apt, city, state, zip }) || '123 Main Street, New York, NY 10001';
       showConfirmation(root, ctx, { fieldLabel: 'Residential Address', valueText });
     } catch (err) {
       console.error(err);
-      showModal('Could Not Save', 'Please try again.');
+      // The store's message says what actually went wrong — a missing column,
+      // a policy refusal, a lost connection — rather than asking somebody to
+      // repeat an action that cannot succeed until something is fixed.
+      showModal('Could not save', err.message);
     }
   });
 }
