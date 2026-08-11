@@ -9,13 +9,15 @@
 
 const APP_VERSION = '1.0.0';
 
-// Chase, Citi and every other bank offer roughly this ladder. 0 is "never",
-// which is a real choice on a device only you use.
+// The ladder Chase, Citi and the rest offer. There is no "never" on it, and
+// that is the point: every bank caps how long a session may sit unattended,
+// because the device it is sitting on is not always the one it was signed in
+// on. The shortest option is the safest, not the longest.
 const TIMEOUT_OPTIONS = [
   { minutes: 5, label: '5 min' },
+  { minutes: 10, label: '10 min' },
   { minutes: 15, label: '15 min' },
   { minutes: 30, label: '30 min' },
-  { minutes: 0, label: 'Never' },
 ];
 
 const SEGMENT_ON = 'flex-1 h-[36px] rounded-[10px] text-[12px] font-semibold cursor-pointer bg-[#2563EB] text-white';

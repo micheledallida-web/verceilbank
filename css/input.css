@@ -2401,6 +2401,162 @@ html.dark body .vb-modal-btn-quiet {
 
 html.dark body .vb-modal-btn-quiet:hover { background: rgba(255, 255, 255, 0.05); }
 
+/* ===================== SESSION TIMEOUT WARNING =====================
+   The dialog that appears a minute or two before an idle session ends. It is
+   centred, opaque and above everything, because a customer who has walked back
+   to their desk has to be able to read it at a glance and answer it — that is
+   the whole reason it exists instead of a silent redirect. */
+.vb-idle-backdrop {
+  position: fixed;
+  inset: 0;
+  /* Above the action modal (z-50) and the bottom nav. Nothing may cover this. */
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 14, 32, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Tailwind's `hidden` is a utility, and this file is appended after
+   @tailwind utilities — so the flex above would otherwise win over it. */
+.vb-idle-backdrop.hidden { display: none; }
+
+.vb-idle-card {
+  width: 100%;
+  max-width: 380px;
+  background: #FFFFFF;
+  color: #111827;
+  border: 1px solid transparent;
+  border-radius: 20px;
+  padding: 26px 22px 20px;
+  text-align: center;
+  box-shadow: 0 24px 48px -12px rgba(8, 20, 50, 0.5);
+  animation: vb-idle-in 0.18s ease-out;
+}
+
+@keyframes vb-idle-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vb-idle-card { animation: none; }
+}
+
+html.dark body .vb-idle-card {
+  background: #0D1728;
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.vb-idle-icon {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563EB;
+}
+
+.vb-idle-icon svg { width: 24px; height: 24px; }
+
+html.dark body .vb-idle-icon {
+  background: rgba(59, 130, 246, 0.16);
+  color: #93B4FF;
+}
+
+.vb-idle-title {
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.vb-idle-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4B5563;
+  margin: 0;
+}
+
+html.dark body .vb-idle-desc { color: #8E9CBA; }
+
+/* Tabular figures so the seconds tick down in place instead of the whole
+   number jittering sideways once a second. */
+.vb-idle-count {
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 10px 0 2px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  color: #111827;
+}
+
+html.dark body .vb-idle-count { color: #FFFFFF; }
+
+.vb-idle-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.vb-idle-btn {
+  width: 100%;
+  height: 46px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.vb-idle-btn:active { transform: scale(0.99); }
+
+/* Focus lands on "Stay signed in" the moment the dialog opens, so this ring is
+   on screen every time rather than only for keyboard users. Offset far enough
+   from the fill to read as a highlight instead of a border. */
+.vb-idle-btn:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 3px;
+}
+
+html.dark body .vb-idle-btn:focus-visible { outline-color: #93B4FF; }
+
+.vb-idle-btn-primary {
+  background: #2563EB;
+  color: #FFFFFF;
+  box-shadow: 0 8px 16px -8px rgba(37, 99, 235, 0.7);
+}
+
+.vb-idle-btn-primary:hover { background: #1D4ED8; }
+
+.vb-idle-btn-quiet {
+  background: transparent;
+  border-color: #E5E7EB;
+  color: #4B5563;
+}
+
+.vb-idle-btn-quiet:hover { background: #F8FAFC; }
+
+html.dark body .vb-idle-btn-quiet {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #8E9CBA;
+}
+
+html.dark body .vb-idle-btn-quiet:hover { background: rgba(255, 255, 255, 0.05); }
+
 /* ===================== LOCKED PROFILE FIELDS =====================
    Name and date of birth. Both were checked against a government ID when the
    customer was verified, so they are the bank's record rather than a setting —

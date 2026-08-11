@@ -486,6 +486,30 @@
     </div>
   </div>
 
+  <!-- Session timeout warning. Sits above every other layer on purpose: it is
+       the last thing between the customer and a signed-out session, so nothing
+       — not a page, not the action modal — may cover it. It has no dismiss
+       affordance of its own; the only ways out are the two buttons. -->
+  <div id="idleModal" class="vb-idle-backdrop hidden" role="alertdialog" aria-modal="true" aria-labelledby="idleTitle" aria-describedby="idleDesc">
+    <div class="vb-idle-card">
+      <div class="vb-idle-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline>
+        </svg>
+      </div>
+      <h3 id="idleTitle" class="vb-idle-title">Are you still there?</h3>
+      <p id="idleDesc" class="vb-idle-desc">To keep your account secure, we&rsquo;ll sign you out in</p>
+      <!-- aria-live so a screen reader hears the countdown rather than only
+           seeing it. Polite, not assertive: once a second, interrupting every
+           other announcement would make the dialog unusable. -->
+      <div id="idleCountdown" class="vb-idle-count" role="timer" aria-live="polite">2:00</div>
+      <div class="vb-idle-actions">
+        <button id="idleStayBtn" type="button" class="vb-idle-btn vb-idle-btn-primary">Stay signed in</button>
+        <button id="idleSignOutBtn" type="button" class="vb-idle-btn vb-idle-btn-quiet">Sign out now</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Generated at build time by scripts/generate-config.js; sets window.SUPABASE_URL / window.SUPABASE_ANON_KEY -->
   <script src="js/config.js"></script>
   <!-- Core app module: Supabase client, shared helpers, theme, modal, loadPage() -->
