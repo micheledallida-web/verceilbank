@@ -730,6 +730,63 @@ begin
 end $$;
 
 
+-- Giving a repaired account back the money the ledger already knows about.
+--
+-- Reopening the account is only half of it. The balance triggers in section 6
+-- fire on a ledger row as it is written; they do not replay history. So a
+-- customer who banked for weeks with no `accounts` row has every deposit and
+-- every payment sitting in `transactions` and an account that has just come
+-- back reading zero. Their money is not lost — it is in the ledger, which is
+-- the record that matters — but nothing has told the balance about it.
+--
+-- The ledger is the source of truth and `accounts.balance` is a cache of it, so
+-- the cache is rebuilt from the ledger. 'completed' is the same test the
+-- trigger applies, so a pending trade is left out here exactly as it is there.
+--
+-- THE CONDITION IS NARROW ON PURPOSE: only an account sitting at exactly zero
+-- whose ledger says otherwise. That is unambiguous — it can only be an account
+-- that missed its own history. Any other disagreement between a balance and its
+-- ledger is a different fault, and one this file must not paper over: a
+-- representative's manual correction, posted with the service key, is a real
+-- adjustment and rewriting it from the ledger would silently undo it. Section
+-- 10 reports those instead, and a person decides.
+do $$
+declare
+  r      record;
+  n      int := 0;
+  total  numeric := 0;
+begin
+  if to_regclass('public.accounts') is null or to_regclass('public.transactions') is null then
+    return;
+  end if;
+
+  for r in
+    select a.id,
+           coalesce(sum(t.amount) filter (where t.status = 'completed'), 0) as from_ledger
+      from public.accounts a
+      join public.transactions t
+        on t.user_id = a.user_id and t.account_type = a.account_type
+     where coalesce(a.balance, 0) = 0
+     group by a.id
+    having coalesce(sum(t.amount) filter (where t.status = 'completed'), 0) <> 0
+  loop
+    update public.accounts set balance = r.from_ledger where id = r.id;
+    n := n + 1;
+    total := total + r.from_ledger;
+  end loop;
+
+  if n > 0 then
+    raise notice 'reconciled % account(s) from their ledger — % restored in total', n, total;
+  else
+    raise notice 'no balances needed restoring from the ledger';
+  end if;
+exception when others then
+  -- Never take the setup down over this. The accounts are open either way, and
+  -- section 10 will report anything still out of step.
+  raise warning 'balance reconciliation skipped: %', sqlerrm;
+end $$;
+
+
 -- =============================================================================
 -- 6. BALANCE TRIGGERS
 --
