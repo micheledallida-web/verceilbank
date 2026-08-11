@@ -747,6 +747,11 @@
         // own name, so it is checked here rather than discovered at review.
         const born = new Date(dob);
         if (isNaN(born)) return 'Enter a valid date of birth.';
+        // Said separately from the age rule. A date in the future is a typo —
+        // usually the year — and "you must be at least 18" is a baffling
+        // answer to it. The old copy gave that answer, because a future date
+        // computes a negative age and fell through to the same branch.
+        if (born > new Date()) return 'That date is in the future. Check the year.';
         const now = new Date();
         let age = now.getFullYear() - born.getFullYear();
         const monthDiff = now.getMonth() - born.getMonth();
@@ -791,6 +796,28 @@
       btn.addEventListener('click', () => showStep(btn.getAttribute('data-back')));
     });
 
+    // ---------- Date of birth bounds ----------
+    // Computed here rather than written into the markup, so the eighteenth
+    // birthday it allows is eighteen years before TODAY and not before the day
+    // someone happened to edit this file. A hardcoded date is correct for one
+    // day and quietly wrong every day after.
+    //
+    // This is the picker's help, not the rule. The rule is VALIDATORS.identity,
+    // which runs again on submit — `max` is trivially bypassed by typing, by an
+    // older browser that renders this as a text field, or by devtools, and a
+    // date of birth is a KYC field.
+    (function boundDateOfBirth() {
+      const field = document.getElementById('dob');
+      if (!field) return;
+      const iso = (date) => date.toISOString().slice(0, 10);
+      const eighteen = new Date();
+      eighteen.setFullYear(eighteen.getFullYear() - 18);
+      field.max = iso(eighteen);
+      // Nobody opening a bank account was born before this, and it stops the
+      // year spinner running back to the year 1.
+      field.min = '1900-01-01';
+    })();
+
     showStep('product');
 
     signupForm.addEventListener('submit', async (e) => {
@@ -811,7 +838,13 @@
       const firstName = value('firstName');
       const middleName = value('middleName');
       const lastName = value('lastName');
-      const suffix = document.getElementById('suffix').value;
+      // The select's "no suffix" option carries the literal value "None", which
+      // was being written to the profile as if it were a name — the record then
+      // reads "Mercy Chris None". Two screens already strip it on the way out;
+      // this stops it being stored at all. The strippers stay, for the rows
+      // that already have it.
+      const suffixRaw = document.getElementById('suffix').value;
+      const suffix = suffixRaw === 'None' ? '' : suffixRaw;
       const dob = value('dob');
       const ssn = value('ssn').replace(/\D/g, '');
       const email = value('email');
@@ -871,11 +904,12 @@
               // account: it tells the bank what to open once this person has
               // been identity-verified.
               requested_account_type: selectedProduct,
-              // Savings is opened with every account, so it is on the request
-              // whatever was chosen above — recorded rather than assumed, so
-              // the account that gets opened matches what the customer was
-              // shown at sign-up.
-              requested_account_types: [selectedProduct, 'savings']
+              // Only what the customer actually chose. Savings is opened with
+              // every account, but that rule belongs to provision_user, which
+              // adds it server-side — sending it from here as well would mean
+              // a browser could decide which accounts get opened, and a rule
+              // stated in two places is a rule that will disagree with itself.
+              requested_account_types: [selectedProduct]
             }
           }
         }), 'Creating your account');
