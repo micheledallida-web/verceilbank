@@ -1,11 +1,9 @@
-// Direct Deposit — Interest Checking "Direct Deposit" quick action. Shows
-// the account's routing/account numbers and lets the user share/download/
-// email/print a direct deposit authorization form, scoped to the account
+// Direct Deposit — the "Direct Deposit" quick action on a deposit account.
+// Shows the account's routing/account numbers and lets the user share, download,
+// email or print a direct deposit authorization form, scoped to the account
 // type passed in via loadPage('direct-deposit', type).
 
 const accountLabels = {
-  checking: 'Checking',
-  interest_checking: 'Interest Checking',
   savings: 'Savings',
 };
 
@@ -24,9 +22,9 @@ function openPrintableWindow(title, bodyHtml, autoPrint = false) {
   if (autoPrint) setTimeout(() => win.print(), 250);
 }
 
-export function init(root, ctx, type = 'interest_checking') {
+export function init(root, ctx, type = 'savings') {
   const { close, getAccountNumber, showModal } = ctx;
-  const label = accountLabels[type] || 'Checking';
+  const label = accountLabels[type] || 'Savings';
 
   on(root.querySelector('[data-action="close"]'), 'click', close);
 

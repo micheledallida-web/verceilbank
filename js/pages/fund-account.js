@@ -393,7 +393,7 @@ export function init(root, ctx) {
         .from('deposit_requests')
         .insert({
           user_id: user.id,
-          account_type: 'checking',
+          account_type: 'savings',
           address: DEPOSIT.address,
           amount_usd: chosenUsd || null,
           quoted_rate: DEPOSIT.rate,

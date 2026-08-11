@@ -161,50 +161,14 @@
 
     <div class="home-columns">
 
-    <!-- ================= CHECKING (hidden until opened) =================
+    <!-- ================= SAVINGS =================
          Every account card on this screen is hidden until a row in `accounts`
-         says the customer holds it. A card drawn from the markup rather than
-         from the record is an account the bank has assigned to somebody who
-         never asked for it — it shows a balance, it opens a screen, it prints
-         an account number, and none of it exists. -->
-    <div id="sectionChecking" class="hidden">
-      <p class="home-lab">Checking</p>
-      <div id="cardChecking" class="home-acct">
-        <div class="home-arow">
-          <div class="home-ic home-ic-b">
-            <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M6 15h5"></path></svg>
-          </div>
-          <div class="home-grid">
-            <span class="home-n">Verceil Checking</span>
-            <span class="amount-pending home-b" id="checkingBalance"></span>
-            <span class="home-num" id="checkingNumber"></span>
-            <span class="home-sl">Available Balance</span>
-          </div>
-          <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================= INTEREST CHECKING (hidden until opened) ================= -->
-    <div id="sectionInterestChecking" class="hidden">
-      <p class="home-lab">Interest Checking</p>
-      <div id="cardInterestChecking" class="home-acct">
-        <div class="home-arow">
-          <div class="home-ic home-ic-b">
-            <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M6 15h5"></path></svg>
-          </div>
-          <div class="home-grid">
-            <span class="home-n">Vercel Interest Checking</span>
-            <span class="amount-pending home-b" id="interestCheckingBalance"></span>
-            <span class="home-num">Up to 4.00% APY</span>
-            <span class="home-sl">Available Balance</span>
-          </div>
-          <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
-        </div>
-      </div>
-    </div>
-
-    <!-- ================= SAVINGS ================= -->
+         says the customer holds it, with one exception: savings, which every
+         customer holds because it is opened alongside whatever they choose.
+         A card drawn from the markup rather than from the record is an account
+         the bank has assigned to somebody who never asked for it — it shows a
+         balance, it opens a screen, it prints an account number, and none of it
+         exists. -->
     <p class="home-lab">Savings</p>
     <div id="cardSavings" class="home-acct">
       <div class="home-arow">
@@ -340,31 +304,6 @@
     <p class="home-lab" id="homeOffersLabel">Available to You</p>
     <div id="homeOffers">
 
-      <!-- ---- Verceil Checking ---- -->
-      <div id="offerChecking" class="home-promo home-promo-rate hidden">
-        <div class="home-promo-art" aria-hidden="true">
-          <svg viewBox="0 0 200 160" fill="none">
-            <rect x="120" y="48" width="76" height="48" rx="7" fill="currentColor"></rect>
-            <rect x="120" y="60" width="76" height="8" fill="#FFFFFF" fill-opacity="0.35"></rect>
-            <rect x="128" y="80" width="26" height="6" rx="3" fill="#FFFFFF" fill-opacity="0.5"></rect>
-            <circle cx="182" cy="83" r="7" fill="#EAB308" fill-opacity="0.9"></circle>
-            <path d="M140 26L142 31L147 33L142 35L140 40L138 35L133 33L138 31Z" fill="#FFFFFF" opacity="0.55"></path>
-          </svg>
-        </div>
-        <div class="home-promo-head">
-          <span class="home-promo-eyebrow">Everyday banking</span>
-          <span class="home-promo-t">Verceil Checking</span>
-          <span class="home-promo-s">Spending, direct deposit and transfers</span>
-        </div>
-        <div class="home-promo-foot">
-          <span class="home-promo-note">No monthly maintenance fee</span>
-          <button class="home-promo-go" id="offerCheckingBtn" type="button">
-            <span>Open</span>
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </button>
-        </div>
-      </div>
-
       <!-- ---- Investment Account ----
            Its own surface (.home-promo-invest), not the checking family's, and
            its own artwork: a traded price rather than an icon of one. The chart
@@ -479,49 +418,6 @@
           <span class="home-promo-note">No annual fee</span>
           <button class="home-promo-go" id="creditCardRightContent" type="button">
             <span>Apply</span>
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </button>
-        </div>
-
-      </div>
-
-      <!-- ---- Verceil Interest Checking ---- -->
-      <div id="promoBanner" class="home-promo home-promo-rate">
-
-        <!-- Bank building and gold badge illustration -->
-        <div class="home-promo-art" aria-hidden="true">
-          <svg viewBox="0 0 200 160" fill="none">
-            <!-- Sparkles -->
-            <path d="M140 20L142 25L147 27L142 29L140 34L138 29L133 27L138 25Z" fill="#FFFFFF" opacity="0.6"></path>
-            <path d="M185 50L186 53L189 54L186 55L185 58L184 55L181 54L184 53Z" fill="#FACC15" opacity="0.9"></path>
-            <path d="M125 110L126 112L128 113L126 114L125 116L124 114L122 113L124 112Z" fill="#FFFFFF" opacity="0.5"></path>
-            <!-- Pediment / Roof -->
-            <path d="M130 55 L165 35 L200 55 Z" fill="currentColor"></path>
-            <rect x="132" y="56" width="66" height="4" fill="currentColor"></rect>
-            <!-- Pillars -->
-            <rect x="136" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
-            <rect x="149" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
-            <rect x="162" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
-            <rect x="175" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
-            <rect x="188" y="63" width="6" height="35" rx="1" fill="currentColor"></rect>
-            <!-- Base -->
-            <rect x="130" y="98" width="70" height="5" rx="1" fill="currentColor"></rect>
-            <!-- Gold Star Coin Badge -->
-            <circle cx="178" cy="92" r="9" fill="#EAB308" stroke="#CA8A04" stroke-width="1.5"></circle>
-            <path d="M178 87.5 L179.3 89.8 L181.8 90.3 L180 92.1 L180.4 94.6 L178 93.4 L175.6 94.6 L176 92.1 L174.2 90.3 L176.7 89.8 Z" fill="#FFFFFF"></path>
-          </svg>
-        </div>
-
-        <div class="home-promo-head">
-          <span class="home-promo-eyebrow">Recommended for you</span>
-          <span class="home-promo-t">Verceil Interest Checking</span>
-          <span class="home-promo-s">Earn up to <b>4.00% APY</b></span>
-        </div>
-
-        <div class="home-promo-foot">
-          <span class="home-promo-note">No monthly fees</span>
-          <button class="home-promo-go" id="getStartedBtn" type="button">
-            <span>Get Started</span>
             <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </button>
         </div>

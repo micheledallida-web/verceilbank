@@ -1,13 +1,11 @@
-// Interest Details — Savings & Interest Checking "Interest Details" quick
-// action. Shows APY, accrued/estimated interest, and a monthly interest
-// payment history derived from the `transactions` table (credited entries
-// tagged as interest).
+// Interest Details — the Savings "Interest Details" quick action. Shows APY,
+// accrued/estimated interest, and a monthly interest payment history derived
+// from the `transactions` table (credited entries tagged as interest).
 
 const APY = 0.04;
 
 const accountMeta = {
   savings: { name: 'High-Yield Savings', balanceId: 'savingsBalance' },
-  interest_checking: { name: 'Vercel Interest Checking', balanceId: 'interestCheckingBalance' },
 };
 
 let listeners = [];

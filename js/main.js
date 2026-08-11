@@ -154,8 +154,9 @@ export function getAccountNumber(type, kind) {
 //
 // So they are derived rather than rolled: from the account holder's id and the
 // account type, which makes them stable per device and unique per account.
-// Every account type seeds differently, so savings never shares checking's
-// number, and two customers never collide because their ids differ. The first
+// Every account type seeds differently, so savings never shares the investment
+// account's number, and two customers never collide because their ids differ.
+// The first
 // digit is forced non-zero so the number is always eleven digits long rather
 // than ten with a leading nought.
 //
@@ -267,11 +268,10 @@ export const FUNDING_DEADLINE_DAYS = 60;
 // a total owed rather than a threshold, so a round rule gets a round number.
 export const MINIMUM_OPENING_DEPOSIT_LABEL = `$${MINIMUM_OPENING_DEPOSIT.toLocaleString('en-US')}`;
 
-// A savings account is not optional. Whichever account someone opens —
-// checking, interest checking or an investment account — savings is opened
-// alongside it, so this is the product every customer holds. It is exported
-// because the sign-up copy, the open flows and the dashboard all have to agree
-// on that being true.
+// A savings account is not optional. It is opened alongside whatever someone
+// chooses, so this is the product every customer holds. It is exported because
+// the sign-up copy, the open flows and the dashboard all have to agree on that
+// being true.
 export const COMPULSORY_ACCOUNT_TYPE = 'savings';
 
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
@@ -287,14 +287,11 @@ let currentUserId = '';
 // number. A product that has only been offered — the Signature Card before it
 // is applied for — is deliberately absent, so it shows no digits.
 //
-// It starts with savings and nothing else. It used to start with checking,
-// savings AND investments, on the assumption that every customer holds all
-// three from the day they join, and that assumption was simply not true: an
-// applicant picks ONE product at sign-up, and savings is the only account
-// opened alongside whatever they picked. Seeding the set with the other two
-// gave an eleven-digit account number, a balance card and a working account
-// screen to two accounts the customer had never asked for — an investment
-// account in particular, which nobody should be handed by default.
+// It starts with savings and nothing else, because savings is the one account
+// every customer is guaranteed to hold. It used to be seeded with the whole
+// product list, on the assumption that everybody holds everything from the day
+// they join — which gave an eleven-digit account number, a balance card and a
+// working account screen to accounts the customer had never asked for.
 //
 // Anything else is added by loadBankReference() from the rows that actually
 // exist in `accounts`.
@@ -633,7 +630,6 @@ function allowFullAccess(name) {
 // that belong to nobody.
 function renderAccountNumberMasks() {
   const masks = {
-    checkingNumber: 'checking',
     savingsNumber: 'savings',
     investmentsNumber: 'investments',
     creditNumber: 'credit',
@@ -1335,11 +1331,9 @@ document.getElementById('messagesBtn').addEventListener('click', (e) => openHead
 document.getElementById('profilePillBtn').addEventListener('click', (e) => openHeaderDropdown('profile', e.currentTarget));
 
 // ---------- Account cards ----------
-document.getElementById('cardChecking').addEventListener('click', () => loadPage('account-detail', 'checking'));
 document.getElementById('cardSavings').addEventListener('click', () => loadPage('account-detail', 'savings'));
 document.getElementById('cardInvestments').addEventListener('click', () => loadPage('account-detail', 'investments'));
 document.getElementById('cardCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
-document.getElementById('cardInterestChecking').addEventListener('click', () => loadPage('account-detail', 'interest_checking'));
 document.getElementById('cardRetirement').addEventListener('click', () => loadPage('retirement'));
 
 // Sell sits inside the Investments card, which is itself a link to the account.
@@ -1349,7 +1343,6 @@ document.getElementById('homeSellInvestments').addEventListener('click', (event)
   event.stopPropagation();
   loadPage('trade', 'sell');
 });
-document.getElementById('promoBanner').addEventListener('click', () => loadPage('interest-checking'));
 // ---------- Signature Card eligibility ----------
 // The card is for established members, and that is two conditions rather than
 // one: the account has to have been open eight whole months, and it has to have
@@ -1433,12 +1426,11 @@ export async function getCardEligibility() {
 document.getElementById('offerCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 
 // ---------- Opening an account ----------
-// Three ways in, one destination. The standalone row under the accounts, and
-// the two offers, all open the same screen — the offers simply arrive on it
-// with their product already chosen, which is the only difference between
-// tapping "Open" on the Investment Account offer and picking it off the list.
+// Two ways in, one destination. The standalone row under the accounts and the
+// Investment Account offer open the same screen — the offer simply arrives on
+// it with its product already chosen, which is the only difference between
+// tapping "Open" there and picking it off the list.
 document.getElementById('homeOpenAccount').addEventListener('click', () => loadPage('open-account'));
-document.getElementById('offerChecking').addEventListener('click', () => loadPage('open-account', { product: 'checking' }));
 document.getElementById('offerInvestments').addEventListener('click', () => loadPage('open-account', { product: 'investments' }));
 
 // ---------- Quick actions (from the old account summary) ----------
@@ -1455,18 +1447,13 @@ const navMenus = {
   // every account's own screen — one way to each destination, so nothing in
   // this app is reachable by two names.
   //
-  // Interest Checking is not on this list either. It is a product you open, not
-  // one you already hold: it appears here as an account once it has been opened
-  // through the offer on the home screen, which requires identity verification
-  // first. Until then there is no account to look at.
-  //
-  // Checking and Investment Accounts are on this list only when the customer
-  // actually holds them — see NAV_ITEM_AVAILABILITY below. A row that opens an
-  // account screen for an account somebody does not have is the menu making the
-  // same claim the dashboard used to.
+  // Investment Accounts is on this list only when the customer actually holds
+  // one — see NAV_ITEM_AVAILABILITY below. A row that opens an account screen
+  // for an account somebody does not have is the menu making the same claim the
+  // dashboard used to.
   navAccounts: {
     title: 'Accounts',
-    items: ['Account Summary', 'Checking', 'Savings', 'Credit Cards', 'Investment Accounts', 'Joint Accounts'],
+    items: ['Account Summary', 'Savings', 'Credit Cards', 'Investment Accounts', 'Joint Accounts'],
     // Not one of the accounts, so not in the list of them. It is the action you
     // take after reading the list and finding something missing, and it sits
     // below the divider on its own for exactly that reason.
@@ -1506,7 +1493,6 @@ const navMenuRoutes = {
   // The account summary is the dashboard now, so this closes whatever screen
   // is open and returns to it rather than loading a page of its own.
   'Account Summary': () => showHome(),
-  'Checking': () => loadPage('account-detail', 'checking'),
   'Savings': () => loadPage('account-detail', 'savings'),
   'Credit Cards': () => loadPage('account-detail', 'credit'),
   'Investment Accounts': () => loadPage('account-detail', 'investments'),
@@ -1683,7 +1669,6 @@ function renderNavMenuGroupRow(item) {
 // menus it governs instead of inside the function that draws them.
 const NAV_ITEM_AVAILABILITY = {
   'Card Services': () => hasOpenCreditCard,
-  'Checking': () => heldAccountTypes.has('checking'),
   'Investment Accounts': () => heldAccountTypes.has('investments'),
 };
 
@@ -1816,7 +1801,10 @@ async function initSupabaseData() {
     return Math.round((Number(value) || 0) * 100);
   }
 
-  const DEPOSIT_TYPES = ['checking', 'savings', 'interest_checking'];
+  // The bank's deposit money, which is savings and only savings. Checking and
+  // interest checking were here until the bank stopped offering current
+  // accounts; see ACCOUNT_PRODUCTS in js/shared/account-products.js.
+  const DEPOSIT_TYPES = ['savings'];
 
   // An IRA is not a deposit account and not the brokerage account either: the
   // money is locked away for retirement under its own tax rules, so it is never
@@ -1879,9 +1867,7 @@ async function initSupabaseData() {
 
     // Each card shows the total across every account of its type, so the
     // hero's Deposits is exactly the three cards beneath it added up.
-    setText('checkingBalance', sumCents(acc => acc.account_type === 'checking'));
     setText('savingsBalance', sumCents(acc => acc.account_type === 'savings'));
-    setText('interestCheckingBalance', sumCents(acc => acc.account_type === 'interest_checking'));
     setText('investmentsBalance', investments);
     setText('creditBalance', cardDebt);
 
@@ -1917,10 +1903,10 @@ async function initSupabaseData() {
     // Every product on this screen follows the same rule, and it is the rule
     // this whole section exists to enforce: a card appears when the customer
     // holds the account, the offer to open it appears when they do not, and
-    // never both. Checking and Investments were the two exceptions — drawn from
-    // the markup, always visible, whether or not the account existed — and an
-    // investment account nobody chose is not a card with a zero on it, it is
-    // the bank having opened something on somebody's behalf.
+    // never both. Investments was the exception — drawn from the markup, always
+    // visible, whether or not the account existed — and an investment account
+    // nobody chose is not a card with a zero on it, it is the bank having
+    // opened something on somebody's behalf.
     //
     // Nothing is decided until the accounts request has actually landed.
     // Hiding a real account for the second a slow network takes would be the
@@ -1929,9 +1915,7 @@ async function initSupabaseData() {
     const card = firstMatch(isActiveCard);
 
     if (balancesReady) {
-      toggleSection('sectionChecking', 'offerChecking', has('checking'));
       toggleSection('sectionInvestments', 'offerInvestments', has('investments'));
-      toggleSection('sectionInterestChecking', 'promoBanner', has('interest_checking'));
       toggleSection('sectionCredit', 'offerCredit', !!card);
 
       // The hero's two conditional figures. Deposits and the total are always
@@ -1996,10 +1980,10 @@ async function initSupabaseData() {
   }
 
   // An account is a row in the accounts table and nothing else. There used to
-  // be a demo fallback here that revealed Interest Checking — and folded a
-  // cached figure into the deposits total — on the strength of a localStorage
-  // flag, which is a value anybody can set from a browser console. Whether
-  // somebody holds an account is the bank's answer to give, not the device's.
+  // be a demo fallback here that revealed an account — and folded a cached
+  // figure into the deposits total — on the strength of a localStorage flag,
+  // which is a value anybody can set from a browser console. Whether somebody
+  // holds an account is the bank's answer to give, not the device's.
 
   if (supabaseClient) {
     try {

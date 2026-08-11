@@ -55,7 +55,6 @@ export async function init(root, ctx) {
       const exportData = {
         profile: profileResp.data,
         holdings: holdingsResp.data || [],
-        checkingBalance: document.getElementById('checkingBalance')?.textContent,
         savingsBalance: document.getElementById('savingsBalance')?.textContent,
         investmentsBalance: document.getElementById('investmentsBalance')?.textContent,
         exportedAt: new Date().toISOString(),

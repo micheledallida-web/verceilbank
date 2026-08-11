@@ -1,4 +1,4 @@
-const balanceSourceIds = { checking: 'checkingBalance', savings: 'savingsBalance', investments: 'investmentsBalance' };
+const balanceSourceIds = { savings: 'savingsBalance', investments: 'investmentsBalance' };
 const docTypeLabels = {
   monthly_statement: 'Monthly Statement',
   account_document: 'Account Document',
@@ -6,7 +6,7 @@ const docTypeLabels = {
 };
 
 let listeners = [];
-let activeTab = 'checking';
+let activeTab = 'savings';
 let activeDocFilter = 'all';
 let currentDocs = [];
 
@@ -108,7 +108,7 @@ function renderDocs(root, ctx) {
       openPrintableWindow(`${doc.doc_type} — ${doc.period}`, `
         <h1>${doc.doc_type}</h1>
         <div class="row"><span>Statement Period</span><strong>${doc.period}</strong></div>
-        <div class="row"><span>Account Number</span><strong>${ctx.getAccountNumber(doc.account_type || 'checking', 'account')}</strong></div>
+        <div class="row"><span>Account Number</span><strong>${ctx.getAccountNumber(doc.account_type || 'savings', 'account')}</strong></div>
         <div class="row"><span>Ending Balance</span><strong>${ctx.formatCurrency(doc.ending_balance || 0)}</strong></div>
         <div class="row"><span>Generated</span><strong>${new Date(doc.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong></div>
         <p>This is a system-generated summary based on your account records at the time of generation. It is not a substitute for an official audited statement.</p>
@@ -121,7 +121,7 @@ function renderDocs(root, ctx) {
       const doc = currentDocs.find((item) => String(item.id) === btn.getAttribute('data-id'));
       if (!doc) return;
       const subject = encodeURIComponent(`${doc.doc_type} — ${doc.period}`);
-      const body = encodeURIComponent(`Verceil Bank Document\n\nPeriod: ${doc.period}\nEnding Balance: ${ctx.formatCurrency(doc.ending_balance || 0)}\nAccount: ${ctx.getAccountNumber(doc.account_type || 'checking', 'account')}`);
+      const body = encodeURIComponent(`Verceil Bank Document\n\nPeriod: ${doc.period}\nEnding Balance: ${ctx.formatCurrency(doc.ending_balance || 0)}\nAccount: ${ctx.getAccountNumber(doc.account_type || 'savings', 'account')}`);
       window.location.href = `mailto:?subject=${subject}&body=${body}`;
     });
   });
@@ -166,7 +166,7 @@ export async function init(root, ctx, initialTab) {
       const user = await getCurrentUser();
       if (!user || !supabaseClient) throw new Error('no user');
       const docType = activeDocFilter === 'all' ? 'Monthly Statement' : (docTypeLabels[activeDocFilter] || 'Monthly Statement');
-      const balanceEl = document.getElementById(balanceSourceIds[activeTab] || 'checkingBalance');
+      const balanceEl = document.getElementById(balanceSourceIds[activeTab] || 'savingsBalance');
       await supabaseClient.from('account_documents').insert({
         user_id: user.id,
         account_type: activeTab,
@@ -189,7 +189,7 @@ export async function init(root, ctx, initialTab) {
 export function cleanup() {
   listeners.forEach((off) => off());
   listeners = [];
-  activeTab = 'checking';
+  activeTab = 'savings';
   activeDocFilter = 'all';
   currentDocs = [];
 }

@@ -15,33 +15,17 @@
 // it is opened alongside whatever they choose, at sign-up and here — so it can
 // never be something left to open. It is here so a savings row still has a
 // name and a description wherever one is printed.
+//
+// THE BANK OFFERS TWO ACCOUNTS. Verceil Checking and Verceil Interest Checking
+// were here and are gone: the bank does not do current accounts. Everything
+// downstream of this list follows from it — sign-up, Open an Account, the
+// dashboard cards, the transfer screens' account pickers — because this array
+// is the catalogue and nothing else is allowed to hold a second opinion about
+// what a customer can hold.
+//
+// If they are ever brought back, they come back here, and the screens pick them
+// up on their own.
 export const ACCOUNT_PRODUCTS = [
-  {
-    key: 'checking',
-    name: 'Verceil Checking',
-    tagline: 'Everyday banking for spending, direct deposit and transfers',
-    note: 'No monthly maintenance fee',
-    accent: '#2563EB',
-    features: [
-      'No monthly maintenance fee',
-      'Direct deposit up to two days early',
-      'Zelle® transfers and mobile check deposit',
-      'FDIC insured to the applicable limits',
-    ],
-  },
-  {
-    key: 'interest_checking',
-    name: 'Verceil Interest Checking',
-    tagline: 'A checking account that earns interest on your balance',
-    note: 'Up to 4.00% APY · No monthly fees',
-    accent: '#1D4ED8',
-    features: [
-      'Earn up to 4.00% APY on your balance',
-      'No monthly maintenance fee',
-      'Everything Verceil Checking does',
-      'FDIC insured to the applicable limits',
-    ],
-  },
   {
     key: 'savings',
     name: 'High-Yield Savings',
