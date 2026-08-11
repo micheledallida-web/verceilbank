@@ -1676,6 +1676,99 @@ html.dark body .home-sell {
 
 .home-promo-rate .home-promo-go { background: #FFFFFF; color: #1D61F2; }
 
+/* Investment Account — the same blue family, a different product entirely, and
+   it has to look like one.
+   ------------------------------------------------------------------------
+   It shared `home-promo-rate` with Interest Checking, which made two cards a
+   thumb-scroll apart that a customer had to READ to tell apart. They are not
+   the same offer: one is a deposit account paying a published rate, the other
+   is a brokerage account that can lose money.
+
+   Three things separate them, and none of them is "a slightly different blue" —
+   that is the change that never survives contact with a phone screen:
+
+   1. DEPTH. Midnight navy rather than royal blue, and the gradient runs on the
+      diagonal rather than left to right. Darker, cooler, heavier.
+   2. STRUCTURE. A market grid ruled across the whole panel. Interest Checking
+      is a flat wash with an illustration parked in the corner; this one is
+      built out of the graph paper a chart is drawn on, which reads as
+      "markets" before a single word has been.
+   3. ACCENT. Sky over white. The eyebrow, the chart and the pill are all cyan,
+      so the one bright colour on the card is a colour that appears nowhere
+      else in the app. The pill in particular: white pills mean deposits here.
+
+   Still unmistakably blue, and still the same object — same radius, same
+   padding, same three-part layout, same lift. Only the surface changes. */
+.home-promo-invest {
+  background:
+    /* The grid. Two rulings, faint enough to be a texture rather than a
+       drawing, sitting over the gradient beneath them. */
+    repeating-linear-gradient(to right,  rgba(125, 211, 252, 0.09) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(to bottom, rgba(125, 211, 252, 0.08) 0 1px, transparent 1px 34px),
+    linear-gradient(135deg, #0A1F42 0%, #143C78 46%, #0B2650 100%);
+  border-color: rgba(56, 189, 248, 0.3);
+  box-shadow: 0 20px 25px -5px rgba(4, 14, 33, 0.32), 0 8px 10px -6px rgba(4, 14, 33, 0.28);
+}
+
+.dark .home-promo-invest {
+  background:
+    repeating-linear-gradient(to right,  rgba(125, 211, 252, 0.07) 0 1px, transparent 1px 46px),
+    repeating-linear-gradient(to bottom, rgba(125, 211, 252, 0.06) 0 1px, transparent 1px 34px),
+    linear-gradient(135deg, #050E1F 0%, #0A1E3E 46%, #061428 100%);
+  border-color: rgba(56, 189, 248, 0.16);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+/* A light source at the top edge, the way a trading screen glows. Absolutely
+   positioned with no z-index, so it paints under the artwork and under the copy
+   (which carries z-index: 1) and needs no stacking rules of its own. */
+.home-promo-invest::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.18) 0%, rgba(56, 189, 248, 0) 44%);
+  pointer-events: none;
+}
+
+/* The chart is the point of this card, so it is given the full height of the
+   panel and a wider column than the other offers' illustrations get. */
+.home-promo-invest .home-promo-art {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 172px;
+  opacity: 1;
+  color: rgba(125, 211, 252, 0.85);
+  /* The chart is wider than the column the copy leaves clear, and that is the
+     intention — it should run behind the words and off the right edge rather
+     than sit in a box beside them. The mask is what makes that legible instead
+     of busy: the line dissolves into the panel as it travels left, so it
+     emerges from under the subhead rather than crossing it. Everything the
+     customer has to read stays on flat colour. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 36%, #000 64%);
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 36%, #000 64%);
+}
+
+.home-promo-invest .home-promo-eyebrow { color: #7DD3FC; }
+
+.home-promo-invest .home-promo-t { color: #FFFFFF; }
+
+.home-promo-invest .home-promo-s { color: rgba(219, 234, 254, 0.92); }
+
+.home-promo-invest .home-promo-s b { color: #FFFFFF; font-weight: 700; }
+
+/* The risk line. Deliberately not dimmed into the background the way the other
+   cards' fine print is — "may lose value" is the one thing on this card that
+   must not read as decoration. */
+.home-promo-invest .home-promo-note { color: rgba(191, 219, 254, 0.9); }
+
+.home-promo-invest .home-promo-go {
+  background: #38BDF8;
+  color: #062B4A;
+  box-shadow: 0 4px 14px -2px rgba(56, 189, 248, 0.5);
+}
+
 /* Signature Card — the white elevated surface the accounts above it use, so
    the dark metal card in the artwork is the thing that carries the premium,
    not the panel. currentColor tints the card sitting behind it. */
