@@ -1481,7 +1481,19 @@ const headerMenuRoutes = {
 // them, and the profile sheet slides up over the dashboard — in a cafe, on a
 // train, in front of whoever is next to you. They live on their own screens,
 // behind a tap, and nowhere else in the app.
-const PROFILE_VALUE_ROWS = ['Residential Address', 'Mailing Address', 'Phone Number', 'Email Address'];
+//
+// A phone number is not on the list either, and it used to be — as "•••• 0188",
+// which is a mask that does not mask anything. The last four digits are the
+// part of a phone number that identifies it; the rest is an area code and an
+// exchange that thousands of people share. Printing them on a sheet that opens
+// over the dashboard means anyone standing behind the customer reads the only
+// part worth reading, and they never tapped anything to see it.
+//
+// So the row shows its label and nothing else, exactly as the email row does.
+// The number is on the screen behind the tap, masked there too, with a control
+// that reveals it — which is the point: seeing your own phone number should be
+// something you chose to do.
+const PROFILE_VALUE_ROWS = ['Residential Address', 'Mailing Address'];
 
 // Rows with nothing to edit. Name and date of birth are not here any more: with
 // their values off the sheet, the row has to be tappable or there would be no
@@ -1490,11 +1502,6 @@ const PROFILE_VALUE_ROWS = ['Residential Address', 'Mailing Address', 'Phone Num
 const LOCKED_PROFILE_ROWS = [];
 
 let profileRowValues = {};
-
-function maskPhoneNumber(digitsSource) {
-  const digits = String(digitsSource || '').replace(/\D/g, '');
-  return digits.length >= 4 ? `•••• ${digits.slice(-4)}` : '';
-}
 
 // Enough to recognise the address as yours without printing where you live.
 function cityAndCountry(city, country) {
@@ -1515,10 +1522,6 @@ function buildProfileRowValues(profile, verification) {
     // Nothing when the mailing address simply matches the residential one —
     // saying so on the list is noise, and the detail screen says it anyway.
     'Mailing Address': mailingDiffers ? cityAndCountry(profile.mail_city, profile.mail_state) : '',
-    'Phone Number': maskPhoneNumber(profile.phone_number),
-    // Not shown on the list at all. The address is on its own screen, which is
-    // where you go to read it.
-    'Email Address': '',
   };
 }
 

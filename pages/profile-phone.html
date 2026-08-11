@@ -20,15 +20,27 @@
       </div>
 
       <div class="bg-white dark:bg-[#0D1728] rounded-[20px] border border-[#E5E7EB] dark:border-white/[0.06] shadow-sm p-[20px] mb-[24px]">
+        <!-- The number on file. Masked when the screen opens, whatever is on
+             record — the markup carries no example number, because a real one
+             is what a customer will read it as. Filled in by
+             js/pages/profile-phone.js. -->
         <div class="mb-[20px]">
           <div class="text-[13px] font-bold uppercase tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">Current Phone Number</div>
-          <div id="pdCurrentPhone" class="text-[16px] font-semibold text-[#0F172A] dark:text-white">(212) 555-0188</div>
+          <div class="flex items-center gap-[10px]">
+            <div id="pdCurrentPhone" class="text-[16px] font-semibold text-[#0F172A] dark:text-white tabular-nums"></div>
+            <button id="phRevealBtn" type="button" class="hidden text-[13px] font-semibold text-[#2563EB] dark:text-[#3B82F6] cursor-pointer" aria-pressed="false">Show</button>
+          </div>
           <div id="phStatus" class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] mt-[4px]">Not verified</div>
         </div>
 
+        <!-- Changing a number means typing the new one out, the way every bank
+             does it. The field is not pre-filled with the number on file: that
+             would put the digits back on the screen the moment it opens, which
+             is the whole thing the mask above exists to prevent. -->
+        <div class="text-[13px] font-bold uppercase tracking-[1.2px] text-[#6B7280] dark:text-[#8E9CBA] mb-[6px]">New Phone Number</div>
         <div class="flex gap-[10px] mb-[14px]">
-          <input id="phCode" type="text" placeholder="+1" class="w-[72px] h-[56px] px-[12px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
-          <input id="phNumber" type="tel" placeholder="Mobile number" class="flex-1 h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
+          <input id="phCode" type="text" placeholder="+1" autocomplete="off" class="w-[72px] h-[56px] px-[12px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
+          <input id="phNumber" type="tel" inputmode="tel" autocomplete="off" placeholder="New mobile number" class="flex-1 h-[56px] px-[16px] rounded-[16px] bg-gray-50 dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[16px] text-[#0F172A] dark:text-white outline-none focus:border-[#2563EB]">
         </div>
         <button id="phSendCodeBtn" type="button" class="w-full h-[48px] rounded-[16px] bg-white dark:bg-white/5 border border-[#E5E7EB] dark:border-white/10 text-[#0F172A] dark:text-white text-[14px] font-semibold cursor-pointer mb-[10px]">Send Verification Code</button>
         <div id="phVerifyRow" class="hidden gap-[10px] mb-[10px]">
