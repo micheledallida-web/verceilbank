@@ -420,6 +420,26 @@ a warning, so this can never again be discovered by the customer it belongs to.
 gets the product they asked for at sign-up, plus savings — so a browser open
 right now recovers whether or not this file has been re-run.
 
+### Reopening the account is only half the repair
+
+The balance triggers fire on a ledger row **as it is written**. They do not
+replay history. So a customer who banked for weeks with no `accounts` row has
+every deposit sitting in `transactions` and an account that has just come back
+reading zero. Their money was never lost — it is in the ledger, which is the
+record that matters — but nothing had told the balance about it.
+
+Section 5 therefore rebuilds the cache from the ledger, using `status =
+'completed'`, the same test the trigger applies, so a pending trade is left out
+of both. The condition is deliberately narrow: **only an account sitting at
+exactly zero whose ledger says otherwise.** That can only be an account which
+missed its own history.
+
+Any other disagreement is a different fault and is left alone. A
+representative's manual correction, posted with the service key, is a real
+adjustment, and rewriting it from the ledger would silently undo it — so
+section 10 reports those and a person decides. Only `js/main.js` and the
+triggers touch a balance otherwise; customers never can.
+
 Check for anyone who slipped through:
 
 ```sql
