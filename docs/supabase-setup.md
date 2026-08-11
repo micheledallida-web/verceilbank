@@ -176,6 +176,41 @@ grant  update (account_number) on public.accounts to authenticated;
 Balances move through the ledger triggers and nowhere else. `setup.sql` applies
 this, and its verification section fails loudly if it is ever undone.
 
+### Neither is the balance on a *new* account
+
+The same reasoning applies to INSERT, and it is easier to miss. The insert
+policy checks **whose** row is being written and says nothing about what is in
+it — so a customer session could open an account for itself, which is what the
+Open an Account screen legitimately does, and set the opening balance in the
+same statement. Opening an account with a million dollars in it is one request.
+
+Two columns are all a customer needs:
+
+```sql
+revoke insert on public.accounts from authenticated;
+grant  insert (user_id, account_type) on public.accounts to authenticated;
+```
+
+Everything else takes its column default: `balance` 0, `status` `'pending'`,
+`ownership` `'individual'`. That last one is what makes the joint-account rule
+real — `ownership = 'joint'` can only be written by the bank, with the service
+key, after both owners have been identified and the ownership agreement has been
+countersigned.
+
+### Never use `upsert()` against `accounts`
+
+PostgreSQL implements an upsert as `INSERT ... ON CONFLICT DO UPDATE`, and it
+checks UPDATE privilege on every column in the SET list **before** it runs —
+whether or not a conflict actually occurs. With update narrowed to
+`account_number`, every upsert against this table fails with *permission
+denied*, and the screen that issued it reports an account it never opened.
+
+Open accounts with a plain `INSERT` and treat SQLSTATE `23505` as success: the
+unique constraint on `(user_id, account_type)` is what makes it safe to call
+twice, and a duplicate refusal means the account already exists, which is the
+outcome the caller wanted. `openAccountRow()` in `js/main.js` is the single
+place the app does this.
+
 ---
 
 ## 3. Realtime

@@ -15,6 +15,7 @@ import {
   subscribeToActivity,
   watchRealtime,
   flushQueue,
+  ACTIVITY_QUEUE_KEY_PREFIX,
 } from './shared/activity.js';
 
 // Populated by js/config.js (generated at build time from SUPABASE_URL /
@@ -41,6 +42,71 @@ export async function getCurrentUser() {
 
 export function genRef() {
   return 'VB-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+}
+
+// ---------- How a customer's name is printed ----------
+// Somebody types their name into the sign-up form however they type it —
+// "MICHELE", "michele", "mIcHeLe" — and the greeting used to print it back
+// exactly like that. A bank does not shout your name at you when you open its
+// app, and it does not address you in lower case either; Chase, and every bank
+// that looks like Chase, prints one capital and the rest small, every time, no
+// matter what was typed.
+//
+// The rule is applied here rather than with `text-transform: capitalize` in the
+// stylesheet, and that difference is the whole point: CSS capitalize only ever
+// raises the first letter and leaves the rest of the word alone, so "MICHELE"
+// stays "MICHELE". It has to be the string that changes, not its styling — and
+// with it done here, the greeting keeps its own font, weight and size, which
+// no text-transform can then contradict.
+//
+// Word boundaries are spaces, hyphens and apostrophes, so the shapes real names
+// come in survive the trip:
+//
+//   MICHELE       -> Michele        anne-marie   -> Anne-Marie
+//   o'BRIEN       -> O'Brien        MARY JANE    -> Mary Jane
+//
+// Particles that a person writes small in their own name — van, de, bin — are
+// left small when they are not the first word, because "Van Der Berg" is a
+// different name from "van der Berg" and the one on the ID is the one to print.
+const NAME_PARTICLES = ['van', 'von', 'der', 'den', 'del', 'della', 'de', 'di', 'da', 'du', 'la', 'le', 'bin', 'binte', 'al', 'ter', 'ten'];
+
+function capitalizeWord(word, isFirstWord) {
+  if (!word) return word;
+  const lower = word.toLocaleLowerCase();
+  if (!isFirstWord && NAME_PARTICLES.includes(lower)) return lower;
+  return lower.charAt(0).toLocaleUpperCase() + lower.slice(1);
+}
+
+export function formatDisplayName(raw) {
+  const trimmed = String(raw == null ? '' : raw).trim();
+  if (!trimmed) return '';
+
+  let wordIndex = -1;
+  // Split on the separators rather than replacing them, so whatever was
+  // between two words — one space or three — comes back out unchanged.
+  return trimmed.split(/([\s\-'’]+)/).map((part) => {
+    // The odd entries are the separators themselves, kept verbatim.
+    if (/^[\s\-'’]+$/.test(part)) return part;
+    wordIndex += 1;
+    return capitalizeWord(part, wordIndex === 0);
+  }).join('');
+}
+
+// The greeting needs a first name, and what it has is whatever the customer
+// gave. A first name is used when there is one; failing that, the local part of
+// the email address, cut at the first separator and stripped of the digits
+// people put on the end of one — "jane.doe91@..." greets Jane, not
+// "jane.doe91". An address that yields nothing readable greets nobody, and the
+// greeting stands on its own rather than inventing a name to print.
+export function greetingNameFor(user) {
+  if (!user) return '';
+
+  const first = user.user_metadata && user.user_metadata.first_name;
+  if (first && String(first).trim()) return formatDisplayName(first);
+
+  const local = String(user.email || '').split('@')[0];
+  const head = local.split(/[._\-+]/)[0].replace(/\d+$/, '');
+  return formatDisplayName(head);
 }
 
 // The sign goes outside the symbol — "-$45.50", not "$-45.50", which is how
@@ -189,15 +255,22 @@ let accountNumbersByType = {};
 // Seeds the assigned numbers, so they are the same on every device.
 let currentUserId = '';
 
-// The accounts opened at sign-up. Every customer holds all three from the day
-// they join — savings compulsorily, see COMPULSORY_ACCOUNT_TYPE — so all three
-// carry a number whether or not a row has appeared in the table yet.
-const CORE_ACCOUNT_TYPES = ['checking', 'savings', 'investments'];
-
 // Which accounts this customer actually holds, and therefore which have a
 // number. A product that has only been offered — the Signature Card before it
 // is applied for — is deliberately absent, so it shows no digits.
-let heldAccountTypes = new Set(CORE_ACCOUNT_TYPES);
+//
+// It starts with savings and nothing else. It used to start with checking,
+// savings AND investments, on the assumption that every customer holds all
+// three from the day they join, and that assumption was simply not true: an
+// applicant picks ONE product at sign-up, and savings is the only account
+// opened alongside whatever they picked. Seeding the set with the other two
+// gave an eleven-digit account number, a balance card and a working account
+// screen to two accounts the customer had never asked for — an investment
+// account in particular, which nobody should be handed by default.
+//
+// Anything else is added by loadBankReference() from the rows that actually
+// exist in `accounts`.
+let heldAccountTypes = new Set([COMPULSORY_ACCOUNT_TYPE]);
 
 // Whether the user holds a card at all. Card Services is left out of the menu
 // entirely when they do not, rather than shown and then apologised for.
@@ -209,6 +282,19 @@ let kycStatus = null;
 // Nothing is gated until this is known: a slow read must never tell somebody
 // already verified that they are not.
 let openingTermsLoaded = false;
+
+// One account row, folded into what the shell knows about this customer: that
+// they hold this account, and what number it carries. Called from the initial
+// read below and again for every row Realtime delivers, so an account opened
+// mid-session behaves exactly like one that was already there.
+function noteAccountHeld(row) {
+  if (!row || !row.account_type) return;
+  heldAccountTypes.add(row.account_type);
+  if (row.account_number) {
+    accountNumbersByType[row.account_type] = String(row.account_number);
+  }
+  renderAccountNumberMasks();
+}
 
 async function loadBankReference() {
   if (!supabaseClient) return;
@@ -246,19 +332,12 @@ async function loadBankReference() {
     if (accountsRes.error) throw accountsRes.error;
     const rows = accountsRes.data;
 
-    (rows || []).forEach((row) => {
-      if (!row || !row.account_type) return;
-      // A row in this table is an account the customer holds, so it gets a
-      // number — the one the server issued if there is one, otherwise the one
-      // assigned to it below.
-      heldAccountTypes.add(row.account_type);
-      if (row.account_number) {
-        accountNumbersByType[row.account_type] = String(row.account_number);
-      }
-    });
+    // A row in this table is an account the customer holds, so it gets a
+    // number — the one the server issued if there is one, otherwise the one
+    // assigned to it below.
+    (rows || []).forEach(noteAccountHeld);
 
     hasOpenCreditCard = (rows || []).some((row) => row && row.product_type === 'credit_card' && row.status === 'open');
-    renderAccountNumberMasks();
 
     kycStatus = profileRes.data ? profileRes.data.kyc_status : null;
     openingTermsLoaded = true;
@@ -320,30 +399,59 @@ async function persistAssignedNumbers(rows) {
   }));
 }
 
-// Savings comes with whatever else is opened, so every flow that opens an
-// account calls this rather than each one remembering to. Upserted on
-// (user_id, account_type), so someone who already holds savings keeps the one
-// they have and its balance — this can be called as often as it likes.
-export async function openCompulsorySavings() {
-  if (!supabaseClient) return;
-  try {
-    const user = await getCurrentUser();
-    if (!user) return;
-    const { data: existing } = await supabaseClient
-      .from('accounts')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('account_type', COMPULSORY_ACCOUNT_TYPE)
-      .limit(1);
-    if (existing && existing.length) return;
+// ---------- Opening an account ----------
+// The one place a row is written to `accounts`, used by every screen that opens
+// one. Three flows each had their own copy of this, and all three were wrong in
+// the same way.
+//
+// They used upsert(). PostgreSQL implements that as INSERT ... ON CONFLICT DO
+// UPDATE, and a session needs UPDATE privilege on every column in the SET list
+// before it is allowed to run one — whether or not a conflict actually occurs.
+// A customer session has UPDATE on exactly one column of this table,
+// `account_number`, because the balance is the bank's number and not the
+// customer's. So every upsert here failed with "permission denied", and the
+// account the customer had just asked for was never opened. The button said it
+// had worked; nothing had.
+//
+// An INSERT needs no UPDATE privilege. The unique constraint on
+// (user_id, account_type) is what makes it safe to call twice: a second attempt
+// is refused by the database with 23505 rather than opening a duplicate
+// account, and that refusal means the account already exists — which is the
+// outcome the caller wanted.
+//
+// Two columns go out, and no more. Whose account it is and which product it is
+// are the only two things a customer decides; the balance, the status and the
+// ownership type are the bank's, and they take their column defaults — 0,
+// 'pending', 'individual'. That is not only tidiness: the insert grant in the
+// SQL setup allows a customer session to write those two columns and nothing
+// else, so a request carrying a balance is refused outright. Sending one from
+// here would mean the browser had an opinion about what a new account is worth.
+const DUPLICATE_ROW_CODE = '23505';
 
-    const { error } = await supabaseClient.from('accounts').upsert({
-      user_id: user.id,
-      account_type: COMPULSORY_ACCOUNT_TYPE,
-      balance: 0,
-      status: 'approved',
-    }, { onConflict: 'user_id,account_type' });
-    if (error) throw error;
+export async function openAccountRow(accountType) {
+  if (!supabaseClient) return false;
+  const user = await getCurrentUser();
+  if (!user) return false;
+
+  const { error } = await supabaseClient.from('accounts').insert({
+    user_id: user.id,
+    account_type: accountType,
+  });
+
+  // Already held. Nothing was changed, which is exactly right: the balance on
+  // an account somebody already has must not be reset by asking to open it.
+  if (error && error.code === DUPLICATE_ROW_CODE) return true;
+  if (error) throw error;
+  return true;
+}
+
+// Savings comes with whatever else is opened, so every flow that opens an
+// account calls this rather than each one remembering to. Safe to call as often
+// as it likes: someone who already holds savings keeps the one they have and
+// its balance.
+export async function openCompulsorySavings() {
+  try {
+    await openAccountRow(COMPULSORY_ACCOUNT_TYPE);
   } catch (err) {
     console.error('Compulsory savings error:', err);
   }
@@ -830,6 +938,7 @@ export async function loadPage(name, ...args) {
     getCardEligibility,
     applyTheme,
     isDarkTheme: () => htmlElement.classList.contains('dark'),
+    openAccountRow,
     openCompulsorySavings,
     // The ledger and the event log. Every flow that moves money calls
     // recordTransaction() so it lands in the account's activity list; anything
@@ -914,6 +1023,14 @@ function clearCachedUserData() {
       // automatic sign-out interval that reset itself every time it fired
       // would be a setting that never held.
       .filter((key) => key !== SETTINGS_KEY)
+      // The outbox of ledger rows that have not gone out yet. It is keyed by
+      // the account holder it belongs to, so only that person's own session can
+      // ever flush it — which makes it safe to keep, and losing it would mean
+      // losing a transfer somebody made on a train because they signed out
+      // before the tunnel ended. The local activity LOG is not kept: it is a
+      // display cache, and a device two people share should not hold one
+      // person's history after they have signed out.
+      .filter((key) => !key.startsWith(`${ACTIVITY_QUEUE_KEY_PREFIX}:`))
       .filter((key) => key.startsWith('verceil_') || (key.startsWith('sb-') && key.includes('auth-token')))
       .forEach((key) => localStorage.removeItem(key));
   } catch (err) {}
@@ -1220,6 +1337,15 @@ export async function getCardEligibility() {
 
 document.getElementById('offerCredit').addEventListener('click', () => loadPage('account-detail', 'credit'));
 
+// ---------- Opening an account ----------
+// Three ways in, one destination. The standalone row under the accounts, and
+// the two offers, all open the same screen — the offers simply arrive on it
+// with their product already chosen, which is the only difference between
+// tapping "Open" on the Investment Account offer and picking it off the list.
+document.getElementById('homeOpenAccount').addEventListener('click', () => loadPage('open-account'));
+document.getElementById('offerChecking').addEventListener('click', () => loadPage('open-account', { product: 'checking' }));
+document.getElementById('offerInvestments').addEventListener('click', () => loadPage('open-account', { product: 'investments' }));
+
 // ---------- Quick actions (from the old account summary) ----------
 document.getElementById('homeQuickTransfer').addEventListener('click', () => loadPage('transfer'));
 document.getElementById('homeQuickSendMoney').addEventListener('click', () => loadPage('send-money'));
@@ -1238,9 +1364,18 @@ const navMenus = {
   // one you already hold: it appears here as an account once it has been opened
   // through the offer on the home screen, which requires identity verification
   // first. Until then there is no account to look at.
+  //
+  // Checking and Investment Accounts are on this list only when the customer
+  // actually holds them — see NAV_ITEM_AVAILABILITY below. A row that opens an
+  // account screen for an account somebody does not have is the menu making the
+  // same claim the dashboard used to.
   navAccounts: {
     title: 'Accounts',
-    items: ['Account Summary', 'Checking', 'Savings', 'Credit Cards', 'Investment Accounts'],
+    items: ['Account Summary', 'Checking', 'Savings', 'Credit Cards', 'Investment Accounts', 'Joint Accounts'],
+    // Not one of the accounts, so not in the list of them. It is the action you
+    // take after reading the list and finding something missing, and it sits
+    // below the divider on its own for exactly that reason.
+    standaloneItems: ['Open an Account'],
   },
   navPayments: {
     title: 'Payments',
@@ -1248,7 +1383,7 @@ const navMenus = {
   },
   navInvest: {
     title: 'Invest',
-    items: ['Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
+    items: ['Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
   },
   navSupport: {
     title: 'Support',
@@ -1280,6 +1415,8 @@ const navMenuRoutes = {
   'Savings': () => loadPage('account-detail', 'savings'),
   'Credit Cards': () => loadPage('account-detail', 'credit'),
   'Investment Accounts': () => loadPage('account-detail', 'investments'),
+  'Joint Accounts': () => loadPage('joint-account'),
+  'Open an Account': () => loadPage('open-account'),
 
   // Payments
   'Transfer Between Accounts': () => loadPage('transfer'),
@@ -1439,6 +1576,51 @@ function renderNavMenuGroupRow(item) {
       `;
 }
 
+// Rows that only belong on a menu under some condition. A row that opens a
+// screen for something the customer does not have is left out entirely, rather
+// than rendered greyed out or opening a page whose only job is to apologise.
+//
+// This replaces a hard-coded check for Card Services on the Support menu. There
+// are now three of these and there will be more, so the rule lives beside the
+// menus it governs instead of inside the function that draws them.
+const NAV_ITEM_AVAILABILITY = {
+  'Card Services': () => hasOpenCreditCard,
+  'Checking': () => heldAccountTypes.has('checking'),
+  'Investment Accounts': () => heldAccountTypes.has('investments'),
+};
+
+function isNavItemAvailable(item) {
+  const rule = NAV_ITEM_AVAILABILITY[item];
+  return rule ? rule() : true;
+}
+
+// The row that sits below the divider at the foot of a menu. Two tones: an
+// action, which is what Open an Account is, and a destructive one, which is
+// what Sign Out is. They were the same red before there was anything but Sign
+// Out down there.
+function renderNavMenuStandaloneRow(item) {
+  const destructive = item === 'Sign Out';
+  const tone = destructive
+    ? 'text-[#DC2626] hover:bg-red-50 dark:hover:bg-white/5'
+    : 'text-[#2563EB] dark:text-[#3B82F6] hover:bg-blue-50 dark:hover:bg-white/5';
+  const chevron = destructive ? '' : `
+      <svg class="w-[16px] h-[16px] opacity-70 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+  return `
+          <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] transition-all cursor-pointer text-left ${tone}">
+            <span class="text-[15px] font-semibold">${item}</span>${chevron}
+          </button>
+        `;
+}
+
+function renderNavMenuStandaloneBlock(items) {
+  if (!items || !items.length) return '';
+  return `
+      <div class="border-t border-gray-100 dark:border-white/[0.06] mt-[8px] pt-[8px]">
+        ${items.map(renderNavMenuStandaloneRow).join('')}
+      </div>
+    `;
+}
+
 function openNavMenu(key) {
   const menu = navMenus[key];
   if (!menu) return;
@@ -1448,29 +1630,15 @@ function openNavMenu(key) {
   if (menu.groups) {
     navMenuList.innerHTML = menu.groups.map(group => `
       <div class="px-[12px] pt-[16px] pb-[4px] text-[12px] font-bold uppercase tracking-[0.8px] text-[#6B7280] dark:text-[#8E9CBA]">${group.category}</div>
-      ${group.items.map(item => renderNavMenuGroupRow(item)).join('')}
-    `).join('') + (menu.standaloneItems ? `
-      <div class="border-t border-gray-100 dark:border-white/[0.06] mt-[8px] pt-[8px]">
-        ${menu.standaloneItems.map(item => `
-          <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] hover:bg-red-50 dark:hover:bg-white/5 transition-all cursor-pointer text-left">
-            <span class="text-[15px] font-semibold text-[#DC2626]">${item}</span>
-          </button>
-        `).join('')}
-      </div>
-    ` : '');
+      ${group.items.filter(isNavItemAvailable).map(item => renderNavMenuGroupRow(item)).join('')}
+    `).join('') + renderNavMenuStandaloneBlock(menu.standaloneItems);
   } else {
-    // Card Services is only a destination for someone who holds a card. With
-    // no card the row is left out rather than rendered disabled or opening a
-    // page whose only job is to say you have nothing here.
-    const items = key === 'navSupport' && !hasOpenCreditCard
-      ? menu.items.filter((item) => item !== 'Card Services')
-      : menu.items;
-    navMenuList.innerHTML = items.map(item => `
+    navMenuList.innerHTML = menu.items.filter(isNavItemAvailable).map(item => `
       <button class="nav-menu-item w-full flex items-center justify-between px-[12px] py-[14px] rounded-[14px] hover:bg-gray-50 dark:hover:bg-white/5 transition-all cursor-pointer text-left">
         <span class="text-[15px] font-medium text-[#111827] dark:text-[#FFFFFF]">${item}</span>
         <svg class="w-[16px] h-[16px] text-gray-400 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
-    `).join('');
+    `).join('') + renderNavMenuStandaloneBlock(menu.standaloneItems);
   }
 
   navMenuList.querySelectorAll('.nav-menu-item').forEach(btn => {
@@ -1527,7 +1695,10 @@ async function initSupabaseData() {
   if (hours < 12) timeOfDay = 'Good Morning';
   else if (hours >= 17) timeOfDay = 'Good Evening';
 
-  let userName = 'Mercy';
+  // Nobody's name until the session says whose it is. It used to default to
+  // "Mercy", which greeted every customer by a stranger's name for as long as
+  // the first request took.
+  let userName = '';
 
   // Every account we know about, keyed by its row id. Totals are derived from
   // this map rather than accumulated as rows arrive, so re-applying the same
@@ -1645,10 +1816,35 @@ async function initSupabaseData() {
       if (nameEl) nameEl.textContent = both ? 'Retirement Accounts' : RETIREMENT_LABELS[retirementAccount.account_type];
     }
 
-    const hasInterestChecking = !!firstMatch(acc => acc.account_type === 'interest_checking');
+    // Every product on this screen follows the same rule, and it is the rule
+    // this whole section exists to enforce: a card appears when the customer
+    // holds the account, the offer to open it appears when they do not, and
+    // never both. Checking and Investments were the two exceptions — drawn from
+    // the markup, always visible, whether or not the account existed — and an
+    // investment account nobody chose is not a card with a zero on it, it is
+    // the bank having opened something on somebody's behalf.
+    //
+    // Nothing is decided until the accounts request has actually landed.
+    // Hiding a real account for the second a slow network takes would be the
+    // same lie told the other way round.
+    const has = (type) => !!firstMatch(acc => acc.account_type === type);
     const card = firstMatch(isActiveCard);
-    toggleSection('sectionInterestChecking', 'promoBanner', hasInterestChecking);
-    toggleSection('sectionCredit', 'offerCredit', !!card);
+
+    if (balancesReady) {
+      toggleSection('sectionChecking', 'offerChecking', has('checking'));
+      toggleSection('sectionInvestments', 'offerInvestments', has('investments'));
+      toggleSection('sectionInterestChecking', 'promoBanner', has('interest_checking'));
+      toggleSection('sectionCredit', 'offerCredit', !!card);
+
+      // The hero's two conditional figures. Deposits and the total are always
+      // shown — every customer holds a savings account, so both always mean
+      // something — but a line for investments or a card is only a summary of
+      // something that exists.
+      const investmentsStat = document.getElementById('homeInvestmentsStat');
+      const cardStat = document.getElementById('homeCardStat');
+      if (investmentsStat) investmentsStat.classList.toggle('hidden', !has('investments'));
+      if (cardStat) cardStat.classList.toggle('hidden', !card);
+    }
 
     if (card) {
       const sublabel = document.getElementById('creditSublabel');
@@ -1677,6 +1873,11 @@ async function initSupabaseData() {
   function applyAccountRow(acc) {
     if (!acc || !acc.account_type) return;
     accountsById.set(acc.id != null ? `id:${acc.id}` : `type:${acc.account_type}`, acc);
+    // An account arriving over Realtime — one just opened on this device, or on
+    // another one — is an account that holds a number from this moment on. The
+    // set is what getAccountNumber() consults, so without this the card would
+    // appear with its four digits missing until the next reload.
+    noteAccountHeld(acc);
     renderTotals();
   }
 
@@ -1706,11 +1907,7 @@ async function initSupabaseData() {
     try {
       const user = await getCurrentUser();
       if (user) {
-        if (user.user_metadata && user.user_metadata.first_name) {
-          userName = user.user_metadata.first_name;
-        } else if (user.email) {
-          userName = user.email.split('@')[0];
-        }
+        userName = greetingNameFor(user);
 
         const { data: accountsData, error: accountsError } = await supabaseClient
           .from('accounts')
@@ -1750,8 +1947,12 @@ async function initSupabaseData() {
   renderTotals();
   refreshOffersLabel();
 
-  greetingLine1.textContent = `${timeOfDay},`;
+  // Two lines, the way it has always been — the time of day, then the name.
+  // With no name to print, the comma goes with it and the greeting stands on
+  // its own line rather than trailing a punctuation mark into a blank space.
+  greetingLine1.textContent = userName ? `${timeOfDay},` : timeOfDay;
   greetingLine2.textContent = userName;
+  greetingLine2.classList.toggle('hidden', !userName);
 }
 
 // The account cards carry their numbers from the first paint. loadBankReference()

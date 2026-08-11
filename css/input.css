@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===================== HIDDEN MEANS HIDDEN =====================
+   Every custom rule in this file is emitted AFTER `@tailwind utilities`, and
+   `.hidden` is a utility. Both are one class selector, so at equal specificity
+   the later rule wins — which means any component here that sets `display`
+   silently outranks `.hidden`, and an element the JS has hidden stays on
+   screen.
+
+   That is not hypothetical. `.home-promo` sets `display: flex`, so the four
+   offers on the dashboard — Verceil Checking, the Investment Account, Interest
+   Checking, the Signature Card — could not be hidden at all: an account holder
+   went on being sold the account they already had, with a Get Started button
+   under it. Three places in this file had already worked around it one
+   component at a time, with `:not(.hidden)` guards and a `.x.hidden` patch.
+
+   This settles it once, for every component in the app and every one added
+   later. It is the same thing Tailwind's own `important: true` option does,
+   scoped to the one utility whose whole job is to win.
+
+   Anything that needs to override it says so explicitly with its own
+   `!important` — nothing does today, and nothing should. */
+.hidden { display: none !important; }
+
 /* Anything you previously had in a <style> block in the old single file goes here. */
 *, *::before, *::after {
   transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
@@ -83,10 +105,11 @@ html.dark body {
    utility classes already used across the app; these cover the file
    upload slots and the in-button spinner, which had no equivalent.
 
-   The `:not(.hidden)` guards matter: these rules are appended after
-   `@tailwind utilities`, so a bare `display` here would outrank
-   Tailwind's `.hidden` at equal specificity and the slot would stay
-   visible when the JS hides it. */
+   The `:not(.hidden)` guards on the display rules below are belt and braces
+   now — the `.hidden { display: none !important }` rule at the top of this
+   file covers the same ground for every component — but they are correct and
+   they are also what makes each of these rules readable on its own, so they
+   stay. */
 .kyc-slot {
   position: relative;
   background: #ffffff;
@@ -1240,6 +1263,70 @@ html.dark body {
 }
 
 .home-acct:active { transform: scale(0.985); }
+
+/* ---- open an account ----
+   The one row on this screen that is not an account and not an offer. It is
+   deliberately quieter than both: a dashed outline on the same surface as the
+   cards above it, so it reads as the empty slot at the end of the list rather
+   than as another product being sold. Same radius, same width, same tap
+   feedback — it belongs to the stack it sits under. */
+.home-open {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: transparent;
+  border: 1.5px dashed rgba(255, 255, 255, 0.32);
+  border-radius: 20px;
+  padding: 15px 18px;
+  margin-top: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.dark .home-open { border-color: rgba(255, 255, 255, 0.14); }
+
+.home-open:active { transform: scale(0.985); }
+
+.home-open-ic {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  color: #FFFFFF;
+}
+
+.dark .home-open-ic { background: rgba(255, 255, 255, 0.08); color: #8E9CBA; }
+
+.home-open-ic svg { width: 19px; height: 19px; }
+
+.home-open-t { flex: 1; min-width: 0; }
+
+.home-open-n {
+  display: block;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.home-open-s {
+  display: block;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.dark .home-open-s { color: #8E9CBA; }
+
+.home-open .home-chev { stroke: rgba(255, 255, 255, 0.6); }
+
+.dark .home-open .home-chev { stroke: #52607D; }
 
 .home-arow {
   display: flex;
@@ -2427,10 +2514,6 @@ html.dark body .vb-modal-btn-quiet:hover { background: rgba(255, 255, 255, 0.05)
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
 }
-
-/* Tailwind's `hidden` is a utility, and this file is appended after
-   @tailwind utilities — so the flex above would otherwise win over it. */
-.vb-idle-backdrop.hidden { display: none; }
 
 .vb-idle-card {
   width: 100%;

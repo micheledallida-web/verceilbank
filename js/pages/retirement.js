@@ -158,18 +158,10 @@ export function init(root, ctx) {
     const openingBalance = 0;
 
     try {
-      if (supabaseClient) {
-        const user = await getCurrentUser();
-        if (user) {
-          const { error } = await supabaseClient.from('accounts').upsert({
-            user_id: user.id,
-            account_type: product.key,
-            balance: openingBalance,
-            status: 'approved',
-          }, { onConflict: 'user_id,account_type' });
-          if (error) throw error;
-        }
-      }
+      // Through the shared opener, which is the only thing in the app that
+      // writes to `accounts` — see openAccountRow() in js/main.js for why an
+      // upsert here silently opened nothing.
+      await ctx.openAccountRow(product.key);
     } catch (err) {
       console.error('Open IRA error:', err);
       openBtn.disabled = false;
@@ -194,7 +186,7 @@ export function init(root, ctx) {
   on(root.querySelector('#retDoneBtn'), 'click', close);
 
   on(root.querySelector('#retRolloverBtn'), 'click', () => openSupportMessage({
-    category: 'Investments',
+    category: 'investments',
     subject: 'Roll over a 401(k) into an IRA',
     body: 'I would like to roll a workplace retirement plan from a previous employer into a Verceil IRA. Please tell me what you need from me to start the transfer.',
   }));

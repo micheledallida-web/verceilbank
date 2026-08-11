@@ -57,12 +57,7 @@ export function init(root, ctx) {
       if (supabaseClient) {
         const user = await getCurrentUser();
         if (user) {
-          await supabaseClient.from('accounts').upsert({
-            user_id: user.id,
-            account_type: 'interest_checking',
-            balance: initialBalance,
-            status: 'approved',
-          }, { onConflict: 'user_id,account_type' });
+          await ctx.openAccountRow('interest_checking');
           // Savings is opened with every account, not offered beside it.
           // Whoever already holds one keeps the one they have.
           await openCompulsorySavings();
@@ -71,6 +66,10 @@ export function init(root, ctx) {
       }
     } catch (err) {
       console.error('Open Interest Checking error:', err);
+      openAccountBtn.disabled = false;
+      openAccountBtn.textContent = 'Open Interest Checking';
+      showModal('Could Not Open Account', 'Something went wrong opening your account. Please try again, or contact support if it keeps happening.');
+      return;
     }
 
     root.querySelector('#icConfirmationNumber').textContent = confirmationNumber;

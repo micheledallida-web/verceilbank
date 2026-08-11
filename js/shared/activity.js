@@ -18,8 +18,30 @@
 // load or the next time the device comes back online. Nothing a customer does
 // is lost because a tunnel swallowed one request.
 
+// The outbox before anybody has signed in. Sign-up and sign-in both write here
+// — they have events worth keeping and no user id to put on them yet — and
+// whoever signs in next adopts what is in it.
 const QUEUE_KEY = 'verceil_activity_queue';
 const LOG_KEY = 'verceil_activity_log';
+
+// Exported so sign-out knows which keys are the durable outbox and leaves them
+// alone. Everything else of ours is cleared.
+export const ACTIVITY_QUEUE_KEY_PREFIX = QUEUE_KEY;
+
+// Once the account holder is known, the outbox and the log move to keys of
+// their own. This is not tidiness: one shared queue on a device where two
+// people bank — or where somebody signs up for a second account — mixes their
+// rows together, and every one of those rows is rejected by row-level security
+// when it goes out under the wrong session. A rejected row stays queued, the
+// batch it is in keeps failing, and NOTHING that customer does is ever written
+// again. Balances move off ledger rows, so the visible symptom is an account
+// that has quietly stopped working.
+//
+// A key per account holder is what makes that impossible: your queue is only
+// ever flushed by your own session.
+function scopedKey(base, id) {
+  return id ? `${base}:${id}` : base;
+}
 
 // The queue is a durable outbox and the log is a local mirror for reading. Both
 // are capped: a device that has been offline for a week should not fill its
@@ -30,6 +52,14 @@ const MAX_LOG = 100;
 let supabase = null;
 let userId = '';
 let flushing = false;
+
+function queueKey() {
+  return scopedKey(QUEUE_KEY, userId);
+}
+
+function logKey() {
+  return scopedKey(LOG_KEY, userId);
+}
 
 function readStore(key) {
   try {
@@ -60,9 +90,10 @@ function newLocalId() {
 }
 
 function enqueue(table, row) {
-  const queue = readStore(QUEUE_KEY);
+  const key = queueKey();
+  const queue = readStore(key);
   queue.push({ table, row, queued_at: new Date().toISOString() });
-  writeStore(QUEUE_KEY, queue, MAX_QUEUE);
+  writeStore(key, queue, MAX_QUEUE);
 }
 
 // ---------- Public API ----------
@@ -72,7 +103,47 @@ function enqueue(table, row) {
 export function initActivity({ supabaseClient, currentUserId }) {
   supabase = supabaseClient || null;
   userId = currentUserId || '';
+  adoptPreSignInRows();
   flushQueue();
+}
+
+// What sign-up and sign-in left in the shared outbox. Those rows were written
+// before anybody was identified, so they belong to whoever has just signed in —
+// with two exceptions, both of which are dropped rather than sent:
+//
+//   • a row already stamped with a DIFFERENT user id. It is the previous
+//     account holder's, this session cannot write it, and trying forever is
+//     what took the ledger down. It is theirs to flush when they sign in.
+//   • a row older than a day. Nobody is owed an audit trail from a sign-in
+//     attempt made last week, and adopting one attributes it to the wrong
+//     person.
+const ADOPTION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function adoptPreSignInRows() {
+  if (!userId) return;
+  const shared = readStore(QUEUE_KEY);
+  if (!shared.length) return;
+
+  const cutoff = Date.now() - ADOPTION_MAX_AGE_MS;
+  const mine = shared.filter((item) => {
+    const owner = item && item.row && item.row.user_id;
+    if (owner && owner !== userId) return false;
+    const queuedAt = Date.parse((item && item.queued_at) || '');
+    return !Number.isFinite(queuedAt) || queuedAt >= cutoff;
+  });
+
+  // The shared outbox is emptied either way. Anything left in it is another
+  // account's or too old to attribute, and both are rows this device should
+  // stop carrying.
+  writeStore(QUEUE_KEY, [], MAX_QUEUE);
+  if (!mine.length) return;
+
+  const key = queueKey();
+  const own = readStore(key);
+  writeStore(key, own.concat(mine.map((item) => ({
+    ...item,
+    row: { ...item.row, user_id: userId },
+  }))), MAX_QUEUE);
 }
 
 /**
@@ -93,9 +164,10 @@ export function recordEvent(type, detail = {}) {
     occurred_at: new Date().toISOString(),
   };
 
-  const log = readStore(LOG_KEY);
+  const key = logKey();
+  const log = readStore(key);
   log.push(row);
-  writeStore(LOG_KEY, log, MAX_LOG);
+  writeStore(key, log, MAX_LOG);
 
   enqueue('activity_events', row);
   flushQueue();
@@ -153,7 +225,33 @@ export function recordTransaction({
 // What this device has seen, newest first. Used by any screen that wants to
 // show recent activity without waiting on the network.
 export function readLocalActivity(limit = 20) {
-  return readStore(LOG_KEY).slice(-limit).reverse();
+  return readStore(logKey()).slice(-limit).reverse();
+}
+
+// A failure this row will never recover from, however many times it is tried.
+// Row-level security refusing it, a check constraint, a column that does not
+// exist: none of those become true later, so the row is dropped instead of
+// being carried forever.
+//
+// Everything else — a timeout, a dropped socket, a 5xx — is left alone. That is
+// what the queue is for.
+const PERMANENT_ERROR_CODES = [
+  '42501', // insufficient privilege
+  '42703', // undefined column
+  '42P01', // undefined table
+  '23502', // not-null violation
+  '23503', // foreign key violation
+  '23514', // check violation
+  '22P02', // invalid text representation
+  'PGRST204', // column not found in schema cache
+];
+
+function isPermanent(err) {
+  if (!err) return false;
+  if (PERMANENT_ERROR_CODES.includes(err.code)) return true;
+  // PostgREST reports an RLS refusal as a 403 with a message rather than a
+  // Postgres SQLSTATE, so the message is read as well.
+  return /row-level security|violates row-level/i.test(err.message || '');
 }
 
 /**
@@ -165,11 +263,40 @@ export function readLocalActivity(limit = 20) {
  */
 export async function flushQueue() {
   if (flushing || !supabase || !userId) return;
-  const batch = readStore(QUEUE_KEY);
+  const key = queueKey();
+  const batch = readStore(key);
   if (!batch.length) return;
 
   flushing = true;
+  // Rows that went out, and rows that never will. Both leave the queue; only
+  // the first kind counts as progress.
   const sentIds = [];
+  const droppedIds = [];
+
+  // One row at a time, and only after its batch has already failed. A single
+  // bad row used to take its whole table's batch down with it and then sit
+  // there failing it again on every load — so the batch is retried row by row
+  // to find out which one it is, rather than punishing the other twenty-nine.
+  async function sendIndividually(table, items) {
+    for (const item of items) {
+      const row = { ...item.row, user_id: item.row.user_id || userId };
+      try {
+        const { error } = await supabase.from(table).upsert([row], {
+          onConflict: 'local_id',
+          ignoreDuplicates: true,
+        });
+        if (error) throw error;
+        sentIds.push(item.row.local_id);
+      } catch (err) {
+        if (isPermanent(err)) {
+          console.error(`Activity row dropped (${table}), it can never be written:`, err);
+          droppedIds.push(item.row.local_id);
+        } else {
+          console.error(`Activity flush error (${table}):`, err);
+        }
+      }
+    }
+  }
 
   try {
     // Grouped by table so a queue of thirty rows is two requests, not thirty.
@@ -191,8 +318,8 @@ export async function flushQueue() {
         if (error) throw error;
         sentIds.push(...items.map((item) => item.row.local_id));
       } catch (err) {
-        // Left in the queue, and tried again on the next flush.
         console.error(`Activity flush error (${table}):`, err);
+        await sendIndividually(table, items);
       }
     }
   } finally {
@@ -201,10 +328,10 @@ export async function flushQueue() {
     // tick after the debit — is in the queue by now, and writing back the
     // batch we started with would erase it. Only what actually went out is
     // removed, matched on the client-side id.
-    const sent = new Set(sentIds);
-    const current = readStore(QUEUE_KEY);
-    const kept = current.filter((item) => !sent.has(item.row.local_id));
-    writeStore(QUEUE_KEY, kept, MAX_QUEUE);
+    const settled = new Set(sentIds.concat(droppedIds));
+    const current = readStore(key);
+    const kept = current.filter((item) => !settled.has(item.row.local_id));
+    writeStore(key, kept, MAX_QUEUE);
     flushing = false;
 
     // Something arrived mid-flight and is still waiting. Only chased when this
