@@ -492,9 +492,16 @@ requestAnimationFrame(() => {
 // Data Settings, the record itself on Profile. Nothing is repeated here.
 export const SETTINGS_KEY = 'verceil_settings';
 
+// Minutes of inactivity before this device signs itself out, and the only
+// values it may hold. There is no "off": a banking session that never expires
+// is the one setting a customer cannot safely be given, and no bank offers it.
+// Anything else stored — an older build's 0, a hand-edited value — is read back
+// as the default rather than honoured.
+export const AUTO_SIGN_OUT_CHOICES = [5, 10, 15, 30];
+const DEFAULT_AUTO_SIGN_OUT = 10;
+
 const DEFAULT_SETTINGS = {
-  // Minutes of inactivity before this device signs itself out. 0 is off.
-  autoSignOutMinutes: 15,
+  autoSignOutMinutes: DEFAULT_AUTO_SIGN_OUT,
   // Blurs every balance on screen, for reading the app somewhere public.
   hideBalances: false,
 };
@@ -502,7 +509,17 @@ const DEFAULT_SETTINGS = {
 export function readSettings() {
   try {
     const raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
-    return { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+    const merged = { ...DEFAULT_SETTINGS, ...(raw && typeof raw === 'object' ? raw : {}) };
+    if (!AUTO_SIGN_OUT_CHOICES.includes(Number(merged.autoSignOutMinutes))) {
+      merged.autoSignOutMinutes = DEFAULT_AUTO_SIGN_OUT;
+      // Written back rather than only corrected in memory, so what is stored
+      // never disagrees with what the app is doing. Only ever runs once, on
+      // the first read after an out-of-range value was found.
+      if (raw && raw.autoSignOutMinutes !== undefined) {
+        try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged)); } catch (err) {}
+      }
+    }
+    return merged;
   } catch (err) {
     return { ...DEFAULT_SETTINGS };
   }
@@ -525,23 +542,177 @@ export function applySettings(settings = readSettings()) {
 
 // ---------- Automatic sign-out ----------
 // A banking session left open on a shared laptop is the plainest security
-// problem there is. The timer restarts on any sign of a person — a tap, a key,
-// a scroll — so it only ever fires on a session nobody is using.
-const IDLE_EVENTS = ['pointerdown', 'keydown', 'scroll', 'touchstart', 'visibilitychange'];
-let idleTimerId = null;
+// problem there is. This works the way Chase's does, and the shape of it
+// matters more than the number of minutes:
+//
+//   • Inactivity is measured against a timestamp, not a setTimeout. A laptop
+//     that slept for an hour, or a phone that froze the tab in the background,
+//     comes back to a timer that never fired — so the check compares
+//     `Date.now()` on every tick and on every return to the tab instead.
+//   • Nobody is signed out without being asked first. A minute or two before
+//     the deadline the session warns, counts down out loud, and waits. Losing
+//     a half-typed transfer to a silent redirect is the thing people actually
+//     complain about.
+//   • Once the warning is up, only a deliberate click clears it. Mouse
+//     movement is not consent, and a cat on a keyboard should not be able to
+//     hold a bank session open indefinitely.
+//   • The clock is shared across tabs. Reading a statement in one tab keeps
+//     every other tab alive, and a reload cannot be used to reset it.
+const IDLE_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'wheel'];
+// The shared clock. Deliberately a `verceil_` key so signing out clears it —
+// otherwise a stale timestamp would sign the next person out on arrival.
+const ACTIVITY_KEY = 'verceil_last_activity';
+const IDLE_TICK_MS = 1000;
+// How much warning. Chase gives you the last stretch of the window rather than
+// a fixed slice of it; a two-minute warning on a five-minute timeout would
+// spend most of the session warning, so short timeouts get one minute.
+function warningSecondsFor(minutes) {
+  return minutes <= 5 ? 60 : 120;
+}
+
 let idleMinutes = 0;
+let idleTickId = null;
+let lastActivityAt = Date.now();
+let lastBroadcastAt = 0;
+let idleWarningOpen = false;
+let idleSigningOut = false;
+let idleClockPrimed = false;
+
+const idleModal = document.getElementById('idleModal');
+const idleCountdown = document.getElementById('idleCountdown');
+const idleStayBtn = document.getElementById('idleStayBtn');
+const idleSignOutBtn = document.getElementById('idleSignOutBtn');
+
+function readSharedActivity() {
+  try {
+    const stored = Number(localStorage.getItem(ACTIVITY_KEY));
+    return Number.isFinite(stored) && stored > 0 ? stored : 0;
+  } catch (err) {
+    return 0;
+  }
+}
+
+// Written at most once every few seconds. Every pointermove writing to
+// localStorage would be a storage write per frame of a mouse drag.
+function markActivity(force) {
+  lastActivityAt = Date.now();
+  if (force || lastActivityAt - lastBroadcastAt > 5000) {
+    lastBroadcastAt = lastActivityAt;
+    try { localStorage.setItem(ACTIVITY_KEY, String(lastActivityAt)); } catch (err) {}
+  }
+}
+
+function formatCountdown(seconds) {
+  const safe = Math.max(0, Math.ceil(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function openIdleWarning() {
+  if (idleWarningOpen || !idleModal) return;
+  idleWarningOpen = true;
+  idleModal.classList.remove('hidden');
+  // Focus lands on the safe choice, so a keyboard user pressing Enter stays
+  // signed in rather than signing themselves out.
+  if (idleStayBtn) idleStayBtn.focus();
+  recordEvent('session.idle_warned', { after_minutes: idleMinutes });
+}
+
+function closeIdleWarning() {
+  idleWarningOpen = false;
+  if (idleModal) idleModal.classList.add('hidden');
+}
+
+// The only thing that clears the warning short of signing out.
+function staySignedIn() {
+  if (!idleWarningOpen) return;
+  closeIdleWarning();
+  markActivity(true);
+  recordEvent('session.extended', { minutes: idleMinutes });
+  // The countdown is only the browser's half of it. Supabase's access token
+  // has been sitting untouched for the whole idle window, so renew it now —
+  // otherwise "Stay signed in" keeps the screen and loses the session.
+  if (supabaseClient) {
+    supabaseClient.auth.getSession().catch((err) => console.error('Session refresh failed:', err));
+  }
+}
+
+function expireSession() {
+  if (idleSigningOut) return;
+  idleSigningOut = true;
+  if (idleTickId) { clearInterval(idleTickId); idleTickId = null; }
+  closeIdleWarning();
+  handleSignOut(`You were signed out after ${idleMinutes} minutes of inactivity.`);
+}
+
+function idleTick() {
+  if (idleMinutes <= 0 || idleSigningOut) return;
+
+  // Another tab may have been used since the last tick.
+  const shared = readSharedActivity();
+  if (shared > lastActivityAt) {
+    lastActivityAt = shared;
+    // Somebody is using this account right now, just not here.
+    if (idleWarningOpen) closeIdleWarning();
+  }
+
+  const remaining = idleMinutes * 60000 - (Date.now() - lastActivityAt);
+  if (remaining <= 0) return expireSession();
+
+  if (remaining <= warningSecondsFor(idleMinutes) * 1000) {
+    openIdleWarning();
+    if (idleCountdown) idleCountdown.textContent = formatCountdown(remaining / 1000);
+  } else if (idleWarningOpen) {
+    closeIdleWarning();
+  }
+}
 
 function restartIdleTimer(minutes) {
   idleMinutes = Number(minutes) || 0;
-  if (idleTimerId) { clearTimeout(idleTimerId); idleTimerId = null; }
-  if (idleMinutes <= 0) return;
-  idleTimerId = setTimeout(() => {
-    handleSignOut(`You were signed out after ${idleMinutes} minutes of inactivity.`);
-  }, idleMinutes * 60000);
+  if (idleTickId) { clearInterval(idleTickId); idleTickId = null; }
+  if (idleMinutes <= 0) { closeIdleWarning(); return; }
+
+  // On the first run only, inherit the shared clock rather than starting
+  // fresh: a session that went idle and was then reloaded is still an idle
+  // session, and a refresh must not be a way around the timeout. Nothing
+  // stored means this is a new sign-in, which starts the clock now.
+  //
+  // Later runs — the customer changing the interval on Settings — keep the
+  // clock this tab already has, since they are plainly at the keyboard.
+  if (!idleClockPrimed) {
+    idleClockPrimed = true;
+    const shared = readSharedActivity();
+    if (shared > 0) lastActivityAt = shared;
+    else markActivity(true);
+  }
+
+  idleTickId = setInterval(idleTick, IDLE_TICK_MS);
+  idleTick();
 }
 
 IDLE_EVENTS.forEach((evt) => {
-  window.addEventListener(evt, () => { if (idleMinutes > 0) restartIdleTimer(idleMinutes); }, { passive: true });
+  window.addEventListener(evt, () => {
+    // While the warning is up, activity is not an answer. Chase makes you say
+    // it, and so does this.
+    if (idleMinutes <= 0 || idleWarningOpen) return;
+    markActivity();
+  }, { passive: true });
+});
+
+// Coming back to a backgrounded tab is the case a setTimeout gets wrong, so
+// the check runs immediately rather than waiting for the next tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) idleTick();
+});
+
+if (idleStayBtn) idleStayBtn.addEventListener('click', staySignedIn);
+if (idleSignOutBtn) idleSignOutBtn.addEventListener('click', () => {
+  closeIdleWarning();
+  handleSignOut();
+});
+// Escape is the one keyboard shortcut people expect to close a dialog. It
+// means "I'm here", not "sign me out".
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && idleWarningOpen) staySignedIn();
 });
 
 // ---------- Shared modal (every page module can call this) ----------
