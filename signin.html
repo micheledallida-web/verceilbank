@@ -589,6 +589,9 @@
 
   <!-- Generated at build time by scripts/generate-config.js; sets window.SUPABASE_URL / window.SUPABASE_ANON_KEY -->
   <script src="js/config.js"></script>
+  <!-- Reads a Supabase auth failure and says what it actually was. Must come
+       after config.js, since its diagnostic probe uses those two values. -->
+  <script src="js/auth-errors.js"></script>
   <script>
     // Populated by js/config.js (generated at build time from SUPABASE_URL /
     // SUPABASE_ANON_KEY env vars -- see scripts/generate-config.js).
@@ -676,7 +679,8 @@
       const redirectTo = new URL('reset-password.html', window.location.href).href;
 
       try {
-        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+        const { error } = await VerceilAuth.withTimeout(
+          supabaseClient.auth.resetPasswordForEmail(email, { redirectTo }), 'Sending the reset link');
         // A rate limit is worth saying out loud, because "check your inbox" to
         // somebody who will not receive anything for a minute is a lie.
         if (error && /rate|limit|seconds/i.test(error.message || '')) {
@@ -691,8 +695,11 @@
           return;
         }
       } catch (err) {
-        console.error('Password reset error:', err);
-        setResetMessage('We could not send the link just now. Please try again.', 'error');
+        // Same reasoning as the sign-in handler: an unreachable project and a
+        // rejected key are ours to notice, not the customer's to guess at.
+        const { kind, message } = VerceilAuth.describe(err, 'reset');
+        if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
+        setResetMessage(message, 'error');
       }
 
       resetSendBtn.disabled = false;
@@ -731,8 +738,9 @@
       successBanner.style.display = 'none';
 
       if (!supabaseClient) {
-        errorBanner.textContent = 'Network configuration error: Supabase failed to initialize.';
+        errorBanner.textContent = VerceilAuth.clientUnavailableMessage();
         errorBanner.style.display = 'block';
+        VerceilAuth.probe();
         return;
       }
 
@@ -743,10 +751,10 @@
       const password = document.getElementById('password').value;
 
       try {
-        const { data, error } = await supabaseClient.auth.signInWithPassword({
+        const { error } = await VerceilAuth.withTimeout(supabaseClient.auth.signInWithPassword({
           email: email,
           password: password,
-        });
+        }), 'Signing in');
 
         if (error) throw error;
 
@@ -759,8 +767,17 @@
         }, 800);
 
       } catch (err) {
-        queueEvent('signin.failed', { reason: 'invalid_credentials' });
-        errorBanner.textContent = 'Invalid login credentials.';
+        // This is where the damage was. Every failure — an unreachable
+        // project, a rejected API key, an unconfirmed email address, a
+        // rate limit — was reported as "Invalid login credentials.", so a
+        // customer whose details were perfectly correct was told they were
+        // wrong, and an operator whose project was down was told the same.
+        // Each one is now named for what it is.
+        const { kind, message } = VerceilAuth.describe(err, 'signin');
+        queueEvent('signin.failed', { reason: kind });
+        if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
+
+        errorBanner.textContent = message;
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Sign in';
         submitBtn.disabled = false;

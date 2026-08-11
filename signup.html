@@ -610,6 +610,9 @@
 
   <!-- Generated at build time by scripts/generate-config.js; sets window.SUPABASE_URL / window.SUPABASE_ANON_KEY -->
   <script src="js/config.js"></script>
+  <!-- Reads a Supabase auth failure and says what it actually was. Must come
+       after config.js, since its diagnostic probe uses those two values. -->
+  <script src="js/auth-errors.js"></script>
   <script>
     // Populated by js/config.js (generated at build time from SUPABASE_URL /
     // SUPABASE_ANON_KEY env vars -- see scripts/generate-config.js).
@@ -796,8 +799,9 @@
       successBanner.style.display = 'none';
 
       if (!supabaseClient) {
-        errorBanner.textContent = 'Network configuration error: Supabase failed to initialize.';
+        errorBanner.textContent = VerceilAuth.clientUnavailableMessage();
         errorBanner.style.display = 'block';
+        VerceilAuth.probe();
         return;
       }
 
@@ -840,7 +844,7 @@
       }
 
       try {
-        const { data, error } = await supabaseClient.auth.signUp({
+        const { data, error } = await VerceilAuth.withTimeout(supabaseClient.auth.signUp({
           email: email,
           password: password,
           options: {
@@ -874,22 +878,42 @@
               requested_account_types: [selectedProduct, 'savings']
             }
           }
-        });
+        }), 'Creating your account');
 
         if (error) throw error;
 
-        if (!data.session) {
-          const loginRes = await supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-          });
-          if (loginRes.error) throw loginRes.error;
+        // Supabase answers an address that already has an account with a
+        // perfectly ordinary-looking user and an EMPTY identities array,
+        // rather than an error — deliberately, so a stranger cannot use this
+        // form to discover who banks here. It is not an error, so it has to be
+        // read here or the applicant is left staring at a form that did
+        // nothing. The old code missed it entirely.
+        const identities = data && data.user && data.user.identities;
+        if (Array.isArray(identities) && identities.length === 0) {
+          queueEvent('signup.rejected', { reason: 'already_registered' });
+          return fail('An account already exists for that email address. Sign in instead, or use "Forgot password" if you cannot get in.');
         }
 
         queueEvent('signup.completed', {
           requested_account_type: selectedProduct,
           requested_account_types: [selectedProduct, 'savings'],
+          confirmation_required: !(data && data.session),
         });
+
+        // No session means the project requires the email address to be
+        // confirmed first. The old code responded by immediately trying to
+        // sign in, which the server refuses by definition — so a correctly
+        // created account reported itself as a failure. Say what happened
+        // instead, and leave the link in the inbox to do its job.
+        if (!data || !data.session) {
+          successBanner.textContent = 'Application received. Check ' + email +
+            ' for a link to confirm your address, then sign in to finish opening your account.';
+          successBanner.style.display = 'block';
+          submitBtn.style.backgroundColor = '#059669';
+          submitBtn.textContent = 'Check your email';
+          window.scrollTo(0, 0);
+          return;
+        }
 
         successBanner.style.display = 'block';
         submitBtn.style.backgroundColor = '#059669';
@@ -900,15 +924,21 @@
         }, 800);
 
       } catch (err) {
-        let message = err.message || 'Load failed. Please check your network or try again.';
-        if (message.toLowerCase().includes('invalid') || message.toLowerCase().includes('credentials') || message.toLowerCase().includes('already registered')) {
-          message = 'Invalid registration details or email already in use.';
-        }
-        
+        // Every failure used to be rewritten into "Invalid registration
+        // details or email already in use." — including an unreachable
+        // project and a rejected API key, which are ours and not the
+        // applicant's. Now each is named, and the ones that are our fault
+        // also ask the project what is wrong and write the answer to the
+        // console.
+        const { kind, message } = VerceilAuth.describe(err, 'signup');
+        queueEvent('signup.failed', { reason: kind });
+        if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
+
         errorBanner.textContent = message;
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Open my account';
         submitBtn.disabled = false;
+        window.scrollTo(0, 0);
       }
     });
   </script>
