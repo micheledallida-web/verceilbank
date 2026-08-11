@@ -665,24 +665,68 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- Backfill: anyone who signed up before this trigger existed has their details
--- sitting on the auth user and nothing at all in public. This gives them the
+-- sitting on the auth user and not all of them in public. This gives them the
 -- rows a new applicant now gets, using the very same function.
 --
--- Safe to re-run, and safe on a live bank: every insert inside is ON CONFLICT
--- DO NOTHING, so an existing customer's profile, balances and accounts are
--- never touched. Only users with no profile row at all are considered.
+-- THE CONDITION IS THE WHOLE POINT, AND IT USED TO BE WRONG. It considered only
+-- users with no `user_profile` row, on the assumption that a customer either
+-- has everything or nothing. That is not the shape the gap actually takes: an
+-- earlier version of this app wrote a profile row at sign-up and never opened
+-- any accounts, so those customers have a profile, no accounts, and were
+-- skipped by this loop every single time it ran.
+--
+-- What that costs them is not cosmetic. `accounts` is where a balance lives,
+-- and section 6's triggers move a balance with
+-- `update public.accounts ... where user_id = ... and account_type = ...`. With
+-- no row to match, every deposit and every transfer updates NOTHING. Their
+-- money moves in the ledger and their balance never changes — an account that
+-- has quietly stopped working, which is exactly what it looks like from the
+-- customer's side. The most recent sign-ups are fine, because by then the
+-- trigger above existed, so the fault reads as "my first accounts are broken
+-- and only the newest one works".
+--
+-- A missing profile OR missing accounts now brings a customer back through
+-- provisioning. Safe to re-run, and safe on a live bank: every insert inside
+-- provision_user is ON CONFLICT DO NOTHING, so an existing customer's profile,
+-- balances and accounts are never touched — the function only ever fills gaps.
 do $$
 declare
   u record;
   n int := 0;
+  fixed_accounts int := 0;
+  has_accounts boolean := to_regclass('public.accounts') is not null;
 begin
   for u in select id, email, raw_user_meta_data from auth.users loop
-    if not exists (select 1 from public.user_profile where user_id = u.id) then
+    if not exists (select 1 from public.user_profile where user_id = u.id)
+       or (has_accounts and not exists (select 1 from public.accounts where user_id = u.id))
+    then
+      if has_accounts and not exists (select 1 from public.accounts where user_id = u.id) then
+        fixed_accounts := fixed_accounts + 1;
+      end if;
       perform public.provision_user(u.id, u.email, u.raw_user_meta_data);
       n := n + 1;
     end if;
   end loop;
-  raise notice 'provisioned % pre-existing user(s)', n;
+  raise notice 'provisioned % pre-existing user(s); % of them had no accounts at all', n, fixed_accounts;
+end $$;
+
+-- And the check that says whether it worked. A customer with no accounts row
+-- after everything above has run is a customer whose balance cannot move, so it
+-- is reported loudly rather than left to be discovered by the person it belongs
+-- to.
+do $$
+declare
+  stranded text;
+begin
+  if to_regclass('public.accounts') is null then return; end if;
+  select string_agg(u.email, ', ' order by u.email) into stranded
+    from auth.users u
+   where not exists (select 1 from public.accounts a where a.user_id = u.id);
+  if stranded is not null then
+    raise warning 'CUSTOMERS WITH NO ACCOUNTS — their balances cannot move: %', stranded;
+  else
+    raise notice 'every customer holds at least one account';
+  end if;
 end $$;
 
 
