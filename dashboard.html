@@ -365,20 +365,50 @@
         </div>
       </div>
 
-      <!-- ---- Investment Account ---- -->
-      <div id="offerInvestments" class="home-promo home-promo-rate hidden">
+      <!-- ---- Investment Account ----
+           Its own surface (.home-promo-invest), not the checking family's, and
+           its own artwork: a traded price rather than an icon of one. The chart
+           runs the full height of the card and off its right edge, so the card
+           reads as a piece of a market rather than a panel with a graph on it.
+           Drawn in the card's cyan so the whole thing is one accent. -->
+      <div id="offerInvestments" class="home-promo home-promo-invest hidden">
         <div class="home-promo-art" aria-hidden="true">
-          <svg viewBox="0 0 200 160" fill="none">
-            <path d="M126 96l18-18 12 12 20-24" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <path d="M176 66v14h-14" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
-            <rect x="124" y="104" width="10" height="18" rx="3" fill="currentColor" fill-opacity="0.55"></rect>
-            <rect x="142" y="98" width="10" height="24" rx="3" fill="currentColor" fill-opacity="0.75"></rect>
-            <rect x="160" y="90" width="10" height="32" rx="3" fill="currentColor"></rect>
-            <path d="M186 40L187 43L190 44L187 45L186 48L185 45L182 44L185 43Z" fill="#FACC15" opacity="0.9"></path>
+          <svg viewBox="0 0 172 148" fill="none" preserveAspectRatio="xMaxYMid slice">
+            <defs>
+              <linearGradient id="invFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.42"></stop>
+                <stop offset="100%" stop-color="#38BDF8" stop-opacity="0"></stop>
+              </linearGradient>
+              <filter id="invGlow" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="3.2" result="b"></feGaussianBlur>
+                <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
+              </filter>
+            </defs>
+
+            <!-- Volume beneath the price, the way a chart is actually stacked. -->
+            <g fill="#7DD3FC" fill-opacity="0.16">
+              <rect x="10"  y="112" width="7" height="20" rx="2"></rect>
+              <rect x="26"  y="104" width="7" height="28" rx="2"></rect>
+              <rect x="42"  y="116" width="7" height="16" rx="2"></rect>
+              <rect x="58"  y="98"  width="7" height="34" rx="2"></rect>
+              <rect x="74"  y="107" width="7" height="25" rx="2"></rect>
+              <rect x="90"  y="92"  width="7" height="40" rx="2"></rect>
+              <rect x="106" y="99"  width="7" height="33" rx="2"></rect>
+              <rect x="122" y="84"  width="7" height="48" rx="2"></rect>
+              <rect x="138" y="76"  width="7" height="56" rx="2"></rect>
+              <rect x="154" y="66"  width="7" height="66" rx="2"></rect>
+            </g>
+
+            <!-- The price: filled area, then the line over it. -->
+            <path d="M0 84 C 18 88, 30 66, 46 70 C 62 74, 72 52, 90 58 C 108 64, 118 40, 136 34 C 152 29, 164 20, 172 14 L 172 132 L 0 132 Z" fill="url(#invFill)"></path>
+            <path d="M0 84 C 18 88, 30 66, 46 70 C 62 74, 72 52, 90 58 C 108 64, 118 40, 136 34 C 152 29, 164 20, 172 14"
+                  stroke="#38BDF8" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#invGlow)"></path>
+            <circle cx="136" cy="34" r="3.4" fill="#E0F2FE"></circle>
+            <circle cx="136" cy="34" r="7" fill="#38BDF8" fill-opacity="0.25"></circle>
           </svg>
         </div>
         <div class="home-promo-head">
-          <span class="home-promo-eyebrow">Invest with Verceil</span>
+          <span class="home-promo-eyebrow">Markets</span>
           <span class="home-promo-t">Investment Account</span>
           <span class="home-promo-s">Buy and hold <b>stocks, ETFs</b> and funds</span>
         </div>
