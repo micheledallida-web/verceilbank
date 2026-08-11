@@ -194,17 +194,10 @@ Deno.serve(async (req) => {
   // credited — the row sits in deposit_events awaiting a human, which is the
   // right outcome for money whose owner is not known.
   let request: any = null;
-  if (deposit.address) {
-    const { data } = await admin
-      .from('deposit_requests')
-      .select('*')
-      .eq('address', deposit.address)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    request = data;
-  }
-  if (!request && deposit.quidaxUserId) {
+
+  // The exchange's own user id is the only unambiguous link, so it is tried
+  // first. It is present when deposits are taken on per-customer sub-accounts.
+  if (deposit.quidaxUserId) {
     const { data } = await admin
       .from('deposit_requests')
       .select('*')
@@ -213,6 +206,40 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
     request = data;
+  }
+
+  // Falling back to the address, which is only safe while an address belongs to
+  // exactly one customer.
+  //
+  // THIS BANK CURRENTLY SHOWS EVERY CUSTOMER THE SAME RECEIVING ADDRESS. So
+  // "the most recent request for this address" is not the person who paid — it
+  // is whoever opened the Fund Account screen last. Taking it would credit a
+  // stranger's deposit to them, and bitcoin has no chargeback.
+  //
+  // Instead: read the open requests for this address, and act only when they
+  // all belong to one customer. Where two or more people are waiting on the
+  // same address the deposit is left unattributed for a human, which is the
+  // only honest answer. This resolves itself once deposits are taken on
+  // per-customer addresses, at which point the ambiguity cannot arise.
+  if (!request && deposit.address) {
+    const { data: candidates } = await admin
+      .from('deposit_requests')
+      .select('*')
+      .eq('address', deposit.address)
+      .eq('status', 'awaiting')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const owners = new Set((candidates ?? []).map((row: any) => row.user_id));
+    if (owners.size === 1) {
+      request = candidates![0];
+    } else if (owners.size > 1) {
+      console.error('quidax-webhook: shared address, cannot attribute', {
+        reference: deposit.reference,
+        address: deposit.address,
+        waiting: owners.size,
+      });
+    }
   }
 
   if (!request?.user_id) {

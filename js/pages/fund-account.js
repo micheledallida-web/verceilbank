@@ -3,6 +3,8 @@
 // deposit details (Screen 3). Opening the page always lands on Screen 1, and
 // each screen is reachable only from the one before it.
 
+import { watchRealtime } from '../shared/activity.js';
+
 // ---------------------------------------------------------------------------
 // DEPOSIT DATA
 //
@@ -79,6 +81,10 @@ function on(el, evt, fn) { if (!el) return; el.addEventListener(evt, fn); listen
 let tickHandle = null;
 let copyHandle = null;
 let bumpHandle = null;
+// The realtime channel watching this customer's deposit requests, and the id of
+// the request currently on screen.
+let stopDepositWatch = null;
+let currentRequestId = null;
 
 function lockDurationMs() {
   return DEPOSIT.lockMinutes * 60 * 1000;
@@ -116,6 +122,7 @@ function clearExpiry() {
 
 export function init(root, ctx) {
   const { close } = ctx;
+  currentRequestId = null;
 
   // Fetched as the screen opens rather than awaited: the amount step does not
   // quote bitcoin, so nothing on screen is wrong in the meantime, and by the
@@ -167,6 +174,7 @@ export function init(root, ctx) {
 
   const statusTitle = root.querySelector('#fundStatusTitle');
   const statusSub = root.querySelector('#fundStatusSub');
+  const statusPulse = root.querySelector('.fund-pulse');
 
   const cancelBtn = root.querySelector('#fundCancelBtn');
   const restartBtn = root.querySelector('#fundRestartBtn');
@@ -356,8 +364,107 @@ export function init(root, ctx) {
     qrCard.classList.remove('fund-dim');
     statusTitle.textContent = 'Awaiting your payment';
     statusSub.classList.remove('fund-hidden');
+    if (statusPulse) statusPulse.classList.remove('fund-settled');
     cancelBtn.classList.remove('fund-hidden');
     restartBtn.classList.add('fund-hidden');
+  }
+
+  // ---------- The deposit request ----------
+  //
+  // A row recording that THIS customer was shown THIS address for THIS amount
+  // at THIS rate. It is what turns an anonymous incoming payment into one the
+  // bank can attribute, and it is what the customer is credited at — the rate
+  // they were quoted, not the rate at the moment the coins land, which will
+  // have moved while they were sending.
+  //
+  // Without it the screen counts down for thirty minutes and then says
+  // "expired" whether or not the money arrived, because nothing ever told the
+  // bank the payment was expected.
+  async function openDepositRequest() {
+    const { supabaseClient, getCurrentUser } = ctx;
+    currentRequestId = null;
+    if (!supabaseClient || !getCurrentUser) return;
+
+    try {
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      const { data, error } = await supabaseClient
+        .from('deposit_requests')
+        .insert({
+          user_id: user.id,
+          account_type: 'checking',
+          address: DEPOSIT.address,
+          amount_usd: chosenUsd || null,
+          quoted_rate: DEPOSIT.rate,
+          status: 'awaiting',
+          expires_at: new Date(expiry).toISOString(),
+        })
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      currentRequestId = data && data.id;
+    } catch (err) {
+      // Not fatal to the screen: the address and the QR are still correct and
+      // the customer can still pay. It does mean this particular payment will
+      // need crediting by hand, so it is worth a line rather than a swallow.
+      console.error('Deposit request could not be opened:', err);
+    }
+  }
+
+  // The moment the money is credited. Reached over realtime from the row above,
+  // which the webhook updates when the deposit settles — so the screen answers
+  // the only question the customer has while they wait, instead of counting
+  // down to "expired" beside an account that has already been funded.
+  function showReceived(row) {
+    stopTimer();
+    clearExpiry();
+    timerValue.textContent = 'Received';
+    timerValue.classList.remove('fund-warn');
+    timerBar.style.width = '100%';
+    timerBar.classList.remove('fund-warn');
+    qrCard.classList.add('fund-dim');
+    statusTitle.textContent = 'Payment received';
+    const amount = Number(row && row.amount_usd);
+    statusSub.textContent = amount > 0
+      ? `${formatUsd(amount)} has been credited to your account.`
+      : 'Your deposit has been credited to your account.';
+    statusSub.classList.remove('fund-hidden');
+    if (statusPulse) statusPulse.classList.add('fund-settled');
+    cancelBtn.classList.add('fund-hidden');
+    restartBtn.classList.add('fund-hidden');
+  }
+
+  // Scoped to this customer, and to UPDATE only — the row's own insert is this
+  // screen's doing and needs no announcement.
+  //
+  // Deliberately NOT a subscription to `deposit_events`. That table holds the
+  // raw exchange payloads for every customer, including payments that could not
+  // be attributed to anyone; it belongs to the bank and has no customer policy.
+  // This row is the same event, told to the one person it concerns.
+  async function watchDepositRequests() {
+    const { supabaseClient, getCurrentUser } = ctx;
+    if (!supabaseClient || !getCurrentUser) return;
+    const user = await getCurrentUser();
+    if (!user) return;
+
+    if (stopDepositWatch) { stopDepositWatch(); stopDepositWatch = null; }
+    stopDepositWatch = watchRealtime((client) => client
+      .channel(`deposits:${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'deposit_requests',
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        const row = payload.new;
+        if (!row || row.status !== 'credited') return;
+        // An older request settling late must not redraw a screen that is now
+        // showing a different one.
+        if (currentRequestId != null && String(row.id) !== String(currentRequestId)) return;
+        showReceived(row);
+      }),
+    'deposits');
   }
 
   // ---------- Screens ----------
@@ -390,6 +497,7 @@ export function init(root, ctx) {
     if (expiry - Date.now() > 0) revive();
     renderDeposit();
     startTimer();
+    openDepositRequest();
   }
 
   // The back arrow steps back one screen at a time, and only closes the page
@@ -409,6 +517,9 @@ export function init(root, ctx) {
     revive();
     renderDeposit();
     startTimer();
+    // A fresh quote is a fresh request: the rate and the window on the old row
+    // are no longer what the customer is being shown.
+    openDepositRequest();
   });
 
   // ---------- Address ----------
@@ -481,12 +592,15 @@ export function init(root, ctx) {
   });
 
   renderAmount();
+  watchDepositRequests();
 }
 
 export function cleanup() {
   if (tickHandle) { clearInterval(tickHandle); tickHandle = null; }
   if (copyHandle) { clearTimeout(copyHandle); copyHandle = null; }
   if (bumpHandle) { clearTimeout(bumpHandle); bumpHandle = null; }
+  if (stopDepositWatch) { stopDepositWatch(); stopDepositWatch = null; }
+  currentRequestId = null;
   listeners.forEach(off => off());
   listeners = [];
 }

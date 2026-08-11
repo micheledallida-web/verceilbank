@@ -288,7 +288,11 @@ begin
       -- Issued by the bank; a customer may read theirs and nothing else.
       ('tax_documents',            'user_id', 'r'),
       ('account_documents',        'user_id', 'r'),
-      ('deposit_requests',         'user_id', 'r'),
+      -- The customer opens their own deposit request from the Fund Account
+      -- screen, so insert is theirs. Update is NOT: the status only ever moves
+      -- to 'credited' by the webhook, holding the service key. A customer who
+      -- could write that column could mark their own deposit as received.
+      ('deposit_requests',         'user_id', 'rc'),
 
       -- ---- the record the bank holds on the customer ---------------------
       -- Update is allowed, but name and date of birth are held shut by the
@@ -714,6 +718,16 @@ create trigger freeze_verified_identity
 -- account where nothing has happened. That is why `notifications` mattered: the
 -- app has subscribed to it all along and it was never published, so the bell
 -- has never once lit up on its own.
+--
+-- `deposit_events` is deliberately NOT here, and must not be added. It holds
+-- raw exchange payloads — every customer's deposit address, amounts, exchange
+-- user ids, and the payments that could not be attributed to anybody. It is the
+-- bank's table, it has RLS with no policy, and a browser subscribing to it
+-- would either receive nothing (RLS refusing, which is what happens today) or,
+-- if a policy were added to "make it work", hand one customer the deposit
+-- traffic of every other. The customer-facing half of the same event is
+-- `deposit_requests` — their own row, their own status — and that is what is
+-- published below.
 -- =============================================================================
 
 -- The publication is created by Supabase, but not on every project and not
@@ -731,7 +745,8 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['transactions', 'activity_events', 'accounts', 'notifications'] loop
+  foreach t in array array['transactions', 'activity_events', 'accounts',
+                           'notifications', 'deposit_requests'] loop
     if to_regclass('public.' || t) is null then
       raise notice 'realtime: skipping %, table not present', t;
       continue;
@@ -879,7 +894,8 @@ select 'realtime', t,
                           where pubname = 'supabase_realtime'
                             and schemaname = 'public' and tablename = t)
             then 'ok' else 'MISSING — this screen will never update live' end
-  from unnest(array['transactions','activity_events','accounts','notifications']) as t
+  from unnest(array['transactions','activity_events','accounts',
+                    'notifications','deposit_requests']) as t
 
 union all
 select 'realtime', 'accounts replica identity',

@@ -743,6 +743,14 @@ html.dark body {
   50% { opacity: 0.35; transform: scale(0.8); }
 }
 
+/* Arrived. The amber pulse means "still waiting", so leaving it beating beside
+   "Payment received" says two different things at once — it goes green and it
+   stops moving, because there is nothing left to wait for. */
+.fund-pulse.fund-settled {
+  background: #10B981;
+  animation: none;
+}
+
 .fund-status-t {
   color: #F5F7FA;
   font-size: 14px;
