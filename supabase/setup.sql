@@ -543,4 +543,17 @@ having a.balance is distinct from
 --
 -- Never put the service role key or an exchange API key in Vercel. Those are
 -- visible to every visitor's browser.
--- =============================================================================
+--
+--
+-- AND ONE AUTH SETTING, WITHOUT WHICH PASSWORD RESET SILENTLY FAILS
+--
+--   Authentication -> URL Configuration
+--     Site URL        your deployed origin, e.g. https://verceilbank.vercel.app
+--     Redirect URLs   add:  https://<your-domain>/reset-password.html
+--
+-- Supabase refuses to send a customer to a redirect it has not been told about.
+-- If reset-password.html is not on that list the email still arrives, but the
+-- link drops the customer on the Site URL with no recovery token and the page
+-- says the link cannot be used — which looks like a broken link rather than a
+-- missing setting. Add every origin you use, including preview deployments.
+-- ==============================================================================

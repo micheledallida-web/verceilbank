@@ -601,6 +601,21 @@ Variables**:
 | `SUPABASE_URL` | your project URL |
 | `SUPABASE_ANON_KEY` | the anon / public key |
 
+### Auth redirect URLs — required for password reset
+
+**Authentication → URL Configuration**
+
+| Setting | Value |
+|---|---|
+| Site URL | your deployed origin, e.g. `https://verceilbank.vercel.app` |
+| Redirect URLs | add `https://<your-domain>/reset-password.html` |
+
+Supabase will not send a customer to a redirect it has not been told about. If
+`reset-password.html` is not on that list the reset email still arrives, but the
+link drops them on the Site URL with no recovery token and the page reports that
+the link cannot be used — which reads as a broken link rather than a missing
+setting. Add every origin you use, preview deployments included.
+
 The anon key is shipped to the browser by design — RLS is what protects the
 data, which is why section 2 matters more than anything else in this document.
 Never put the service key in these variables.
