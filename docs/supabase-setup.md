@@ -181,20 +181,87 @@ this, and its verification section fails loudly if it is ever undone.
 ## 3. Realtime
 
 The app subscribes to its own ledger and event rows so a credit posted by a
-representative, or a transfer made on another device, appears without a
-refresh. Add both tables to the publication:
+representative, or a transfer made on another device, appears without a refresh.
+There are **five** subscriptions, all filtered to the signed-in customer:
+
+| Channel | Table | Events | What it drives |
+| --- | --- | --- | --- |
+| `activity` | `transactions` | INSERT | the ledger and activity lists |
+| `activity` | `activity_events` | INSERT | the audit trail |
+| `accounts` | `accounts` | `*` | every balance on screen |
+| `notifications` | `notifications` | INSERT | the alerts list and the bell badge |
+| `deposits` | `deposit_requests` | UPDATE | Fund Account: "awaiting" → "received" |
+
+All five tables must be in the publication:
 
 ```sql
 alter publication supabase_realtime add table public.transactions;
 alter publication supabase_realtime add table public.activity_events;
+alter publication supabase_realtime add table public.accounts;
+alter publication supabase_realtime add table public.notifications;
+alter publication supabase_realtime add table public.deposit_requests;
 ```
 
-`accounts` should already be on it — the dashboard has subscribed to it for a
-while. Confirm with:
+### Do not subscribe the app to `deposit_events`
+
+It is the obvious-looking table to watch for a deposit, and it is the wrong one.
+`deposit_events` holds the raw exchange payloads — every customer's deposit
+address, amounts, exchange user ids, and the payments that could not be
+attributed to anybody. It is the bank's table. It has RLS with no policy, so a
+browser subscribing to it receives nothing at all; and adding a policy to "make
+it work" would hand one customer the deposit traffic of every other.
+
+`deposit_requests` is the same event told to the one person it concerns: their
+row, their amount, their status. That is what the Fund Account screen watches.
+
+`notifications` is the one that was missing. **The app has subscribed to it all
+along and it was never published, so the bell has never once lit up on its
+own.** That is worth understanding because of how this fails:
+
+> A table that is not in the publication produces a channel that **joins
+> successfully and then never delivers anything.** No error, no warning, nothing
+> on the console. The screen simply never updates — which is indistinguishable
+> from an account where nothing has happened.
+
+### `accounts` also needs `replica identity full`
+
+```sql
+alter table public.accounts replica identity full;
+```
+
+By default Postgres writes only the primary key of the old row to the WAL.
+Realtime applies RLS to a DELETE by testing the **old** record — and a record
+consisting of nothing but an `id` has no `user_id` to test, so the policy cannot
+pass and the event is silently dropped. `accounts` is the only subscription
+listening for `*`; the others are INSERT-only, where the new row is complete.
+
+### Checking it
+
+From the SQL editor:
 
 ```sql
 select tablename from pg_publication_tables where pubname = 'supabase_realtime';
 ```
+
+From the browser console, on the dashboard:
+
+```js
+VerceilRealtime.status()
+// { activity: 'SUBSCRIBED', accounts: 'SUBSCRIBED' }
+```
+
+`activity` and `accounts` are always there. `notifications` and `deposits`
+appear only while their screens are open, since those channels are opened and
+torn down with the view.
+
+Every channel should read `SUBSCRIBED`. Anything else was already written to the
+console under `[realtime]` with the reason — the subscriptions now report their
+status instead of failing silently, and a channel that errors is rebuilt with a
+backoff rather than staying dead for the rest of the session.
+
+Realtime also has a project-level switch: **Database → Replication**, or
+**Settings → API → Realtime**. If every channel errors and the publication is
+correct, check there.
 
 ---
 

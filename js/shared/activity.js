@@ -213,6 +213,85 @@ export async function flushQueue() {
   }
 }
 
+// ==================== REALTIME ====================
+// Every subscription in the app went out as a bare `.subscribe()`, which takes
+// an optional status callback that nobody was passing. That is the whole
+// difference between realtime working and realtime silently not working:
+//
+//   • A table missing from the `supabase_realtime` publication produces a
+//     channel that joins and then never delivers anything. No error, no
+//     warning, nothing on the console — the screen simply never updates, and
+//     it looks identical to an account where nothing has happened.
+//   • A dropped socket (a tunnel, a sleeping phone, a switch from wifi to
+//     mobile) closed the channel and it stayed closed for the rest of the
+//     session. The balance on screen then quietly stopped being live.
+//
+// This wraps both. Status goes to the console under [realtime], and a channel
+// that errors is rebuilt with a backoff instead of being abandoned.
+
+const liveChannels = new Map();
+
+function subscribeChannel(build, label) {
+  let channel = null;
+  let attempt = 0;
+  let timer = null;
+  let stopped = false;
+
+  const open = () => {
+    channel = build();
+    channel.subscribe((status, err) => {
+      if (stopped) return;
+      liveChannels.set(label, status);
+
+      if (status === 'SUBSCRIBED') {
+        attempt = 0;
+        console.info(`[realtime] ${label}: live`);
+        return;
+      }
+      // Fired by our own removeChannel too, so it is not on its own a fault.
+      if (status === 'CLOSED') return;
+
+      // CHANNEL_ERROR / TIMED_OUT. The most common cause by far is the table
+      // not being in the publication — see section 8 of supabase/setup.sql.
+      console.error(`[realtime] ${label}: ${status}`, err || '');
+      retry();
+    });
+  };
+
+  const retry = () => {
+    if (stopped || timer) return;
+    // 2s, 4s, 8s ... capped at 30. Capped rather than unbounded because the
+    // customer may simply be in a lift, and a channel that gives up entirely
+    // is the bug this exists to fix.
+    const wait = Math.min(30000, 2000 * Math.pow(2, attempt++));
+    timer = setTimeout(() => {
+      timer = null;
+      if (stopped) return;
+      try { supabase.removeChannel(channel); } catch (err) {}
+      open();
+    }, wait);
+  };
+
+  open();
+
+  return () => {
+    stopped = true;
+    liveChannels.delete(label);
+    if (timer) { clearTimeout(timer); timer = null; }
+    try { supabase.removeChannel(channel); } catch (err) {}
+  };
+}
+
+/**
+ * Opens a filtered realtime channel with status reporting and reconnection.
+ * `build` is called with the client and must return a channel with its
+ * `.on(...)` handlers already attached, but NOT subscribed.
+ */
+export function watchRealtime(build, label) {
+  if (!supabase || !userId) return () => {};
+  return subscribeChannel(() => build(supabase), label);
+}
+
 /**
  * The inbound flow. Subscribes to this user's ledger and event rows so the app
  * reacts to anything written elsewhere — a representative posting a credit, a
@@ -221,9 +300,7 @@ export async function flushQueue() {
  * Returns an unsubscribe function.
  */
 export function subscribeToActivity(handler) {
-  if (!supabase || !userId) return () => {};
-
-  const channel = supabase
+  return watchRealtime((client) => client
     .channel(`activity:${userId}`)
     // Scoped to this user. An unfiltered subscription hands you every other
     // account holder's rows.
@@ -238,11 +315,17 @@ export function subscribeToActivity(handler) {
       schema: 'public',
       table: 'activity_events',
       filter: `user_id=eq.${userId}`,
-    }, (payload) => handler({ kind: 'event', row: payload.new }))
-    .subscribe();
+    }, (payload) => handler({ kind: 'event', row: payload.new })),
+  'activity');
+}
 
-  return () => {
-    try { supabase.removeChannel(channel); } catch (err) {}
+// Answers "is realtime actually on?" from the console, the same way
+// VerceilAuth.probe() answers it for auth. Every channel should read
+// SUBSCRIBED; anything else names itself and the reason is on the console
+// above.
+if (typeof window !== 'undefined') {
+  window.VerceilRealtime = {
+    status: () => Object.fromEntries(liveChannels),
   };
 }
 

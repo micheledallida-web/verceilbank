@@ -4,6 +4,8 @@
 // thing in the app that must be readable in full, so it gets the whole screen
 // and its body wraps to as many lines as it needs.
 
+import { watchRealtime } from '../shared/activity.js';
+
 let listeners = [];
 let items = [];
 let channel = null;
@@ -208,7 +210,12 @@ async function markAllRead(root, ctx) {
 // ---------- Realtime ----------
 
 function teardownChannel() {
-  if (channel && channelClient) {
+  // `channel` is now the unsubscribe function watchRealtime returns, which
+  // also stops any pending reconnect — a retry timer left running after the
+  // view closed would reopen a channel nothing is listening to.
+  if (typeof channel === 'function') {
+    try { channel(); } catch (err) {}
+  } else if (channel && channelClient) {
     try { channelClient.removeChannel(channel); } catch (err) {}
   }
   channel = null;
@@ -227,7 +234,7 @@ async function subscribeToInserts(root, ctx) {
   if (!user) return;
 
   channelClient = supabaseClient;
-  channel = supabaseClient
+  channel = watchRealtime((client) => client
     .channel(`notifications:${user.id}`)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -242,8 +249,8 @@ async function subscribeToInserts(root, ctx) {
       items = [payload.new].concat(items);
       render(root, ctx);
       if (ctx.refreshAlertsBadge) ctx.refreshAlertsBadge();
-    })
-    .subscribe();
+    }),
+  'notifications');
 }
 
 export async function init(root, ctx) {

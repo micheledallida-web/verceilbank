@@ -13,6 +13,7 @@ import {
   recordTransaction,
   readLocalActivity,
   subscribeToActivity,
+  watchRealtime,
   flushQueue,
 } from './shared/activity.js';
 
@@ -276,6 +277,10 @@ async function loadBankReference() {
 // made on another device, an administrator correcting the record — arrive here
 // over Realtime and the app reacts to them rather than waiting for a refresh.
 let stopActivityFlow = null;
+// The accounts channel. Held so a second initSupabaseData — a re-auth, a
+// reconnect — replaces it instead of stacking a duplicate subscription on top
+// of the first, which would apply every balance change twice.
+let stopAccountsFlow = null;
 
 function startActivityFlow() {
   if (stopActivityFlow) return;
@@ -1719,7 +1724,11 @@ async function initSupabaseData() {
         // Scoped to this user. An unfiltered subscription hands you every
         // other account holder's updates, and applyAccountRow would happily
         // fold a stranger's balance into these totals.
-        supabaseClient
+        //
+        // Through watchRealtime, so a channel that cannot join says so and is
+        // rebuilt rather than leaving the balance on screen quietly stale.
+        if (stopAccountsFlow) stopAccountsFlow();
+        stopAccountsFlow = watchRealtime((client) => client
           .channel(`accounts:${user.id}`)
           .on('postgres_changes', {
             event: '*',
@@ -1729,8 +1738,8 @@ async function initSupabaseData() {
           }, (payload) => {
             if (payload.eventType === 'DELETE') removeAccountRow(payload.old);
             else if (payload.new) applyAccountRow(payload.new);
-          })
-          .subscribe();
+          }),
+        'accounts');
       }
     } catch (err) {
       console.error('Supabase data fetch error:', err);

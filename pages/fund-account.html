@@ -136,7 +136,11 @@
     <!-- 3 · QR + address -->
     <div class="fund-qr-card" id="fundQrCard">
       <div class="fund-qr-box" id="fundQrBox"><div id="fundQrHolder"></div></div>
-      <p class="fund-addr-lab">Bitcoin address · one-time use</p>
+      <!-- It said "one-time use", which is not true: this is the bank's
+           receiving address, it is the same one for every customer and it is
+           reused for every deposit. Telling somebody an address is spent when
+           it is not is the kind of wrong that ends with money sent nowhere. -->
+      <p class="fund-addr-lab">Bitcoin address · Bitcoin network</p>
       <div class="fund-addr-row">
         <span class="fund-addr" id="fundAddress"></span>
         <button class="fund-copy" id="fundCopyBtn">Copy</button>
