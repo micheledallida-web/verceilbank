@@ -99,6 +99,50 @@ function selectableCard({ key, name, tagline, accent, points, selected }) {
   `;
 }
 
+// Verceil Savings, on the list with the products and not one of them.
+//
+// Every customer holds one — it is opened alongside whatever they choose, here
+// and at sign-up — so it can never be a thing left to open, and offering it as
+// a choice would be offering something they already have. Leaving it off the
+// list entirely was worse: the screen then said "a savings account is opened
+// alongside it" in a line of prose above the cards and showed no such account
+// anywhere, so the one account that always comes along was the only one never
+// pictured.
+//
+// So it is drawn as a card in the same stack, same width and shape, with an
+// INCLUDED badge where the other cards carry their radio. It is a div rather
+// than a button and has no `oa-choice` class, which is what keeps it out of the
+// selection handler: there is nothing here to choose. Same object as the
+// "Included" card on the sign-up screen, which is where a customer sees this
+// rule stated for the first time.
+function includedSavingsCard() {
+  const savings = ACCOUNT_PRODUCTS_BY_KEY.savings;
+  if (!savings) return '';
+
+  return `
+    <div class="w-full text-left rounded-[20px] p-[16px] shadow-lg bg-white dark:bg-[#0D1728] border-2 border-dashed"
+      style="border-color:${savings.accent}55;">
+      <div class="flex items-start justify-between gap-[12px] mb-[10px]">
+        <div class="min-w-0">
+          <div class="text-[15px] font-bold text-[#111827] dark:text-white">${savings.name}</div>
+          <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">${savings.tagline}</div>
+        </div>
+        <span class="text-[10px] font-bold uppercase tracking-[0.08em] px-[9px] py-[4px] rounded-full flex-shrink-0"
+          style="background:${savings.accent}1A; color:${savings.accent};">Included</span>
+      </div>
+      ${savings.features.map((f) => `
+        <div class="flex items-start gap-[8px] py-[3px]">
+          ${checkIcon(savings.accent)}
+          <span class="text-[12px] text-[#111827] dark:text-white leading-snug">${f}</span>
+        </div>
+      `).join('')}
+      <div class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed mt-[10px] pt-[10px] border-t border-gray-100 dark:border-white/[0.06]">
+        Nothing to choose and nothing to sign. If you already hold one, you keep it and its balance.
+      </div>
+    </div>
+  `;
+}
+
 export function init(root, ctx, options = {}) {
   const {
     close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency,
@@ -170,7 +214,10 @@ export function init(root, ctx, options = {}) {
     const choosable = choosableProducts();
 
     if (!choosable.length) {
-      productsWrap.innerHTML = '';
+      // Nothing left to choose, but savings is still worth stating — it is the
+      // account they hold that they never picked, and this is the screen that
+      // explains what comes with what.
+      productsWrap.innerHTML = includedSavingsCard();
       nothingLeft.classList.remove('hidden');
       riskNote.classList.add('hidden');
       openBtn.classList.add('hidden');
@@ -194,7 +241,7 @@ export function init(root, ctx, options = {}) {
       accent: product.accent,
       points: product.features,
       selected: product.key === selectedKey,
-    })).join('');
+    })).join('') + includedSavingsCard();
 
     productsWrap.querySelectorAll('.oa-choice').forEach((btn) => {
       on(btn, 'click', () => {
