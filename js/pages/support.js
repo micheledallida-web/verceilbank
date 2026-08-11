@@ -5,6 +5,13 @@
 
 // The categories the support_threads table accepts, paired with something a
 // person would actually recognise. This is the only place the mapping lives.
+// `value` is what is written to support_threads.category, and it is the only
+// thing here another screen may hand in. Four screens used to pass their own
+// display labels instead — 'Account', 'Accounts', 'Investments' — none of which
+// match a value, so every one of them silently filed its message under General
+// and support saw a name change, an IRA rollover and a joint-owner request as
+// the same undifferentiated pile. The values below cover what those screens
+// actually ask about.
 const SUPPORT_CATEGORIES = [
   { value: 'general', label: 'General' },
   { value: 'card_application', label: 'Card application' },
@@ -14,6 +21,9 @@ const SUPPORT_CATEGORIES = [
   { value: 'funding_ach', label: 'Funding — ACH transfer' },
   { value: 'disputes', label: 'Disputes' },
   { value: 'account_access', label: 'Account access' },
+  { value: 'account_ownership', label: 'Joint account ownership' },
+  { value: 'investments', label: 'Investments' },
+  { value: 'personal_details', label: 'Personal details' },
 ];
 
 // Each topic is a shortcut into the new-message form with the category and

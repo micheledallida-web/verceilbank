@@ -52,7 +52,7 @@ export async function init(root, ctx) {
   root.querySelectorAll('[data-action="back"]').forEach((btn) => on(btn, 'click', () => loadPage('profile')));
 
   on(root.querySelector('#pdContactBtn'), 'click', () => openSupportMessage({
-    category: 'Account',
+    category: 'personal_details',
     subject: 'Correction to date of birth',
     body: 'The date of birth on my account is incorrect. Please tell me what documentation you need to correct it.',
   }));

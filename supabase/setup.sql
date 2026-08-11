@@ -227,9 +227,75 @@ alter table public.user_profile
   add column if not exists postal_code   text,
   add column if not exists ssn_last4     text;
 
--- The account number the app assigns at opening.
+-- The account number the app assigns at opening, and who owns the account.
+--
+-- `ownership` is 'individual' for every account a customer opens themselves.
+-- Only the bank ever writes 'joint', and only once both owners have been
+-- identified and the ownership agreement has been countersigned — the insert
+-- grant in section 4 is what makes that true rather than a convention.
 alter table public.accounts
-  add column if not exists account_number text;
+  add column if not exists account_number text,
+  add column if not exists ownership     text not null default 'individual';
+
+do $$
+begin
+  if to_regclass('public.accounts') is null then
+    raise notice 'accounts: table not present, skipping ownership constraint';
+    return;
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.accounts'::regclass and conname = 'accounts_ownership_check'
+  ) then
+    alter table public.accounts
+      add constraint accounts_ownership_check check (ownership in ('individual', 'joint'));
+    raise notice 'accounts: ownership constrained to individual|joint';
+  end if;
+exception when others then
+  -- A project whose existing rows carry some other ownership value keeps them,
+  -- and keeps its sign-up working. The constraint is a guard rail, not a
+  -- reason to stop the whole setup.
+  raise warning 'accounts: could not constrain ownership: %', sqlerrm;
+end $$;
+
+-- Defaults for the two columns a customer session is about to lose the right to
+-- write (see section 4). Without these an insert that omits them would fail on
+-- a NOT NULL, or open an account with a null balance.
+--
+-- 'pending' is deliberate, and it is the same status new-user provisioning
+-- uses: signing up or opening an account is an application. Nothing is fully
+-- open until identity is verified and the opening deposit has landed.
+do $$
+begin
+  if to_regclass('public.accounts') is null then
+    raise notice 'accounts: table not present, skipping column defaults';
+    return;
+  end if;
+
+  begin
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'accounts' and column_name = 'balance') then
+      alter table public.accounts alter column balance set default 0;
+      raise notice 'accounts: balance defaults to 0';
+    end if;
+  exception when others then
+    raise warning 'accounts: could not default balance: %', sqlerrm;
+  end;
+
+  -- Guarded separately: a project whose `status` is an enum rather than text
+  -- would reject the literal, and that must not take the setup down on its way
+  -- past. The column is left without a default there, which is survivable —
+  -- the app reads a null status as "not closed", so the account still works.
+  begin
+    if exists (select 1 from information_schema.columns
+                where table_schema = 'public' and table_name = 'accounts' and column_name = 'status') then
+      alter table public.accounts alter column status set default 'pending';
+      raise notice 'accounts: status defaults to pending';
+    end if;
+  exception when others then
+    raise warning 'accounts: could not default status: %', sqlerrm;
+  end;
+end $$;
 
 
 -- =============================================================================
@@ -375,12 +441,28 @@ end $$;
 -- a session may touch; only a column grant decides which COLUMNS — so without
 -- this, the update policy on `accounts` above is a licence to self-credit.
 -- Balances move through the ledger triggers in section 6 and nowhere else.
+--
+-- INSERT needs exactly the same treatment, and used not to have it. The insert
+-- policy above checks WHOSE row is being written; it says nothing about what is
+-- in it. So a customer session could open an account for itself — which is
+-- allowed, that is what the Open an Account screen does — and set the balance
+-- on it in the same statement. Opening an account with a million dollars in it
+-- is one request. The update grant closed the front door and left this open.
+--
+-- Two columns are all a customer needs to open an account: whose it is, and
+-- which product. Everything else takes its default: balance 0, status pending,
+-- ownership individual. A joint account is therefore something only the bank
+-- can write, which is the rule the Joint Accounts screen describes.
 do $$
 begin
   if to_regclass('public.accounts') is not null then
     revoke update on public.accounts from authenticated;
     grant  update (account_number) on public.accounts to authenticated;
     raise notice 'accounts: update narrowed to account_number';
+
+    revoke insert on public.accounts from authenticated;
+    grant  insert (user_id, account_type) on public.accounts to authenticated;
+    raise notice 'accounts: insert narrowed to user_id, account_type';
   end if;
 end $$;
 
@@ -863,11 +945,24 @@ select 'row level security', c.relname,
   from pg_class c
  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
 
--- The balance column must not be client-writable, whatever the policies say.
+-- The balance column must not be client-writable, whatever the policies say —
+-- on an existing row or on a brand-new one. Ownership goes with them: a
+-- customer who can write it can open their own joint account.
 union all
 select 'column grant', 'accounts.balance not writable by customers',
        case when has_column_privilege('authenticated', 'public.accounts', 'balance', 'UPDATE')
             then 'EXPOSED — customers can set their own balance' else 'ok' end
+
+union all
+select 'column grant', 'accounts.balance not settable at insert',
+       case when has_column_privilege('authenticated', 'public.accounts', 'balance', 'INSERT')
+            then 'EXPOSED — customers can open an account with any balance' else 'ok' end
+
+union all
+select 'column grant', 'accounts.ownership not settable by customers',
+       case when has_column_privilege('authenticated', 'public.accounts', 'ownership', 'INSERT')
+             or has_column_privilege('authenticated', 'public.accounts', 'ownership', 'UPDATE')
+            then 'EXPOSED — customers can declare their own account joint' else 'ok' end
 
 union all
 select 'balance trigger', tgname,

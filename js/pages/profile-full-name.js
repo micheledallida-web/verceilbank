@@ -60,7 +60,7 @@ export async function init(root, ctx) {
   root.querySelectorAll('[data-action="back"]').forEach((btn) => on(btn, 'click', () => loadPage('profile')));
 
   on(root.querySelector('#pnContactBtn'), 'click', () => openSupportMessage({
-    category: 'Account',
+    category: 'personal_details',
     subject: 'Change to legal name',
     body: 'I need to change the legal name on my account. Please tell me what documentation you need.',
   }));

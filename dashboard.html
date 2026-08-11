@@ -49,8 +49,12 @@
     <!-- TOP HEADER -->
     <header class="pt-[14px] pb-[20px] flex items-start justify-between gap-[12px]">
       <div>
-        <div id="greetingLine1" class="home-greet">Good Morning,</div>
-        <div id="greetingLine2" class="home-name">Mercy</div>
+        <!-- Both lines are written by initSupabaseData() in js/main.js once the
+             session says who this is. The name starts empty on purpose: a
+             placeholder here is a stranger's name on somebody's dashboard for
+             as long as the first request takes. -->
+        <div id="greetingLine1" class="home-greet">Welcome</div>
+        <div id="greetingLine2" class="home-name hidden"></div>
       </div>
 
       <div class="flex items-center gap-[9px] flex-shrink-0 mt-[3px]">
@@ -118,11 +122,15 @@
           <span class="home-hero-k">Deposits</span>
           <span class="amount-pending home-hero-v" id="homeDeposits"></span>
         </div>
-        <div>
+        <!-- Both of these are hidden until the customer actually holds the
+             thing they report. A line reading "Investments $0.00" to somebody
+             who has never opened an investment account is not a summary, it is
+             an account they were never given. -->
+        <div id="homeInvestmentsStat" class="hidden">
           <span class="home-hero-k">Investments</span>
           <span class="amount-pending home-hero-v" id="homeInvestments"></span>
         </div>
-        <div>
+        <div id="homeCardStat" class="hidden">
           <span class="home-hero-k">Card balance</span>
           <span class="amount-pending home-hero-v" id="homeCardBalance"></span>
         </div>
@@ -153,20 +161,27 @@
 
     <div class="home-columns">
 
-    <!-- ================= CHECKING ================= -->
-    <p class="home-lab">Checking</p>
-    <div id="cardChecking" class="home-acct">
-      <div class="home-arow">
-        <div class="home-ic home-ic-b">
-          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M6 15h5"></path></svg>
+    <!-- ================= CHECKING (hidden until opened) =================
+         Every account card on this screen is hidden until a row in `accounts`
+         says the customer holds it. A card drawn from the markup rather than
+         from the record is an account the bank has assigned to somebody who
+         never asked for it — it shows a balance, it opens a screen, it prints
+         an account number, and none of it exists. -->
+    <div id="sectionChecking" class="hidden">
+      <p class="home-lab">Checking</p>
+      <div id="cardChecking" class="home-acct">
+        <div class="home-arow">
+          <div class="home-ic home-ic-b">
+            <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M6 15h5"></path></svg>
+          </div>
+          <div class="home-grid">
+            <span class="home-n">Verceil Checking</span>
+            <span class="amount-pending home-b" id="checkingBalance"></span>
+            <span class="home-num" id="checkingNumber"></span>
+            <span class="home-sl">Available Balance</span>
+          </div>
+          <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
         </div>
-        <div class="home-grid">
-          <span class="home-n">Verceil Checking</span>
-          <span class="amount-pending home-b" id="checkingBalance"></span>
-          <span class="home-num" id="checkingNumber"></span>
-          <span class="home-sl">Available Balance</span>
-        </div>
-        <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
       </div>
     </div>
 
@@ -206,7 +221,10 @@
       </div>
     </div>
 
-    <!-- ================= INVESTMENTS ================= -->
+    <!-- ================= INVESTMENTS (hidden until opened) =================
+         An investment account is opened when somebody chooses it — at sign-up,
+         or afterwards from Open an Account. It is never assigned. -->
+    <div id="sectionInvestments" class="hidden">
     <p class="home-lab">Investments</p>
     <div id="cardInvestments" class="home-acct">
       <div class="home-arow">
@@ -262,6 +280,7 @@
         <div class="home-rg">ALL</div>
       </div>
     </div>
+    </div>
 
     <!-- ================= RETIREMENT (hidden until an IRA is opened) ================= -->
     <div id="sectionRetirement" class="hidden">
@@ -301,9 +320,76 @@
       </div>
     </div>
 
+    <!-- ================= OPEN AN ACCOUNT =================
+         Standalone, always here, and not an offer: the offers below are
+         products the bank is recommending, this is the door to every product
+         it has. It sits under the accounts you hold, which is where you are
+         looking when you notice one you want and do not have. -->
+    <button id="homeOpenAccount" class="home-open" type="button">
+      <span class="home-open-ic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </span>
+      <span class="home-open-t">
+        <span class="home-open-n">Open an account</span>
+        <span class="home-open-s">Individually, or jointly with someone else</span>
+      </span>
+      <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+    </button>
+
     <!-- ================= AVAILABLE TO YOU ================= -->
     <p class="home-lab" id="homeOffersLabel">Available to You</p>
     <div id="homeOffers">
+
+      <!-- ---- Verceil Checking ---- -->
+      <div id="offerChecking" class="home-promo home-promo-rate hidden">
+        <div class="home-promo-art" aria-hidden="true">
+          <svg viewBox="0 0 200 160" fill="none">
+            <rect x="120" y="48" width="76" height="48" rx="7" fill="currentColor"></rect>
+            <rect x="120" y="60" width="76" height="8" fill="#FFFFFF" fill-opacity="0.35"></rect>
+            <rect x="128" y="80" width="26" height="6" rx="3" fill="#FFFFFF" fill-opacity="0.5"></rect>
+            <circle cx="182" cy="83" r="7" fill="#EAB308" fill-opacity="0.9"></circle>
+            <path d="M140 26L142 31L147 33L142 35L140 40L138 35L133 33L138 31Z" fill="#FFFFFF" opacity="0.55"></path>
+          </svg>
+        </div>
+        <div class="home-promo-head">
+          <span class="home-promo-eyebrow">Everyday banking</span>
+          <span class="home-promo-t">Verceil Checking</span>
+          <span class="home-promo-s">Spending, direct deposit and transfers</span>
+        </div>
+        <div class="home-promo-foot">
+          <span class="home-promo-note">No monthly maintenance fee</span>
+          <button class="home-promo-go" id="offerCheckingBtn" type="button">
+            <span>Open</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ---- Investment Account ---- -->
+      <div id="offerInvestments" class="home-promo home-promo-rate hidden">
+        <div class="home-promo-art" aria-hidden="true">
+          <svg viewBox="0 0 200 160" fill="none">
+            <path d="M126 96l18-18 12 12 20-24" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M176 66v14h-14" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+            <rect x="124" y="104" width="10" height="18" rx="3" fill="currentColor" fill-opacity="0.55"></rect>
+            <rect x="142" y="98" width="10" height="24" rx="3" fill="currentColor" fill-opacity="0.75"></rect>
+            <rect x="160" y="90" width="10" height="32" rx="3" fill="currentColor"></rect>
+            <path d="M186 40L187 43L190 44L187 45L186 48L185 45L182 44L185 43Z" fill="#FACC15" opacity="0.9"></path>
+          </svg>
+        </div>
+        <div class="home-promo-head">
+          <span class="home-promo-eyebrow">Invest with Verceil</span>
+          <span class="home-promo-t">Investment Account</span>
+          <span class="home-promo-s">Buy and hold <b>stocks, ETFs</b> and funds</span>
+        </div>
+        <div class="home-promo-foot">
+          <span class="home-promo-note">Not FDIC insured · May lose value</span>
+          <button class="home-promo-go" id="offerInvestmentsBtn" type="button">
+            <span>Open</span>
+            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+      </div>
 
       <!-- ---- Verceil Signature Card ---- -->
       <div id="offerCredit" class="home-promo home-promo-card">
