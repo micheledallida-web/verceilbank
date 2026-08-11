@@ -7,6 +7,7 @@
 // and parses the one screen someone is looking at.
 
 import { createLiveSparkline } from './shared/live-sparkline.js';
+import { ACCOUNT_PRODUCTS_BY_KEY } from './shared/account-products.js';
 import {
   initActivity,
   recordEvent,
@@ -205,13 +206,38 @@ function localSeed() {
   }
 }
 
+// Which seed the cached derived numbers were worked out from.
+//
+// This exists because of the order the shell starts in. renderAccountNumberMasks()
+// runs at first paint, before the session has landed, so `currentUserId` is
+// still empty and deriveAccountNumber() falls back to the DEVICE seed. Those
+// digits were then cached, and — the part that matters — persistAssignedNumbers()
+// wrote them to `accounts` a moment later as the bank's own record.
+//
+// A device seed is the same for everyone who uses the phone. Two customers
+// signing in on one handset were therefore issued the SAME eleven-digit account
+// number, permanently, in the bank's record.
+//
+// So the seed is remembered alongside the numbers. The moment the account
+// holder is known the cache is thrown away and rebuilt from their id, which is
+// the only seed the stored number is ever allowed to come from.
+let derivedNumbersSeed = '';
+// Declared here rather than beside the server-issued map so it is in scope
+// before anything can call this, whatever order the module grows in.
+let derivedNumbersByType = {};
+
 function assignAccountNumber(type) {
-  if (!accountNumbersByType[type]) {
+  const seed = currentUserId || localSeed();
+  if (derivedNumbersSeed !== seed) {
+    derivedNumbersSeed = seed;
+    derivedNumbersByType = {};
+  }
+  if (!derivedNumbersByType[type]) {
     const number = deriveAccountNumber(type);
     if (!number) return '';
-    accountNumbersByType[type] = number;
+    derivedNumbersByType[type] = number;
   }
-  return accountNumbersByType[type];
+  return derivedNumbersByType[type];
 }
 
 // ---------- Bank reference data ----------
@@ -249,8 +275,10 @@ export const MINIMUM_OPENING_DEPOSIT_LABEL = `$${MINIMUM_OPENING_DEPOSIT.toLocal
 export const COMPULSORY_ACCOUNT_TYPE = 'savings';
 
 let bankRoutingNumber = DEFAULT_ROUTING_NUMBER;
-// Every account number known for this customer, server-issued or assigned at
-// opening. Keyed by account type, because an account holder has one of each.
+// The numbers the SERVER issued, keyed by account type. These are the bank's
+// record and they always win. The derived fallbacks live in their own map,
+// declared beside assignAccountNumber() above — kept apart so rebuilding the
+// derived ones can never discard an issued number.
 let accountNumbersByType = {};
 // Seeds the assigned numbers, so they are the same on every device.
 let currentUserId = '';
@@ -379,6 +407,10 @@ function startActivityFlow() {
 // eleven digits for the same account, so two of them racing here write the
 // same number rather than two different ones.
 async function persistAssignedNumbers(rows) {
+  // Never before the account holder is known. A number worked out without one
+  // is seeded from the device and belongs to nobody — writing it to `accounts`
+  // is how two customers on the same phone ended up sharing digits.
+  if (!currentUserId) return;
   const missing = (rows || []).filter((row) => row && row.id != null && row.account_type && !row.account_number);
   if (!missing.length) return;
 
@@ -454,6 +486,69 @@ export async function openCompulsorySavings() {
     await openAccountRow(COMPULSORY_ACCOUNT_TYPE);
   } catch (err) {
     console.error('Compulsory savings error:', err);
+  }
+}
+
+// ---------- Repairing a customer with no accounts ----------
+// Zero rows in `accounts` is not a state a customer can legitimately be in.
+// Everyone holds savings at the very least — it is opened alongside whatever
+// they chose, at sign-up and from Open an Account — so an empty answer means
+// provisioning never ran for them, not that they hold nothing.
+//
+// It has happened, and it is worth naming precisely because the symptom does
+// not look like this at all. An earlier version of this app wrote a profile row
+// at sign-up and opened no accounts. The database's own backfill then skipped
+// those customers, because it only looked for people with no profile. What that
+// costs them is their balance: the ledger triggers move money with
+// `update accounts ... where user_id = ... and account_type = ...`, and with no
+// row to match, every deposit updates nothing. Money arrives, the balance never
+// changes. From the customer's side an account has simply stopped working — and
+// only their newest sign-up behaves, because by then the trigger existed.
+//
+// supabase/setup.sql fixes the backfill, and this fixes the customer whose
+// browser is open right now whether or not that has been re-run yet.
+//
+// What gets opened is what the bank recorded at sign-up: the product they
+// actually asked for, validated against the catalogue so nothing arbitrary off
+// the auth record reaches the table, plus savings. It is the same rule
+// provision_user applies server-side. Nothing is invented and nothing is
+// assigned — a customer who asked for one product does not acquire a second.
+async function repairMissingAccounts(user) {
+  const meta = (user && user.user_metadata) || {};
+  const requested = Array.isArray(meta.requested_account_types)
+    ? meta.requested_account_types
+    : [meta.requested_account_type].filter(Boolean);
+
+  const wanted = [...new Set(
+    requested
+      .map((type) => String(type || '').trim())
+      .filter((type) => Object.prototype.hasOwnProperty.call(ACCOUNT_PRODUCTS_BY_KEY, type))
+      .concat(COMPULSORY_ACCOUNT_TYPE),
+  )];
+
+  console.warn('No accounts on record for this customer — provisioning', wanted.join(', '));
+  recordEvent('accounts.repaired', { opened: wanted });
+
+  for (const type of wanted) {
+    try {
+      await openAccountRow(type);
+    } catch (err) {
+      // One product failing must not cost the customer the others, and least
+      // of all savings.
+      console.error(`Could not open ${type} while repairing accounts:`, err);
+    }
+  }
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id);
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('Could not re-read accounts after repair:', err);
+    return [];
   }
 }
 
@@ -1917,8 +2012,15 @@ async function initSupabaseData() {
           .select('*')
           .eq('user_id', user.id);
 
-        if (accountsData && !accountsError) {
-          accountsData.forEach(applyAccountRow);
+        if (!accountsError) {
+          let rows = accountsData || [];
+          // No accounts at all is not a state a customer can legitimately be
+          // in. Every customer holds savings at the very least — it is opened
+          // alongside whatever they chose, at sign-up and everywhere else — so
+          // an empty answer here means provisioning never ran for them, not
+          // that they hold nothing. See repairMissingAccounts().
+          if (!rows.length) rows = await repairMissingAccounts(user);
+          rows.forEach(applyAccountRow);
         }
 
         // Scoped to this user. An unfiltered subscription hands you every

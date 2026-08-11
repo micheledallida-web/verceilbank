@@ -389,9 +389,36 @@ here rather than trusted from the browser. Nothing is `approved` until identity
 is verified and the opening deposit lands.
 
 It also backfills. Anyone who signed up before the trigger existed has their
-details sitting on their auth user and nothing in `public`; the backfill runs
-the same function over them. Every insert is `on conflict do nothing`, so an
-existing customer's profile, balances and accounts are never touched.
+details sitting on their auth user and not all of them in `public`; the backfill
+runs the same function over them. Every insert is `on conflict do nothing`, so
+an existing customer's profile, balances and accounts are never touched.
+
+### The backfill condition, and why it matters more than it looks
+
+The backfill considers a customer with **no `user_profile` row OR no `accounts`
+row**. That second clause is not belt and braces — it is the whole fix for a
+fault that reads as an account having stopped working.
+
+An earlier version of this app wrote a profile row at sign-up and opened no
+accounts. A backfill that only looked for a missing profile skipped exactly
+those customers, every time it ran. And `accounts` is where a balance lives:
+the ledger triggers in section 4 move money with
+
+```sql
+update public.accounts set balance = ... where user_id = ... and account_type = ...
+```
+
+With no row to match, **every deposit and every transfer updates nothing**. The
+money is in the ledger, the balance never changes, and there is no error
+anywhere — the account looks broken and nobody can say why. Because the trigger
+existed by the time later sign-ups happened, the fault presents as *"my first
+accounts don't work and only my newest one does"*.
+
+The last statement of section 5 now names anyone still holding no accounts, as
+a warning, so this can never again be discovered by the customer it belongs to.
+`js/main.js` also repairs it client-side — a signed-in customer with zero rows
+gets the product they asked for at sign-up, plus savings — so a browser open
+right now recovers whether or not this file has been re-run.
 
 Check for anyone who slipped through:
 
