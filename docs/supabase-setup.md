@@ -6,6 +6,46 @@ the SQL in the Supabase dashboard under **SQL Editor → New query**.
 Two of these are new (`activity_events`, `transactions`); the rest are settings
 on tables you already have. Nothing here drops or rewrites existing data.
 
+> **The short version:** paste `supabase/setup.sql` into the SQL Editor and run
+> it. It is the whole of this document as one runnable, re-runnable file, and it
+> prints a pass/fail table at the end. This page explains what each part does
+> and why. Read section 0 first if auth is misbehaving right now.
+
+---
+
+## 0. Sign-up or sign-in is not working
+
+Open the browser console on the sign-in page and try it. Every auth failure now
+writes a line beginning `[auth:signin]` or `[auth:signup]` naming what actually
+happened, and anything that looks like our fault also runs a probe that writes
+`[auth:probe]` with a verdict. You can run that probe by hand at any time:
+
+```js
+VerceilAuth.probe()
+```
+
+What it will tell you, and what each answer means:
+
+| Verdict | What to do |
+| --- | --- |
+| `js/config.js did not load` | The build did not run. `npm run build` runs `scripts/generate-config.js`, which writes `js/config.js` from the `SUPABASE_URL` / `SUPABASE_ANON_KEY` environment variables. That file is gitignored, so it exists only after a build. |
+| `rejected the anon key` | The key in `js/config.js` is not this project's. Copy it again from **Project Settings → API**. |
+| `Could not reach the project at all` | Wrong URL, or the project is paused. Supabase pauses free projects after a week with no traffic — the dashboard shows a **Restore** button. |
+| `sign-ups are DISABLED` | **Authentication → Sign In / Providers → Allow new users to sign up.** |
+| `Email confirmation is ON` | Working as designed. A new customer has no session until they open the emailed link, so sign-up shows "check your email" rather than going to the dashboard. Turn it off under the same screen if you want them signed straight in. |
+
+Two failures worth naming separately, because neither reaches the probe:
+
+- **"Database error saving new user."** This comes from a trigger on
+  `auth.users` throwing. An error in such a trigger aborts the insert that fired
+  it, so sign-up does not degrade — it stops completely, for everyone. Section 5
+  of `setup.sql` replaces any older `handle_new_user` with one whose entire body
+  is inside an exception handler for exactly this reason.
+- **A blank or stuck button.** The `supabase-js` bundle is loaded from a CDN. If
+  a content blocker eats it, `window.supabase` is never defined. The pages now
+  say so instead of failing silently, and every auth call has a 20-second
+  timeout so nothing waits forever.
+
 ---
 
 ## 1. New tables
@@ -89,23 +129,52 @@ Deliberately **no update or delete policy on either table.** An audit log a
 client can edit is not an audit log, and a ledger a client can rewrite is not a
 ledger. Corrections are posted as new rows, or made with the service key.
 
-### Check the same is true of the tables you already have
+### The other twenty-five tables
 
-Run this and confirm every row says `true`:
+The two blocks above are what this document used to say, and they were not
+enough. The app reads and writes **thirty** tables. Securing five of them left
+the rest in whatever state they happened to be in, and there are only two
+states, both bad:
+
+- **RLS off** — the anon key, which is in every visitor's browser by design, can
+  read every customer's investments, statements, support messages, linked bank
+  accounts and tax documents.
+- **RLS on with no policy** — the table denies everything, and the screen that
+  reads it renders empty forever with no error anyone ever sees.
+
+Section 4 of `supabase/setup.sql` now covers all of them from one table of
+intent, so there is a single place to check what a customer session may do to
+each table. Run this to see where you stand:
 
 ```sql
-select relname, relrowsecurity
-from pg_class
-where relnamespace = 'public'::regnamespace
-  and relkind = 'r'
-order by relname;
+select c.relname,
+       c.relrowsecurity as rls_on,
+       count(p.polname)  as policies
+  from pg_class c
+  left join pg_policy p on p.polrelid = c.oid
+ where c.relnamespace = 'public'::regnamespace and c.relkind = 'r'
+ group by 1, 2
+ order by 2, 3, 1;
 ```
 
-Any table reading `false` is readable by anyone holding the anon key — which is
-in the shipped JavaScript. The ones that matter most: `accounts`,
-`user_profile`, `profiles`, `verification_requests`, `transfers`, `payments`,
-`wire_transfers`, `external_transfers`, `investment_orders`, `card_reports`,
-`notifications`.
+`rls_on = false` is a leak. `rls_on = true, policies = 0` is a dead screen. The
+only table that should show `true, 0` is `deposit_events`, which holds raw
+exchange payloads and belongs to the bank.
+
+### The balance is not a customer-writable column
+
+The app writes one column of `accounts` — the account number it derives. An
+update policy alone would therefore hand every customer the ability to set their
+own balance, since RLS decides which **rows** may be written, never which
+**columns**. That takes a grant:
+
+```sql
+revoke update on public.accounts from authenticated;
+grant  update (account_number) on public.accounts to authenticated;
+```
+
+Balances move through the ledger triggers and nowhere else. `setup.sql` applies
+this, and its verification section fails loudly if it is ever undone.
 
 ---
 
@@ -197,6 +266,42 @@ full number is typed at sign-up and again at identity verification, where it
 goes to `verification_requests`. If you want it stored encrypted rather than in
 plain text, enable `pgsodium` and store it in an encrypted column — never widen
 what the anon key can read.
+
+---
+
+## 5a. Sign-up has to produce something
+
+Sign-up collects a name, a date of birth, the last four of an SSN, an address
+and a chosen product, and hands the lot to Supabase as user metadata. Until now
+that is where it stopped: the details landed in
+`auth.users.raw_user_meta_data` and nothing in `public` ever read them. A brand
+new customer signed in to a dashboard with no profile row, no accounts and no
+record of what they had asked to open — so the app looked like it had lost the
+application.
+
+Section 5 of `setup.sql` adds a trigger on `auth.users` that unpacks the
+metadata the moment the auth user is created: it writes `user_profile`, seeds
+`profiles.kyc_status`, and opens the requested accounts at `status = 'pending'`
+with a zero balance — plus savings, which comes with every product, enforced
+here rather than trusted from the browser. Nothing is `approved` until identity
+is verified and the opening deposit lands.
+
+It also backfills. Anyone who signed up before the trigger existed has their
+details sitting on their auth user and nothing in `public`; the backfill runs
+the same function over them. Every insert is `on conflict do nothing`, so an
+existing customer's profile, balances and accounts are never touched.
+
+Check for anyone who slipped through:
+
+```sql
+select u.id, u.email, u.created_at
+  from auth.users u
+  left join public.user_profile p on p.user_id = u.id
+ where p.user_id is null;
+```
+
+An empty result is correct. Rows here mean the trigger warned rather than
+wrote — look for `provision_user failed` in **Logs → Postgres**.
 
 ---
 
