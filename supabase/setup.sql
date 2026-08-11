@@ -707,14 +707,33 @@ create trigger freeze_verified_identity
 --
 -- So a credit posted by a representative, or a transfer made on another device,
 -- reaches an open screen without a refresh.
+--
+-- A table that is not in this publication produces a channel that JOINS
+-- SUCCESSFULLY and then never delivers anything. There is no error and nothing
+-- on the console — the screen simply never updates, which looks exactly like an
+-- account where nothing has happened. That is why `notifications` mattered: the
+-- app has subscribed to it all along and it was never published, so the bell
+-- has never once lit up on its own.
 -- =============================================================================
+
+-- The publication is created by Supabase, but not on every project and not
+-- under every template. Without this guard the ALTER below fails and takes the
+-- rest of the file with it.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+    raise notice 'created the supabase_realtime publication';
+  end if;
+end $$;
 
 do $$
 declare
   t text;
 begin
-  foreach t in array array['transactions', 'activity_events', 'accounts'] loop
+  foreach t in array array['transactions', 'activity_events', 'accounts', 'notifications'] loop
     if to_regclass('public.' || t) is null then
+      raise notice 'realtime: skipping %, table not present', t;
       continue;
     end if;
     if not exists (
@@ -723,8 +742,29 @@ begin
     ) then
       execute format('alter publication supabase_realtime add table public.%I', t);
       raise notice 'added % to supabase_realtime', t;
+    else
+      raise notice '% is already published', t;
     end if;
   end loop;
+end $$;
+
+-- REPLICA IDENTITY on `accounts`, and only on `accounts`.
+--
+-- By default Postgres puts just the primary key of the old row into the WAL.
+-- Realtime applies RLS to a DELETE by testing the OLD record — and a record
+-- consisting of nothing but an id has no user_id to test, so the policy cannot
+-- pass and the event is dropped. Every other subscription in the app listens
+-- for INSERT only, where the new row is complete; `accounts` is the one that
+-- listens for '*'.
+--
+-- The cost is a larger WAL for updates to this table, which for a table with
+-- one row per account per customer is not a consideration.
+do $$
+begin
+  if to_regclass('public.accounts') is not null then
+    alter table public.accounts replica identity full;
+    raise notice 'accounts: replica identity full (delete events now carry user_id)';
+  end if;
 end $$;
 
 
@@ -829,10 +869,23 @@ select 'sign-up trigger', 'on_auth_user_created',
                            and tgrelid = 'auth.users'::regclass)
             then 'ok' else 'MISSING' end
 
+-- Checked against what the app subscribes to, rather than listing whatever
+-- happens to be published. A missing table here is a screen that never updates,
+-- with no error anywhere to say so.
 union all
-select 'realtime', tablename, 'ok'
-  from pg_publication_tables
- where pubname = 'supabase_realtime' and schemaname = 'public'
+select 'realtime', t,
+       case when to_regclass('public.' || t) is null then 'table missing'
+            when exists (select 1 from pg_publication_tables
+                          where pubname = 'supabase_realtime'
+                            and schemaname = 'public' and tablename = t)
+            then 'ok' else 'MISSING — this screen will never update live' end
+  from unnest(array['transactions','activity_events','accounts','notifications']) as t
+
+union all
+select 'realtime', 'accounts replica identity',
+       case when to_regclass('public.accounts') is null then 'table missing'
+            when (select relreplident from pg_class where oid = 'public.accounts'::regclass) = 'f'
+            then 'ok' else 'MISSING — delete events will be dropped by RLS' end
 
 order by 1, 3 desc, 2;
 
