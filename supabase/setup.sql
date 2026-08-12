@@ -24,8 +24,9 @@
 --   8. Realtime
 --   9. Reference data
 --  10. Identity verification THE ONE THAT MAKES ID UPLOAD WORK
---  11. Verification          run this at the end and read the output
---  12. Optional: pg_cron
+--  11. Statement files       THE ONE THAT MAKES DOWNLOAD PDF HAND OVER A FILE
+--  12. Verification          run this at the end and read the output
+--  13. Optional: pg_cron
 -- =============================================================================
 
 
@@ -1130,7 +1131,128 @@ create policy "own kyc documents update"
 
 
 -- =============================================================================
--- 11. VERIFICATION
+-- 11. STATEMENT FILES — THE BUCKET AND THE COLUMNS THAT POINT AT IT
+--
+-- THE ONE THAT MAKES "DOWNLOAD PDF" HAND OVER A FILE.
+--
+-- A statement row records what a statement SAYS — the period, the account, the
+-- closing balance. It never recorded where the document IS, so there was
+-- nothing for the download button to fetch and the app could only ever draw the
+-- customer a summary of the row it already had.
+--
+-- These columns are that missing pointer, and the bucket below is what they
+-- point into. Both are optional by design: a row with no path still downloads,
+-- as a summary generated in the browser from the row itself (see
+-- js/shared/documents.js). Filling the path in upgrades that row from a summary
+-- to the bank's own document, one row at a time, with no change to the app.
+--
+-- The upsert pattern for whatever generates them: write the PDF to
+--   statements/<user-id>/<period>-<doc-type>.pdf
+-- then update the row for that user + period + type, or insert it if it is not
+-- there yet. The path carries the user id as its FIRST folder, because that is
+-- what the storage policies below check — a path shaped any other way is a file
+-- its owner cannot read.
+-- =============================================================================
+
+do $$
+begin
+  if to_regclass('public.investment_statements') is null then
+    raise notice 'investment_statements missing, skipping the storage columns';
+  else
+    alter table public.investment_statements
+      -- Where the file lives, relative to the bucket. Null means "not generated
+      -- yet", which the app reads as "draw the summary instead".
+      add column if not exists storage_object_path text,
+      -- Which bucket, for the day statements and tax forms live in different
+      -- ones. Defaulted so nothing has to say it today.
+      add column if not exists storage_bucket      text not null default 'statements',
+      -- What the file should be CALLED when it lands in somebody's Downloads
+      -- folder. Without this a customer ends up with a file named after a
+      -- storage key.
+      add column if not exists file_name           text,
+      add column if not exists mime_type           text not null default 'application/pdf',
+      add column if not exists file_size_bytes     bigint,
+      add column if not exists file_generated_at   timestamptz;
+  end if;
+
+  -- The account documents hub downloads the same way and needs the same
+  -- pointer. Same shape, deliberately: one download path serves both screens.
+  if to_regclass('public.account_documents') is null then
+    raise notice 'account_documents missing, skipping the storage columns';
+  else
+    alter table public.account_documents
+      add column if not exists storage_object_path text,
+      add column if not exists storage_bucket      text not null default 'statements',
+      add column if not exists file_name           text,
+      add column if not exists mime_type           text not null default 'application/pdf',
+      add column if not exists file_size_bytes     bigint,
+      add column if not exists file_generated_at   timestamptz;
+  end if;
+end $$;
+
+-- One statement per customer, per period, per type. This is what makes the
+-- generator's upsert an upsert rather than a way to accumulate four copies of
+-- August: without it, "regenerate this month" appends, and the customer's list
+-- fills with duplicates that all say the same thing.
+--
+-- Added only if the existing rows allow it. A table that already holds
+-- duplicates would fail the whole script here, which is a worse outcome than
+-- going without the constraint until somebody has looked at those rows.
+do $$
+begin
+  if to_regclass('public.investment_statements') is null then
+    return;
+  end if;
+
+  if exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.investment_statements'::regclass
+       and conname = 'investment_statements_period_unique'
+  ) then
+    return;
+  end if;
+
+  if exists (
+    select 1 from public.investment_statements
+     group by user_id, statement_period, doc_type
+    having count(*) > 1
+  ) then
+    raise warning 'investment_statements holds duplicate period/type rows — unique constraint NOT added, dedupe them first';
+    return;
+  end if;
+
+  alter table public.investment_statements
+    add constraint investment_statements_period_unique
+    unique (user_id, statement_period, doc_type);
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- The bucket. PRIVATE, for the same reason the identity one is: a bank
+-- statement carries a name, an address, an account number and a balance. A
+-- public bucket would put every one of them behind a guessable URL.
+--
+-- Nothing is fetched from here directly. The app asks Storage for a signed URL
+-- — this customer, this object, ten minutes — and downloads that, which is the
+-- only way to read a private object from a browser.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('statements', 'statements', false)
+on conflict (id) do update set public = false;
+
+-- Read only, and only your own. The first folder of the path is the owner.
+--
+-- No insert, update or delete policy, and that is the point: statements are
+-- written by the bank with the service key, never by a customer session. A
+-- customer who could write into this bucket could write their own statement.
+drop policy if exists "own statements read" on storage.objects;
+
+create policy "own statements read"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'statements' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- =============================================================================
+-- 12. VERIFICATION
 --
 -- Run this section on its own afterwards and read the output. Every row should
 -- say 'ok'. Anything that says 'MISSING' is not set up.
@@ -1245,6 +1367,31 @@ select 'identity uploads', 'ssn not readable by customer sessions',
        case when has_column_privilege('authenticated', 'public.verification_requests', 'ssn', 'SELECT')
             then 'EXPOSED — a session can read SSNs back' else 'ok' end
 
+-- Without these, Download PDF still works — it falls back to a summary drawn
+-- in the browser — but the bank's own statement file can never be served.
+union all
+select 'statement files', 'statements bucket (private)',
+       case when not exists (select 1 from storage.buckets where id = 'statements')
+              then 'MISSING — stored statement PDFs cannot be served'
+            when (select public from storage.buckets where id = 'statements')
+              then 'EXPOSED — bucket is public, statements readable by URL'
+            else 'ok' end
+
+union all
+select 'statement files', 'own statements read policy',
+       case when exists (select 1 from pg_policy
+                          where polrelid = 'storage.objects'::regclass
+                            and polname = 'own statements read')
+            then 'ok' else 'MISSING — a signed URL will be refused' end
+
+union all
+select 'statement files', 'investment_statements.storage_object_path',
+       case when to_regclass('public.investment_statements') is null then 'table missing'
+            when exists (select 1 from information_schema.columns
+                          where table_schema = 'public' and table_name = 'investment_statements'
+                            and column_name = 'storage_object_path')
+            then 'ok' else 'MISSING — every download will be a generated summary' end
+
 union all
 select 'realtime', 'accounts replica identity',
        case when to_regclass('public.accounts') is null then 'table missing'
@@ -1277,7 +1424,7 @@ having a.balance is distinct from
 
 
 -- =============================================================================
--- 12. OPTIONAL — pg_cron
+-- 13. OPTIONAL — pg_cron
 --
 -- Not run by the statements above. Enable the pg_cron extension first
 -- (Database -> Extensions), then run this block on its own if you want it.
