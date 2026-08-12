@@ -1346,6 +1346,94 @@ revoke all on public.offer_codes            from anon, authenticated;
 revoke all on public.offer_code_redemptions from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- THROTTLING THE ORACLE
+--
+-- `offer_code_status` answers one question for anybody holding the anon key:
+-- does this code work. That is the whole point of it — it is what lets the form
+-- say "check that code" at the step instead of at the end of a six-screen
+-- application. It is also, unthrottled, a brute-force oracle.
+--
+-- The arithmetic is the thing. Seven digits with a leading digit of 1-9 is a
+-- space of nine million. With N live codes in it, a random guess hits one with
+-- probability N/9,000,000:
+--
+--       100 live codes  ->  1 in 90,000  ->  ~90,000 guesses expected
+--     2,000 live codes  ->  1 in  4,500  ->   ~4,500 guesses expected
+--
+-- Four and a half thousand cheap requests is minutes of scripting. The size of
+-- the space stops being a defence somewhere between those two rows, and it is
+-- not the sort of thing to discover after issuing the codes.
+--
+-- So the oracle is rate limited per caller. What it is NOT is a second gate:
+-- a throttled caller is told "cannot check right now", the form waves them
+-- through, and the trigger on auth.users decides at submit exactly as it would
+-- have anyway. The throttle costs an attacker their cheap yes/no feed and costs
+-- a real applicant nothing but a message they will never see.
+--
+-- Sign-up itself is a separate path with its own limit — Supabase's own auth
+-- rate limiting, under Authentication -> Rate Limits. This does not and cannot
+-- cover that: GoTrue talks to Postgres directly rather than through PostgREST,
+-- so the trigger has no request headers to identify a caller by. Check that
+-- setting is sane; it is what governs guessing by repeated sign-up.
+-- ---------------------------------------------------------------------------
+
+-- One row per caller. Small — it is bounded by distinct client addresses, not
+-- by attempts — and prunable, see the end of this section.
+create table if not exists public.offer_code_attempts (
+  client       text primary key,
+  window_start timestamptz not null default now(),
+  attempts     integer     not null default 0,
+  last_seen    timestamptz not null default now()
+);
+
+-- The bank's, like the codes themselves. Deny-all: a caller who could read this
+-- could see how close they were to the limit, and one who could write it could
+-- reset their own.
+alter table public.offer_code_attempts enable row level security;
+revoke all on public.offer_code_attempts from anon, authenticated;
+
+-- Who is asking.
+--
+-- PostgREST puts the request's headers in a GUC. `x-forwarded-for` is set by
+-- Supabase's edge on every browser request and its first entry is the client;
+-- `cf-connecting-ip` is the fallback for a project fronted by Cloudflare.
+--
+-- NULL when there is no request to look at — a psql session, a server-side
+-- call, anything that is not PostgREST. That is deliberate and it is read as
+-- "do not throttle" rather than as one shared bucket: an unidentifiable caller
+-- put in a shared bucket means the first script to run empties everybody's
+-- allowance and sign-up stops working for every real applicant at once. An
+-- availability failure to defend against an enumeration risk is a bad trade,
+-- and the header is always there for the callers this is aimed at.
+create or replace function public.offer_code_client()
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  headers json;
+begin
+  begin
+    headers := nullif(current_setting('request.headers', true), '')::json;
+  exception when others then
+    return null;
+  end;
+  if headers is null then
+    return null;
+  end if;
+  return coalesce(
+    nullif(btrim(split_part(headers->>'x-forwarded-for', ',', 1)), ''),
+    nullif(btrim(headers->>'cf-connecting-ip'), '')
+  );
+end;
+$$;
+
+revoke all on function public.offer_code_client() from public, anon, authenticated;
+
+
+-- ---------------------------------------------------------------------------
 -- BINDING TO THE TABLE THAT IS ACTUALLY THERE
 --
 -- A project that rolled its own offer codes did not use these column names, and
@@ -1508,25 +1596,74 @@ begin
 
   -- Is this code usable? The one question a stranger is allowed to ask.
   --
-  -- 'ok' or 'invalid', and nothing else — NOT 'expired', NOT 'already used up'.
-  -- A code is seven digits, so the whole space is ten million; an answer that
-  -- distinguished "no such code" from "that code is spent" would confirm which
-  -- of those ten million are real, one guess at a time. One vaguer word costs
-  -- the applicant very little and costs an enumerator everything.
+  -- Three answers, and only three:
   --
-  -- It consumes nothing. It exists so the form can say "check that code" at the
-  -- step rather than at the end of the application, and it is not what enforces
-  -- the rule — the trigger below is.
+  --   'ok'        spend it, it works
+  --   'invalid'   it does not — and NOT which kind of invalid. Never 'expired',
+  --               never 'already used up'. An answer that separated "no such
+  --               code" from "that code is spent" would confirm which of nine
+  --               million strings are real, one guess at a time.
+  --   'throttled' this caller has asked too often. Says nothing about the code.
+  --
+  -- It consumes nothing and it enforces nothing. It exists so the form can say
+  -- "check that code" at the step rather than at the end of a six-screen
+  -- application; the trigger below is what decides whether an account opens.
+  -- A caller who is throttled is not refused a sign-up, only a preview of the
+  -- answer.
+  --
+  -- Getting it right forgives the misses that led there: somebody who mistypes
+  -- four times and then reads their invitation properly walks away with a clean
+  -- record, while a script that only ever misses keeps every one of them.
   execute format($fn$
     create or replace function public.offer_code_status(p_code text)
-    returns text language sql security definer stable set search_path = public as $body$
+    returns text language plpgsql security definer set search_path = public as $body$
+    declare
+      -- Ten tries per ten minutes. An applicant needs one, or two if the letter
+      -- is smudged; nobody legitimately needs ten. Both numbers are here rather
+      -- than anywhere else, so this is where to change them.
+      max_tries constant integer  := 10;
+      window_for constant interval := interval '10 minutes';
+      -- v_ prefixed, and not decoratively: `client` is also the name of the
+      -- column this writes to, and in plpgsql the variable wins. `where client
+      -- = client` would then be `where true` — the success path below would
+      -- clear every caller's counter in the table instead of this one's, which
+      -- is a throttle that quietly turns itself off the first time anybody
+      -- enters a correct code.
+      v_client  text;
+      tries     integer;
+      verdict   text;
+    begin
+      v_client := public.offer_code_client();
+
+      -- No identifiable caller, no throttle. See offer_code_client.
+      if v_client is not null then
+        insert into public.offer_code_attempts as a (client, window_start, attempts, last_seen)
+        values (v_client, now(), 1, now())
+        on conflict (client) do update
+          set window_start = case when now() - a.window_start > window_for then now() else a.window_start end,
+              attempts     = case when now() - a.window_start > window_for then 1    else a.attempts + 1 end,
+              last_seen    = now()
+        returning a.attempts into tries;
+
+        if tries > max_tries then
+          return 'throttled';
+        end if;
+      end if;
+
       select case when exists (
         select 1 from public.offer_codes oc
          where oc.%1$I = p_code
            and oc.%2$I
            and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
            and (oc.expires_at is null or oc.expires_at > now())
-      ) then 'ok' else 'invalid' end;
+      ) then 'ok' else 'invalid' end into verdict;
+
+      if verdict = 'ok' and v_client is not null then
+        update public.offer_code_attempts set attempts = 0 where client = v_client;
+      end if;
+
+      return verdict;
+    end;
     $body$;
   $fn$, code_col, active_col);
 
@@ -1847,6 +1984,20 @@ select 'offer codes', 'usable codes available',
               then 'n/a — requirement is off'
             when public.offer_codes_usable() > 0
             then 'ok' else 'NONE — nobody can sign up; issue a code' end
+
+union all
+select 'offer codes', 'code checks are rate limited',
+       case when to_regclass('public.offer_code_attempts') is null
+              then 'MISSING — the anon key can brute-force the code space'
+            when not exists (select 1 from pg_proc where proname = 'offer_code_client')
+              then 'MISSING — no way to tell callers apart, so no throttle'
+            else 'ok' end
+
+union all
+select 'offer codes', 'attempt counters not readable by sessions',
+       case when has_table_privilege('anon', 'public.offer_code_attempts', 'SELECT')
+             or has_table_privilege('authenticated', 'public.offer_code_attempts', 'SELECT')
+            then 'EXPOSED — a caller can see its own allowance' else 'ok' end
 
 union all
 select 'offer codes', 'codes not readable by customer sessions',

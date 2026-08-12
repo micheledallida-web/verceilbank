@@ -1026,6 +1026,51 @@ as overloads, so nothing breaks, but only `consume_offer_code(text, uuid)` is
 the one the trigger calls. Drop yours once you have moved off it. If your column
 was converted to `text`, yours will error when called — loudly, not silently.
 
+### The pre-check is rate limited
+
+`offer_code_status` is callable by the anon key, which is what lets the form say
+"check that code" at the step. Unthrottled, that is also a brute-force oracle,
+and the arithmetic gets uncomfortable as you issue more codes. Seven digits with
+a leading digit of 1–9 is a space of nine million:
+
+| live codes | odds per guess | expected guesses to a hit | at 10 req/s |
+|---|---|---|---|
+| 100 | 1 in 90,000 | ~90,000 | ~2.5 hours |
+| 2,000 | 1 in 4,500 | ~4,500 | **~7 minutes** |
+
+So it is capped at **10 checks per 10 minutes per caller**, counted in
+`public.offer_code_attempts` and keyed on the client address PostgREST reports
+(`x-forwarded-for`, falling back to `cf-connecting-ip`). Both numbers live at
+the top of the generated function; that is the only place to change them.
+
+Three things about how it behaves, all deliberate:
+
+- **A throttled caller is not refused a sign-up.** The function answers
+  `'throttled'`, the form treats that exactly as it treats "cannot reach the
+  bank" — waves them through — and the trigger decides at submit as it always
+  would. The throttle takes away the cheap yes/no, not the ability to open an
+  account.
+- **Getting it right forgives the misses.** A correct code resets that caller's
+  counter, so somebody who mistypes four times and then reads their invitation
+  properly walks away clean. A script that only ever misses keeps every one.
+- **An unidentifiable caller is not throttled at all.** No request headers means
+  no PostgREST request — psql, a server-side call. Putting those in one shared
+  bucket would mean the first script to run empties everyone's allowance and
+  sign-up stops working for every real applicant at once. An availability
+  failure to defend an enumeration risk is a bad trade.
+
+**This does not cover sign-up itself.** GoTrue talks to Postgres directly rather
+than through PostgREST, so the trigger has no headers to identify anyone by.
+Guessing by repeated `auth.signUp` is governed by Supabase's own limits under
+**Authentication → Rate Limits** — check that setting is sane.
+
+The counter table is one row per client address, so it stays small. Prune it if
+you like:
+
+```sql
+delete from public.offer_code_attempts where last_seen < now() - interval '7 days';
+```
+
 ### Turning it off
 
 For creating a user by hand in the Supabase dashboard, or to open sign-ups to

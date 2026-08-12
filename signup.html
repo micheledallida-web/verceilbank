@@ -841,6 +841,12 @@
     // decides — the trigger on auth.users is the gate, and refusing somebody
     // here because their train went into a tunnel would be this screen
     // inventing a rejection the bank never made.
+    //
+    // The same goes for 'throttled', which is what the bank answers a caller
+    // that has asked about too many codes too quickly. It is a defence against
+    // somebody working through the seven-digit space one guess at a time, and
+    // the thing it takes away is the cheap yes/no — not the ability to open an
+    // account. See the note above offer_code_status in setup.sql.
     async function checkOfferCode(code) {
       if (Object.prototype.hasOwnProperty.call(offerCodeVerdicts, code)) {
         return offerCodeVerdicts[code];
@@ -853,6 +859,20 @@
           'Checking your offer code',
         );
         if (error) throw error;
+
+        // 'throttled' is not an answer about the code — it is the bank
+        // declining to answer, because this caller has asked too many times too
+        // quickly. It means the same thing to this screen as not being able to
+        // reach the bank at all: we do not know, so we do not claim to. The
+        // applicant goes through and the sign-up itself decides.
+        //
+        // Not cached either, for the same reason: there is nothing here worth
+        // remembering about this code.
+        if (data === 'throttled') {
+          console.warn('[signup] offer code checks are rate limited for this caller; letting the sign-up decide');
+          return 'unreachable';
+        }
+
         const verdict = data === 'ok' ? 'ok' : 'invalid';
         offerCodeVerdicts[code] = verdict;
         return verdict;
