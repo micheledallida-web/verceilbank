@@ -179,6 +179,23 @@
       cursor: pointer;
     }
 
+    /* The offer code is seven digits and nothing else, so it is set as digits
+       rather than as prose: tabular figures at an even width, spaced apart far
+       enough to be counted and checked against a letter without losing your
+       place. The placeholder shows the length before anything is typed. */
+    .input-group input.offer-code-input {
+      font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+      font-size: 1.4rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.42em;
+      text-indent: 0.42em;
+    }
+
+    .input-group input.offer-code-input::placeholder {
+      color: #d1d5db;
+      letter-spacing: 0.42em;
+    }
+
     .input-group input:focus, .input-group select:focus {
       border-bottom-color: var(--vb-blue-dark);
     }
@@ -454,11 +471,41 @@
              render blocks the customer with no explanation at all. -->
         <div class="step-error" data-step-error="product"></div>
 
-        <button type="button" class="btn-next-full" data-next="identity">Continue</button>
+        <button type="button" class="btn-next-full" data-next="offer">Continue</button>
       </div>
 
-      <!-- ================= STEP 2 — WHO YOU ARE ================= -->
-      <!-- ================= STEP 2 — NAME AND DATE OF BIRTH ================= -->
+      <!-- ================= STEP 2 — OFFER CODE =================
+           Verceil is invite-only. The code is asked for here, before any
+           personal detail, because it is the one answer that can end the
+           application — and asking somebody for their name, their date of
+           birth, four digits of their Social Security Number and their home
+           address before telling them they cannot open an account is
+           collecting a stranger's identity for nothing.
+
+           The field is checked against the bank as the step is cleared, not at
+           the end. The real gate is the trigger on auth.users; this is what
+           stops an applicant reaching the last screen before finding out. -->
+      <div id="stepOffer" style="display:none;">
+        <h1>What is your offer code?</h1>
+        <p class="subtitle">Verceil Bank is invite-only. Enter the seven-digit code from your invitation to continue.</p>
+
+        <div class="input-group">
+          <label for="offerCode">Offer code</label>
+          <input type="text" id="offerCode" class="offer-code-input" inputmode="numeric" autocomplete="one-time-code"
+                 placeholder="0000000" maxlength="7" required aria-describedby="offerCodeNote">
+        </div>
+
+        <div class="step-note" id="offerCodeNote">
+          Your code is in the invitation email or letter we sent you. Each code opens a limited number of accounts. If yours will not work, contact the person who invited you or call us on (800) 555-0123.
+        </div>
+
+        <div class="step-error" data-step-error="offer"></div>
+
+        <button type="button" class="btn-next-full" data-next="identity">Continue</button>
+        <button type="button" class="btn-back-link" data-back="product">Back</button>
+      </div>
+
+      <!-- ================= STEP 3 — NAME AND DATE OF BIRTH ================= -->
       <div id="stepIdentity" style="display:none;">
         <h1>Let's get to know you</h1>
         <p class="subtitle">Your name and date of birth as they appear on your government ID. These are checked against your ID during verification, so they cannot be changed afterwards.</p>
@@ -496,7 +543,7 @@
 
         <div class="step-error" data-step-error="identity"></div>
         <button type="button" class="btn-next-full" data-next="ssn">Next</button>
-        <button type="button" class="btn-back-link" data-back="product">Back</button>
+        <button type="button" class="btn-back-link" data-back="offer">Back</button>
       </div>
 
       <!-- ================= STEP 3 — SOCIAL SECURITY NUMBER ================= -->
@@ -672,6 +719,10 @@
     // hand by then.
     const STEPS = [
       { key: 'product', id: 'stepProduct', label: 'Choose your account' },
+      // Second, and ahead of every personal detail on purpose. It is the only
+      // step that can end the application, so it is asked before the applicant
+      // has handed over a name, a date of birth or an address.
+      { key: 'offer', id: 'stepOffer', label: 'Your offer code' },
       { key: 'identity', id: 'stepIdentity', label: 'Your name and date of birth' },
       { key: 'ssn', id: 'stepSsn', label: 'Last four of your SSN' },
       { key: 'address', id: 'stepAddress', label: 'Home address' },
@@ -747,6 +798,64 @@
       ssnInput.value = ssnInput.value.replace(/\D/g, '').slice(0, 4);
     });
 
+    // ---------- Offer code ----------
+    // Seven digits. The field refuses anything else as it is typed, so a code
+    // pasted out of an email with a space or a dash in it still lands correctly
+    // rather than being rejected for a character the applicant did not put
+    // there.
+    const OFFER_CODE_LENGTH = 7;
+    const offerCodeInput = document.getElementById('offerCode');
+
+    offerCodeInput.addEventListener('input', () => {
+      offerCodeInput.value = offerCodeInput.value.replace(/\D/g, '').slice(0, OFFER_CODE_LENGTH);
+      // A complaint about the previous attempt should not still be on screen
+      // while a new one is being typed.
+      setStepError('offer', '');
+    });
+
+    // What the bank last told us about a code, so tabbing back and forth over a
+    // cleared step does not re-ask about a code it has already answered for.
+    // Keyed by the code itself; a different code is a different question.
+    const offerCodeVerdicts = Object.create(null);
+
+    // Asks the project whether this code can still be spent.
+    //
+    // `offer_code_status` is a security-definer function granted to the anon
+    // key — the offer_codes table itself is readable by nobody, so this is the
+    // only thing a stranger can ask, and all it will answer is 'ok' or
+    // 'invalid'. It deliberately will not say WHICH kind of invalid: a code is
+    // seven digits, so an answer that separated "no such code" from "that one
+    // is used up" would confirm which of ten million strings are real.
+    //
+    // A failure to reach the bank is NOT treated as a bad code. The applicant
+    // is allowed through the step on a network error and the sign-up itself
+    // decides — the trigger on auth.users is the gate, and refusing somebody
+    // here because their train went into a tunnel would be this screen
+    // inventing a rejection the bank never made.
+    async function checkOfferCode(code) {
+      if (Object.prototype.hasOwnProperty.call(offerCodeVerdicts, code)) {
+        return offerCodeVerdicts[code];
+      }
+      if (!supabaseClient) return 'unreachable';
+
+      try {
+        const { data, error } = await VerceilAuth.withTimeout(
+          supabaseClient.rpc('offer_code_status', { p_code: code }),
+          'Checking your offer code',
+        );
+        if (error) throw error;
+        const verdict = data === 'ok' ? 'ok' : 'invalid';
+        offerCodeVerdicts[code] = verdict;
+        return verdict;
+      } catch (err) {
+        // Logged rather than shown. Whoever opens the console needs to know the
+        // function is missing or the grant was never made; the applicant does
+        // not, and must not be blocked by it.
+        console.error('[signup] offer code check could not be made:', err);
+        return 'unreachable';
+      }
+    }
+
     // ---------- Per-step validation ----------
     // Each returns an error string, or '' when the step is complete. Nothing
     // moves forward until its own step is right, so an error can only ever be
@@ -758,6 +867,14 @@
       product: () => (SIGNUP_PRODUCTS.includes(selectedProduct)
         ? ''
         : 'Choose one of the accounts listed to continue.'),
+      // Shape only. Whether the code is real is the bank's answer, asked for
+      // separately below — this is what stops six digits being sent to find out.
+      offer: () => {
+        const digits = value('offerCode').replace(/\D/g, '');
+        if (!digits) return 'Enter the seven-digit offer code from your invitation.';
+        if (digits.length !== OFFER_CODE_LENGTH) return 'An offer code is seven digits. Check the code on your invitation.';
+        return '';
+      },
       identity: () => {
         if (!value('firstName')) return 'Enter your first name as it appears on your ID.';
         if (!value('lastName')) return 'Enter your last name as it appears on your ID.';
@@ -801,13 +918,51 @@
       },
     };
 
+    // A step that has to ask the bank something before it will let go.
+    //
+    // Only the offer code does, and only because the alternative is letting
+    // somebody fill in five more screens before being told their invitation is
+    // no good. Each returns an error string, or '' to let the step pass.
+    const SERVER_CHECKS = {
+      offer: async () => {
+        const verdict = await checkOfferCode(value('offerCode').replace(/\D/g, ''));
+        if (verdict === 'invalid') {
+          return 'That code is not valid. Check the seven digits on your invitation, or contact whoever invited you.';
+        }
+        // 'unreachable' passes. See checkOfferCode.
+        return '';
+      },
+    };
+
     document.querySelectorAll('[data-next]').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const current = STEPS.find((step) => document.getElementById(step.id).style.display !== 'none');
         const key = current ? current.key : 'product';
         const error = (VALIDATORS[key] || (() => ''))();
         setStepError(key, error);
         if (error) return;
+
+        const check = SERVER_CHECKS[key];
+        if (!check) {
+          showStep(btn.getAttribute('data-next'));
+          return;
+        }
+
+        // The button says what it is doing and cannot be pressed twice while it
+        // is doing it. A second request would be a second answer racing the
+        // first one onto the same step.
+        const label = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Checking...';
+        let serverError = '';
+        try {
+          serverError = await check();
+        } finally {
+          btn.disabled = false;
+          btn.textContent = label;
+        }
+        setStepError(key, serverError);
+        if (serverError) return;
         showStep(btn.getAttribute('data-next'));
       });
     });
@@ -867,6 +1022,7 @@
       const suffix = suffixRaw === 'None' ? '' : suffixRaw;
       const dob = value('dob');
       const ssn = value('ssn').replace(/\D/g, '');
+      const offerCode = value('offerCode').replace(/\D/g, '');
       const email = value('email');
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
@@ -915,6 +1071,15 @@
               city: value('city'),
               state: value('state'),
               postal_code: value('postalCode'),
+              // The invitation this account is being opened against.
+              //
+              // Sent as metadata, and spent by the BEFORE INSERT trigger on
+              // auth.users in the same transaction that creates the user — so a
+              // code that cannot be spent takes the sign-up down with it, and a
+              // sign-up that fails for any other reason leaves the code
+              // untouched. The step above already asked the bank about this
+              // code; that was for the applicant's benefit, not the rule's.
+              offer_code: offerCode,
               // The last four, which is now all this screen ever collects.
               // The full number is written to the verification record at
               // identity check, never onto the auth user, where it would sit
@@ -992,6 +1157,21 @@
         const { kind, message } = VerceilAuth.describe(err, 'signup');
         queueEvent('signup.failed', { reason: kind });
         if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
+
+        // The gate refused this code between the step check and the submit —
+        // somebody else spent the last use of it, or it expired in the minutes
+        // the application took. Put the applicant back on the step that can fix
+        // it rather than leaving them on the password screen reading about a
+        // field they cannot see, and forget the verdict we cached so the code
+        // is asked about again rather than waved through from memory.
+        if (kind === 'offer_code') {
+          delete offerCodeVerdicts[offerCode];
+          showStep('offer');
+          setStepError('offer', message);
+          submitBtn.textContent = 'Open my account';
+          submitBtn.disabled = false;
+          return;
+        }
 
         errorBanner.textContent = message;
         errorBanner.style.display = 'block';
