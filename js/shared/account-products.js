@@ -72,10 +72,19 @@ export const ACCOUNT_PRODUCTS = [
     accent: '#059669',
     // Automatic at sign-up, a choice afterwards. See the note above the list.
     openWith: ['app'],
+    // Offered ALONGSIDE another account rather than instead of one. Every other
+    // product on this list answers "which account are you opening?"; savings
+    // answers "and do you want one of these with it?", which is a different
+    // question and needs a different control — a checkbox, not a radio. Open an
+    // Account reads this flag and draws it accordingly.
+    addOn: true,
+    // Nothing here about WHEN it was opened. That differs by reader — it came
+    // with a member's first account, and it is a thing a member without one is
+    // choosing right now — so the card says it in its footer instead.
     features: [
       '4.00% APY on the whole balance',
       'No minimum balance to earn interest',
-      'Opened with your first account when you join',
+      'No monthly maintenance fee',
       'FDIC insured to the applicable limits',
     ],
   },
