@@ -903,6 +903,15 @@ That is why the code is consumed from a trigger rather than called from the
 client before sign-up: the client-side order burns a code every time a sign-up
 fails after the check, and leaves the decision with the browser.
 
+**What a code looks like is defined once**, by the `offer_codes_seven_digits`
+constraint. The trigger checks only that a code was *sent* — it does not repeat
+the pattern, because a string that is not a valid code cannot be stored as one,
+so it cannot match a row, so it is refused anyway and for the true reason. If
+you ever move to eight digits, change the constraint and nothing else. (The
+form's `OFFER_CODE_LENGTH` is a separate copy by necessity — the browser cannot
+read a check constraint — but it is one constant, and the field's `maxlength`
+and placeholder are written from it.)
+
 ### Issue a code
 
 `setup.sql` creates no codes, on purpose — a code committed to a source file is

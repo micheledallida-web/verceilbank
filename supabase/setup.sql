@@ -1366,17 +1366,27 @@ alter table public.offer_codes
 
 -- Seven digits, exactly. Enforced here as well as in the form, because the form
 -- is not what decides what a valid code looks like.
+-- The pattern is a variable rather than a literal typed twice, because the
+-- check that decides whether the constraint CAN be added and the constraint
+-- itself have to be the same rule — and written out twice, three lines apart,
+-- they are two rules that merely happen to agree today.
+--
+-- This is the only place in this file that says what a code looks like. The
+-- sign-up trigger below deliberately does not repeat it.
 do $$
+declare
+  pattern constant text := '^[0-9]{7}$';
 begin
   if not exists (
     select 1 from pg_constraint
      where conrelid = 'public.offer_codes'::regclass and conname = 'offer_codes_seven_digits'
   ) then
-    if exists (select 1 from public.offer_codes where code !~ '^[0-9]{7}$') then
+    if exists (select 1 from public.offer_codes where code !~ pattern) then
       raise warning 'offer_codes holds codes that are not seven digits — format constraint NOT added, fix those rows first';
     else
-      alter table public.offer_codes
-        add constraint offer_codes_seven_digits check (code ~ '^[0-9]{7}$');
+      execute format(
+        'alter table public.offer_codes add constraint offer_codes_seven_digits check (code ~ %L)',
+        pattern);
     end if;
   end if;
 end $$;
@@ -1544,7 +1554,22 @@ begin
 
   code := nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), '');
 
-  if code is null or code !~ '^[0-9]{7}$' then
+  -- PRESENCE only. What a code looks like is decided in exactly one place —
+  -- the `offer_codes_seven_digits` constraint above — and repeating the pattern
+  -- here would be the same rule written twice: change the codes to eight digits
+  -- one day and this copy would go on refusing every valid one, from inside a
+  -- trigger, with an error that says the code is missing when it is not.
+  --
+  -- It does not need repeating. A string that is not a valid code cannot be
+  -- stored as one, so it cannot match a row, so consume_offer_code below
+  -- returns false and the sign-up is refused anyway — for the true reason
+  -- rather than a guessed one.
+  --
+  -- The empty case stays, because it is a different fact and deserves its own
+  -- answer: nothing was sent at all. That is not somebody mistyping their
+  -- invitation, it is a client that did not ask for one — an old cached copy of
+  -- the form, or a script posting straight at the endpoint.
+  if code is null then
     raise exception 'offer code required'
       using errcode = 'check_violation',
             hint    = 'Sign-up needs a valid seven-digit offer code.';

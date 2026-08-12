@@ -491,8 +491,13 @@
 
         <div class="input-group">
           <label for="offerCode">Offer code</label>
+          <!-- No `maxlength` and no `placeholder` here on purpose: both are the
+               code's length, and the length is stated once, in the script
+               below, which sets them. Three copies of a 7 in two languages is
+               how a field ends up accepting a different number of digits than
+               the thing checking it. -->
           <input type="text" id="offerCode" class="offer-code-input" inputmode="numeric" autocomplete="one-time-code"
-                 placeholder="0000000" maxlength="7" required aria-describedby="offerCodeNote">
+                 required aria-describedby="offerCodeNote">
         </div>
 
         <div class="step-note" id="offerCodeNote">
@@ -803,8 +808,12 @@
     // pasted out of an email with a space or a dash in it still lands correctly
     // rather than being rejected for a character the applicant did not put
     // there.
+    // The length, once. The field's own attributes are written from it rather
+    // than repeated in the markup, so this is the only 7 on the page.
     const OFFER_CODE_LENGTH = 7;
     const offerCodeInput = document.getElementById('offerCode');
+    offerCodeInput.setAttribute('maxlength', String(OFFER_CODE_LENGTH));
+    offerCodeInput.setAttribute('placeholder', '0'.repeat(OFFER_CODE_LENGTH));
 
     offerCodeInput.addEventListener('input', () => {
       offerCodeInput.value = offerCodeInput.value.replace(/\D/g, '').slice(0, OFFER_CODE_LENGTH);
