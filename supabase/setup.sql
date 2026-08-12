@@ -1295,6 +1295,63 @@ create table if not exists public.offer_codes (
   created_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- A table that was already here, brought into the shape the rest of this
+-- section needs. Two things get fixed, and both of them are things a project
+-- that rolled its own offer codes is likely to have.
+--
+-- 1. `code` STORED AS A NUMBER.
+--
+--    It is the obvious choice — the codes are digits — and it is wrong, because
+--    a seven-digit code is not a quantity, it is a string that happens to be
+--    made of digits. Stored as an integer, 0123456 is 123456: the leading zero
+--    is not hidden, it is gone, and one code in ten is silently a six-digit
+--    code that will never match what its owner types. Nothing else in this
+--    section works against a number either — you cannot regex-match one, and
+--    comparing it to the text the browser sends is an error rather than a
+--    mismatch.
+--
+--    Converted in place with a plain cast, which changes no value. If that
+--    leaves anything shorter than seven digits, the constraint below refuses to
+--    be added and names the rows: those are the codes the leading zeros were
+--    already lost from, and only whoever issued them knows what they were.
+--
+-- 2. `code` NOT UNIQUE.
+--
+--    Everything below keys on it. A campaign-plus-code model lets the same
+--    seven digits exist twice, and then spending it updates both rows.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  coltype text;
+begin
+  select data_type into coltype
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'offer_codes' and column_name = 'code';
+
+  if coltype is null then
+    -- No `code` column at all. The ALTER below adds it.
+    null;
+  elsif coltype <> 'text' then
+    execute 'alter table public.offer_codes alter column code type text using code::text';
+    raise notice 'offer_codes.code converted from % to text — check for codes that lost a leading zero', coltype;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_codes'::regclass
+       and contype in ('p', 'u')
+       and pg_get_constraintdef(oid) like '%(code)'
+  ) then
+    if exists (select code from public.offer_codes group by code having count(*) > 1) then
+      raise warning 'offer_codes holds the same code more than once — uniqueness NOT enforced, and spending one of them will spend all of them';
+    else
+      alter table public.offer_codes add constraint offer_codes_code_key unique (code);
+      raise notice 'offer_codes.code is now unique';
+    end if;
+  end if;
+end $$;
+
 alter table public.offer_codes
   add column if not exists code       text,
   -- What this code is for, for whoever reads the table later: 'launch-2026',
