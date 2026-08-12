@@ -153,6 +153,31 @@ export const OWNERSHIP_JOINT = 'joint';
 // before somebody else is given the keys to it.
 export const JOINT_OWNER_MIN_DAYS = 60;
 
+// ---------- Linking an account at another bank ----------
+// Linking one and sending money to one are two different things, and this is
+// the gap between them.
+//
+// A customer can add an external account whenever they like: the details are
+// theirs, the row is written immediately, and it appears in their list. What
+// they cannot do is push money to it on the same day. Every bank holds a newly
+// linked external account before it will send to it, because the whole shape of
+// an account-takeover is: get into somebody's online banking, add an account
+// you control, empty the balance into it, and be gone before anyone notices.
+// The hold is what turns that from minutes into something the real customer
+// gets a chance to see.
+//
+// Thirty days, and then a person. The wait is not enough on its own — an
+// attacker patient enough to wait a month still wins if the link activates
+// itself — so activation is done by customer care, who can check that the
+// person asking is the customer whose money it is. It cannot be a button in
+// the app, because a session that could press it is exactly what has been
+// stolen.
+export const EXTERNAL_ACCOUNT_MIN_DAYS = 30;
+
+// What the bank may have written on an external account row. Only 'active'
+// means money can be sent; everything else is the app's way of saying no yet.
+export const EXTERNAL_ACCOUNT_ACTIVE = 'active';
+
 // Customer care. The same number the Support and Help Center screens print, so
 // the bank has one phone number rather than one per screen.
 export const SUPPORT_PHONE = '+18005550123';
@@ -227,4 +252,75 @@ export async function readJointOwnerEligibility({ supabaseClient, getCurrentUser
     console.error('Joint owner eligibility error:', err);
     return unknown;
   }
+}
+
+// ---------- Where an external account stands ----------
+/**
+ * Reads one external_accounts row and answers the only question the transfer
+ * screen actually has: may money be sent to this, and if not, what should the
+ * customer be told.
+ *
+ * Three states, and they need different sentences:
+ *
+ *   active    the bank has activated it. Send.
+ *   waiting   linked less than thirty days ago. There is a date to give, and
+ *             until that date there is nothing for anybody to do — telling
+ *             somebody to call now would waste their time and customer care's.
+ *   callable  thirty days have passed and it is still not active. Now there is
+ *             something to do, and it is a phone call.
+ *
+ * `status` is the bank's word and beats the calendar in both directions: a row
+ * the bank has activated early is active, and a row it has refused stays
+ * refused however long it sits there. The date is only consulted when the row
+ * is still pending.
+ *
+ * A row with no created_at reads as waiting rather than as ready — an unknown
+ * age is not evidence that thirty days have passed.
+ */
+export function readExternalAccountStanding(account) {
+  const status = String((account && account.status) || 'pending').toLowerCase();
+
+  if (status === EXTERNAL_ACCOUNT_ACTIVE) {
+    return { state: 'active', canTransfer: true, daysRemaining: 0, availableOn: '', label: 'Active' };
+  }
+
+  const since = account && account.created_at ? new Date(account.created_at) : null;
+  const known = since && !isNaN(since);
+  const daysHeld = known ? Math.max(0, wholeDaysBetween(since, new Date())) : 0;
+  const daysRemaining = Math.max(0, EXTERNAL_ACCOUNT_MIN_DAYS - daysHeld);
+  const availableOn = known
+    ? formatLongDate(new Date(since.getTime() + EXTERNAL_ACCOUNT_MIN_DAYS * MS_PER_DAY))
+    : '';
+
+  return {
+    state: daysRemaining > 0 ? 'waiting' : 'callable',
+    canTransfer: false,
+    daysRemaining,
+    availableOn,
+    // Short enough for a badge on a card. The full explanation is the
+    // sentence below, and that is only shown when somebody tries to send.
+    label: daysRemaining > 0 ? 'Pending' : 'Activation required',
+  };
+}
+
+/**
+ * The sentence to show somebody who has just tried to send money to an account
+ * that is not ready. Written to answer "so what do I do" rather than to state a
+ * policy at them.
+ */
+export function externalAccountHoldMessage(standing) {
+  if (standing.state === 'callable') {
+    return 'This account has not been activated yet. Call Verceil Bank customer care on '
+      + `${SUPPORT_PHONE_DISPLAY} and we will activate it once we have confirmed the request with you. `
+      + `Lines are open ${SUPPORT_HOURS}.`;
+  }
+
+  const when = standing.availableOn
+    ? `on ${standing.availableOn}`
+    : `${EXTERNAL_ACCOUNT_MIN_DAYS} days after it was linked`;
+  const remaining = standing.daysRemaining === 1 ? 'tomorrow' : `in ${standing.daysRemaining} days`;
+
+  return `Transfers to a newly linked account become available ${EXTERNAL_ACCOUNT_MIN_DAYS} days after it is added — `
+    + `for this account, ${when} (${remaining}). From that date, call customer care on `
+    + `${SUPPORT_PHONE_DISPLAY} to activate it. You can still receive money and move funds between your Verceil accounts in the meantime.`;
 }

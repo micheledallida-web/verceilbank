@@ -141,6 +141,13 @@ Open it with `loadPage('your-page-name')`, or from markup with
 - **An account exists only if a row says so.** Nothing on the dashboard is drawn
   from the markup. A customer chooses one product at sign-up, savings comes with
   it, and everything else is offered rather than assigned.
+- **Linking an external account and being allowed to send to it are separate.**
+  Anybody may link one and the row is written immediately; transfers to it are
+  held for 30 days and then activated by customer care. `external_accounts.status`
+  is not a column a customer session may write — at insert or at update — because
+  the same stolen session that links an account would otherwise activate it. The
+  refusal is shown when a transfer is attempted, not when the account is added.
+  See `readExternalAccountStanding()` in `js/shared/account-products.js`.
 - **Sign-up is invite-only, and the form is not what enforces it.** A seven-digit
   offer code is asked for at step two and spent by a `BEFORE INSERT` trigger on
   `auth.users`, in the same transaction that creates the user — so a code that

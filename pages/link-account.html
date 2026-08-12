@@ -57,6 +57,15 @@
 
       <div id="linkAccountError" class="hidden text-[12px] font-medium text-[#EF4444]"></div>
 
+      <!-- Said here, before the account is added, because a customer who finds
+           out about the hold only when a transfer is refused has been let down
+           twice. It is a note, not a warning: adding the account still works,
+           and the refusal itself is left to the moment somebody actually tries
+           to send — see js/pages/external-transfers.js. -->
+      <div class="rounded-[12px] bg-white/10 dark:bg-white/5 border border-white/15 dark:border-white/10 px-[12px] py-[10px] text-[12px] leading-[1.45] text-white/80 dark:text-[#8E9CBA]">
+        Your account is saved straight away. Transfers to it become available 30 days after it is linked, and are activated by customer care once we have confirmed the request with you.
+      </div>
+
       <button id="linkAccountSaveBtn" class="w-full h-[46px] rounded-[14px] bg-[#2563EB] text-white text-[14px] font-semibold flex items-center justify-center gap-[8px] cursor-pointer hover:opacity-90 transition-all mt-[4px]">
         <span id="linkAccountSaveBtnLabel">Save Account</span>
       </button>

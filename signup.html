@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- iOS Safari finds anything that looks like a phone number and turns it
+       into a link of its own — its own blue, its own underline, over the top of
+       whatever the page had decided. It is why the customer care number on the
+       offer-code step came out underlined and split across two lines. The page
+       says where its links are; the browser does not need to guess. -->
+  <meta name="format-detection" content="telephone=no">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign up - Verceil Bank</title>
   <link rel="stylesheet" href="index.css?v=17">
@@ -422,6 +428,13 @@
       margin-bottom: 0.45rem;
     }
 
+    /* Keeps a phone number, a code or a reference whole. A number broken over
+       two lines is one somebody has to reassemble before they can use it. */
+    .nowrap {
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
     .step-note {
       font-size: 0.8rem;
       color: #6b7280;
@@ -600,8 +613,12 @@
           <div class="code-error" data-step-error="offer" role="status" aria-live="polite"></div>
         </div>
 
+        <!-- `telephone=no` on the page keeps iOS from turning the number into
+             a link of its own, which is where the underline came from, and
+             `.nowrap` keeps it on one line: a phone number broken across two
+             lines is one somebody has to reassemble before they can dial it. -->
         <div class="step-note" id="offerCodeNote">
-          Your code is in the invitation email or letter we sent you. Each code opens a limited number of accounts. If yours will not work, contact the person who invited you or call us on (800) 555-0123.
+          Your offer code is in the invitation we sent you. If it will not work, please contact the person who referred you, or call Verceil Bank customer care on <span class="nowrap">(800) 555-0123</span>.
         </div>
 
         <button type="button" class="btn-next-full" data-next="identity">Continue</button>

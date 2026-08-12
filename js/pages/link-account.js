@@ -1,3 +1,5 @@
+import { EXTERNAL_ACCOUNT_MIN_DAYS, SUPPORT_PHONE_DISPLAY } from '../shared/account-products.js';
+
 let listeners = [];
 function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el.removeEventListener(evt, fn)); }
 
@@ -66,7 +68,16 @@ export function init(root, ctx) {
       linkRoutingNumber.value = '';
       linkAccountNumber.value = '';
       close();
-      setTimeout(() => showModal('Account Linked', `${bankName} account ending in ${account.slice(-4)} was linked successfully.`), 260);
+      // Says what happened AND what has not happened yet. The old wording —
+      // "linked successfully" and nothing else — left somebody to discover the
+      // thirty-day hold at the moment they tried to send money, which is the
+      // worst possible time to learn it.
+      setTimeout(() => showModal(
+        'Account Linked',
+        `${bankName} account ending in ${account.slice(-4)} has been added. `
+        + `Transfers to it become available ${EXTERNAL_ACCOUNT_MIN_DAYS} days from today, `
+        + `and are activated by customer care on ${SUPPORT_PHONE_DISPLAY} once we have confirmed the request with you.`,
+      ), 260);
     } catch (err) {
       console.error('Link external account error:', err);
       linkAccountSaveBtn.disabled = false;
