@@ -120,14 +120,18 @@ html {
   scroll-padding-bottom: var(--scroll-end);
 }
 
-/* Smooth for anyone who has not asked otherwise. Reduced motion turns it off
-   entirely rather than merely shortening it — a page that slides when somebody
-   has said not to is worse than one that jumps. */
-@media (prefers-reduced-motion: no-preference) {
-  html {
-    scroll-behavior: smooth;
-  }
-}
+/* NO smooth scrolling on the document, deliberately.
+   It was on, and it is what made the page feel like it caught before it moved.
+   `scroll-behavior: smooth` does not only apply to anchor jumps — it animates
+   every programmatic scroll, including the window.scrollTo(0, 0) that runs
+   whenever a screen closes and the dashboard comes back. Measured, that
+   animation ran for more than twelve frames, and a finger landing during it is
+   fighting an animation that already owns the scroll position. The result is
+   exactly the reported symptom: sometimes it sticks, then goes.
+   Closing a sheet and being at the top is instant in every native app, and it
+   is instant here now. Momentum, rubber-banding and the rest are the
+   platform's, which is what makes a page feel like the phone rather than like
+   a web page imitating one. */
 /* Light Mode: Blue background (#0B4CC2) */
 html:not(.dark) body {
   background: #0B4CC2;
@@ -1646,6 +1650,17 @@ html.dark body .home-sell {
 
 .home-promo-art svg { width: 100%; height: 100%; }
 
+/* The two promo illustrations are the only things on this page carrying an SVG
+   blur filter, and a filter is re-rasterised every time the element it is on
+   moves — which, on a scrolling page, is every frame. `contain: paint` tells
+   the browser nothing inside can affect anything outside, so the filter is
+   rasterised once into its own box and the rest of the scroll costs nothing.
+   This is the difference between a page that glides and one that grinds on the
+   two cards at the bottom of it. */
+.home-promo-art {
+  contain: paint;
+}
+
 .home-promo-head,
 .home-promo-foot { position: relative; z-index: 1; }
 
@@ -1901,7 +1916,15 @@ html.dark body .home-sell {
   right: 0;
   z-index: 50;
   background: #FFFFFF;
-  padding: 12px 0 24px;
+  /* The bottom padding has to clear the home indicator, not sit under it.
+     The page is `viewport-fit=cover`, so on an iPhone the bottom 34px of this
+     bar were behind the indicator: the white block looked shorter than it is,
+     its labels sat in the gesture strip, and the card above ended up looking
+     as though it were nearly touching it. --nav-h is MEASURED from this
+     element, so widening it here widens the runway under the last card by the
+     same amount, automatically, on every device that has an inset and no
+     device that does not. */
+  padding: 12px 0 calc(24px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -1px 4px rgba(8, 20, 50, 0.08);
 }
 

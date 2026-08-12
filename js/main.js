@@ -1967,6 +1967,35 @@ async function initSupabaseData() {
   // figure instead of adding a line beside it.
   const CHECKING_TYPES = ['checking', 'interest_checking'];
 
+  // What the figure on an account card MEANS, by account type.
+  //
+  // Savings was the one card that never said. It read "4.00% APY" where every
+  // other deposit account read "Available Balance", so the only card without a
+  // word for its own number was the one people check most.
+  //
+  // Written from here rather than left in the markup so it applies to accounts
+  // that do not exist yet: anything not named below is money you can spend and
+  // is labelled as such, which means a product added later is right by default
+  // and only an exception has to be remembered.
+  const BALANCE_LABEL_DEFAULT = 'Available Balance';
+  const BALANCE_LABELS = {
+    // Not deposits. A brokerage figure is what the holdings are worth today,
+    // not money available to spend, and calling it "available" on a bank
+    // screen would be a plain misstatement.
+    investments: 'Total Value',
+    ira_traditional: 'Total Value',
+    ira_roth: 'Total Value',
+  };
+
+  function applyBalanceLabels() {
+    document.querySelectorAll('[data-balance-label]').forEach((el) => {
+      const type = el.getAttribute('data-balance-label');
+      el.textContent = BALANCE_LABELS[type] || BALANCE_LABEL_DEFAULT;
+    });
+  }
+
+  applyBalanceLabels();
+
   // An IRA is not a deposit account and not the brokerage account either: the
   // money is locked away for retirement under its own tax rules, so it is never
   // added into either total. It is reported on its own card.

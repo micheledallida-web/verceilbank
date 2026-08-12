@@ -23,8 +23,9 @@
 --   7. Identity lock
 --   8. Realtime
 --   9. Reference data
---  10. Verification          run this at the end and read the output
---  11. Optional: pg_cron
+--  10. Identity verification THE ONE THAT MAKES ID UPLOAD WORK
+--  11. Verification          run this at the end and read the output
+--  12. Optional: pg_cron
 -- =============================================================================
 
 
@@ -1004,7 +1005,132 @@ revoke insert, update, delete on public.bank_settings from authenticated, anon;
 
 
 -- =============================================================================
--- 10. VERIFICATION
+-- 10. IDENTITY VERIFICATION — THE TABLE AND THE DOCUMENT BUCKET
+--
+-- THE ONE THAT MAKES ID UPLOAD WORK AT ALL.
+--
+-- The Verify screen uploads three photos to a storage bucket called
+-- `kyc-documents` and then writes a row to `verification_requests` holding the
+-- paths. Neither existed. The upload failed, the row was never written, and
+-- nobody could verify their identity — which gates moving money, so it gated
+-- the whole account.
+--
+-- The client writes each file to  <user-id>/<name>.<ext>  so the first folder
+-- in the path IS the owner. That is what the storage policies below check.
+-- =============================================================================
+
+create table if not exists public.verification_requests (
+  id                bigint generated always as identity primary key,
+  user_id           uuid not null references auth.users (id) on delete cascade,
+  submitted_at      timestamptz not null default now(),
+  status            text not null default 'pending'
+);
+
+-- Every field the Verify screen sends. Added separately so a project that
+-- already has this table gains only what it is missing.
+alter table public.verification_requests
+  -- These two are in the CREATE above as well, and they have to be here too:
+  -- a project that already has this table skips the CREATE entirely, and the
+  -- index below is on submitted_at. Leaving them out of this list is why the
+  -- file failed against a database that already had the table.
+  add column if not exists submitted_at     timestamptz not null default now(),
+  add column if not exists status           text not null default 'pending',
+  add column if not exists legal_first_name text,
+  add column if not exists legal_last_name  text,
+  add column if not exists date_of_birth    date,
+  add column if not exists ssn              text,
+  add column if not exists address_line1    text,
+  add column if not exists address_line2    text,
+  add column if not exists city             text,
+  add column if not exists state            text,
+  add column if not exists postal_code      text,
+  add column if not exists id_type          text,
+  -- Storage paths, not the images. The files live in the bucket below.
+  add column if not exists id_front_path    text,
+  add column if not exists id_back_path     text,
+  add column if not exists selfie_path      text,
+  -- Filled by whoever reviews it.
+  add column if not exists reviewed_at      timestamptz,
+  add column if not exists rejection_reason text;
+
+create index if not exists verification_requests_user_idx
+  on public.verification_requests (user_id, submitted_at desc);
+
+-- The Social Security number is the most sensitive column in this database.
+-- The app WRITES it and never reads it back — the Verify screen submits it and
+-- nothing selects it — so the read is taken away entirely. A customer session
+-- can still insert a request and still read its status; it just cannot ask the
+-- database to hand an SSN back to a browser, which is the shape of every
+-- account-takeover that starts with a stolen session.
+--
+-- Review it with the service key, or through a view that does not carry it.
+-- Revoking the COLUMN is not enough and quietly does nothing: a column-level
+-- revoke cannot cut a hole in a table-level grant, and `authenticated` holds
+-- SELECT on the whole table. The table grant has to go first, and then every
+-- column except this one is granted back — the same shape as the balance
+-- column on `accounts`.
+do $$
+declare
+  cols text;
+begin
+  if to_regclass('public.verification_requests') is null then
+    raise notice 'verification_requests missing, skipping the ssn grant';
+    return;
+  end if;
+
+  select string_agg(quote_ident(column_name), ', ' order by ordinal_position)
+    into cols
+    from information_schema.columns
+   where table_schema = 'public'
+     and table_name = 'verification_requests'
+     and column_name <> 'ssn';
+
+  revoke select on public.verification_requests from authenticated, anon;
+  execute format('grant select (%s) on public.verification_requests to authenticated', cols);
+  raise notice 'verification_requests: ssn is write-only for customer sessions';
+end $$;
+
+
+-- ---------------------------------------------------------------------------
+-- The bucket. PRIVATE — `public => false` is the difference between a
+-- government ID that only its owner and the bank can fetch, and one anybody
+-- with the URL can.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('kyc-documents', 'kyc-documents', false)
+on conflict (id) do update set public = false;
+
+-- Storage is an ordinary table with RLS, so the rules are ordinary policies.
+-- Each one is scoped to the first folder of the path, which the client sets to
+-- the uploader's own user id.
+--
+-- INSERT AND UPDATE BOTH, deliberately: the client uploads with `upsert: true`,
+-- and an upsert against an existing object is an UPDATE. With only the insert
+-- policy, a customer who retakes a blurred photo is refused — which is exactly
+-- the moment they are most likely to try again.
+--
+-- No DELETE policy, equally deliberately. A submitted identity document is a
+-- record of what the bank was given; it is not a customer's to remove.
+drop policy if exists "own kyc documents read"   on storage.objects;
+drop policy if exists "own kyc documents insert" on storage.objects;
+drop policy if exists "own kyc documents update" on storage.objects;
+
+create policy "own kyc documents read"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "own kyc documents insert"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "own kyc documents update"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- =============================================================================
+-- 11. VERIFICATION
 --
 -- Run this section on its own afterwards and read the output. Every row should
 -- say 'ok'. Anything that says 'MISSING' is not set up.
@@ -1093,6 +1219,32 @@ select 'realtime', t,
   from unnest(array['transactions','activity_events','accounts',
                     'notifications','deposit_requests']) as t
 
+-- Without these, the Verify screen cannot upload and nobody can be verified.
+union all
+select 'identity uploads', 'verification_requests table',
+       case when to_regclass('public.verification_requests') is not null
+            then 'ok' else 'MISSING' end
+
+union all
+select 'identity uploads', 'kyc-documents bucket (private)',
+       case when not exists (select 1 from storage.buckets where id = 'kyc-documents')
+              then 'MISSING — ID upload will fail'
+            when (select public from storage.buckets where id = 'kyc-documents')
+              then 'EXPOSED — bucket is public, IDs readable by URL'
+            else 'ok' end
+
+union all
+select 'identity uploads', 'storage policies (need insert + update)',
+       case when (select count(*) from pg_policy
+                   where polrelid = 'storage.objects'::regclass
+                     and polname like 'own kyc documents%') >= 3
+            then 'ok' else 'MISSING — retaking a photo will be refused' end
+
+union all
+select 'identity uploads', 'ssn not readable by customer sessions',
+       case when has_column_privilege('authenticated', 'public.verification_requests', 'ssn', 'SELECT')
+            then 'EXPOSED — a session can read SSNs back' else 'ok' end
+
 union all
 select 'realtime', 'accounts replica identity',
        case when to_regclass('public.accounts') is null then 'table missing'
@@ -1125,7 +1277,7 @@ having a.balance is distinct from
 
 
 -- =============================================================================
--- 11. OPTIONAL — pg_cron
+-- 12. OPTIONAL — pg_cron
 --
 -- Not run by the statements above. Enable the pg_cron extension first
 -- (Database -> Extensions), then run this block on its own if you want it.
