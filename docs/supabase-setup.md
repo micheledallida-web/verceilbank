@@ -84,7 +84,8 @@ create table if not exists public.transactions (
   id               bigint generated always as identity primary key,
   local_id         text not null unique,
   user_id          uuid not null references auth.users (id) on delete cascade,
-  -- 'savings' | 'investments' | 'ira_traditional' | 'ira_roth' | 'credit'
+  -- 'checking' | 'savings' | 'interest_checking' | 'investments'
+  -- | 'ira_traditional' | 'ira_roth' | 'credit'
   account_type     text not null,
   -- Signed: negative leaves the account, positive arrives in it.
   amount           numeric(14,2) not null,
@@ -631,7 +632,7 @@ and the balance follows:
 insert into public.transactions
   (local_id, user_id, account_type, amount, title, category, status)
 values
-  (gen_random_uuid()::text, '<uuid>', 'savings', 500.00,
+  (gen_random_uuid()::text, '<uuid>', 'checking', 500.00,
    'Deposit received', 'deposit', 'completed');
 ```
 
@@ -680,7 +681,7 @@ create table if not exists public.deposit_requests (
   id             bigint generated always as identity primary key,
   user_id        uuid not null references auth.users (id) on delete cascade,
   -- Which of their accounts the money lands in.
-  account_type   text not null default 'savings',
+  account_type   text not null default 'checking',
   -- The address shown to this customer for this request.
   address        text not null,
   quidax_user_id text,
@@ -744,7 +745,7 @@ In **Project Settings → Edge Functions → Secrets**:
 | Name | Value |
 |---|---|
 | `QUIDAX_WEBHOOK_SECRET` | the Signature Secret you set in Quidax |
-| `QUIDAX_CREDIT_ACCOUNT_TYPE` | optional, defaults to `savings` |
+| `QUIDAX_CREDIT_ACCOUNT_TYPE` | optional, defaults to `checking` |
 
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to functions
 automatically. **Never put the service key or the Quidax API key in Vercel** —
@@ -787,7 +788,7 @@ with posted as (
   insert into public.transactions
     (local_id, user_id, account_type, amount, title, category, reference_number, status)
   values
-    ('quidax:<reference>', '<user-uuid>', 'savings', 500.00,
+    ('quidax:<reference>', '<user-uuid>', 'checking', 500.00,
      'Bitcoin deposit', 'deposit', '<reference>', 'completed')
   returning id
 )

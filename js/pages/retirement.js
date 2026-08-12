@@ -194,7 +194,7 @@ export function init(root, ctx) {
   on(root.querySelector('#retAdvisorBtn'), 'click', () => loadPage('advisor'));
 
   // ---------- The gate ----------
-  // Identical in shape to the Open an Account gate: an account is opened only
+  // Identical in shape to the Interest Checking gate: an account is opened only
   // for someone the bank has actually verified, and anyone else is sent to the
   // verification screen rather than being quietly refused at the last step.
   // The button is bound once, here, and what it does is swapped underneath it.

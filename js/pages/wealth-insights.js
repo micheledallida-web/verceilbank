@@ -149,10 +149,10 @@ export function init(root, ctx) {
 
   async function refreshInsights() {
     const currentHoldings = await loadHoldings();
-    
+    const checking = parseBalanceText(document.getElementById('checkingBalance')?.textContent || '$0.00');
     const savings = parseBalanceText(document.getElementById('savingsBalance')?.textContent || '$0.00');
     const investValue = currentHoldings.reduce((sum, holding) => sum + Number(holding.value || 0), 0);
-    const cashHoldings = savings;
+    const cashHoldings = checking + savings;
     const netWorth = cashHoldings + investValue;
     const totalDayChange = currentHoldings.reduce((sum, holding) => sum + Number(holding.day_change || 0), 0);
     const totalCostBasis = currentHoldings.reduce((sum, holding) => sum + Number(holding.cost_basis || 0), 0);

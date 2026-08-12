@@ -1,8 +1,22 @@
 // Account Detail — opens from any account card on the dashboard shell
-// (Savings, Investments, Credit). Expects the account `type` as the argument
-// passed via loadPage('account-detail', type).
+// (Checking, Savings, Investments, Credit). Expects the account `type` as
+// the argument passed via loadPage('account-detail', type).
 
 const accountConfigs = {
+  checking: {
+    title: 'Verceil Checking',
+    balanceLabel: 'Available Balance',
+    balanceSourceId: 'checkingBalance',
+    iconBg: '#1D61F2',
+    iconSvg: '<svg class="w-[26px] h-[26px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="6" width="18" height="12" rx="3"></rect><path d="M3 10h18"></path></svg>',
+  },
+  interest_checking: {
+    title: 'Vercel Interest Checking',
+    balanceLabel: 'Available Balance · Up to 4.00% APY',
+    balanceSourceId: 'interestCheckingBalance',
+    iconBg: '#1D61F2',
+    iconSvg: '<svg class="w-[26px] h-[26px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><rect x="3" y="6" width="18" height="12" rx="3"></rect><path d="M3 10h18"></path></svg>',
+  },
   savings: {
     title: 'High-Yield Savings',
     balanceLabel: 'Available Balance',
@@ -45,13 +59,23 @@ const qaIcons = {
 // Per-account-type Quick Actions — 2x2 grid, matches the copy in the
 // problem statement 1:1. `action` is invoked with `ctx` when the card is tapped.
 const quickActionConfigs = {
+  checking: [
+    { icon: qaIcons.transfer, title: 'Transfer', subtitle: 'Move money between Vercel accounts or external banks.', action: (ctx) => ctx.loadPage('transfer') },
+    { icon: qaIcons.sendMoney, title: 'Send Money', subtitle: 'Send money using Zelle® or internal bank transfers.', action: (ctx) => ctx.loadPage('send-money') },
+    { icon: qaIcons.deposit, title: 'Deposit Funds', subtitle: 'Add money to your checking account.', action: (ctx) => ctx.loadPage('fund-account') },
+    { icon: qaIcons.directDeposit, title: 'Direct Deposit', subtitle: 'View and share your routing and account details for direct deposit.', action: (ctx) => ctx.loadPage('direct-deposit', 'checking') },
+  ],
   savings: [
     { icon: qaIcons.transfer, title: 'Transfer', subtitle: 'Move money to or from your savings account.', action: (ctx) => ctx.loadPage('transfer') },
-    { icon: qaIcons.sendMoney, title: 'Send Money', subtitle: 'Send money using Zelle® or internal bank transfers.', action: (ctx) => ctx.loadPage('send-money') },
     { icon: qaIcons.deposit, title: 'Deposit Funds', subtitle: 'Add funds to your savings account.', action: (ctx) => ctx.loadPage('fund-account') },
-    { icon: qaIcons.directDeposit, title: 'Direct Deposit', subtitle: 'View and share your routing and account details for direct deposit.', action: (ctx) => ctx.loadPage('direct-deposit', 'savings') },
     { icon: qaIcons.goal, title: 'Savings Goal', subtitle: 'Create or manage savings goals.', action: (ctx) => ctx.loadPage('savings-goal') },
     { icon: qaIcons.interest, title: 'Interest Details', subtitle: 'View APY, interest earned, and payment history.', action: (ctx) => ctx.loadPage('interest-details', 'savings') },
+  ],
+  interest_checking: [
+    { icon: qaIcons.transfer, title: 'Transfer', subtitle: 'Move money into or out of Interest Checking.', action: (ctx) => ctx.loadPage('transfer') },
+    { icon: qaIcons.deposit, title: 'Deposit Funds', subtitle: 'Fund your Interest Checking account.', action: (ctx) => ctx.loadPage('fund-account') },
+    { icon: qaIcons.directDeposit, title: 'Direct Deposit', subtitle: 'View and share direct deposit information.', action: (ctx) => ctx.loadPage('direct-deposit', 'interest_checking') },
+    { icon: qaIcons.interest, title: 'Interest Details', subtitle: 'View APY, accrued interest, and monthly earnings.', action: (ctx) => ctx.loadPage('interest-details', 'interest_checking') },
   ],
   investments: [
     { icon: qaIcons.deposit, title: 'Add Funds', subtitle: 'Add money to your investment account.', action: (ctx) => ctx.loadPage('fund-account') },
@@ -68,7 +92,7 @@ function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el
 export function init(root, ctx, type) {
   const { supabaseClient, getCurrentUser, getAccountNumber, loadPage, close } = ctx;
 
-  const cfg = accountConfigs[type] || accountConfigs.savings;
+  const cfg = accountConfigs[type] || accountConfigs.checking;
 
   const detailAccountName = root.querySelector('#detailAccountName');
   const detailAccountIcon = root.querySelector('#detailAccountIcon');
@@ -90,7 +114,7 @@ export function init(root, ctx, type) {
   on(root.querySelector('[data-action="close"]'), 'click', close);
 
   function renderQuickActions() {
-    const actions = quickActionConfigs[type] || quickActionConfigs.savings;
+    const actions = quickActionConfigs[type] || quickActionConfigs.checking;
     detailQuickActions.innerHTML = actions.map((a, idx) => `
       <button class="detail-quick-action group text-left cursor-pointer flex flex-col gap-[10px] transition-transform duration-150 active:scale-[0.97]" data-index="${idx}">
         <div class="flex items-center justify-between">

@@ -36,10 +36,10 @@ export function init(root, ctx) {
       formError.classList.remove('hidden');
       return;
     }
-    const fundingEl = document.getElementById('savingsBalance');
-    const available = fundingEl ? parseBalanceText(fundingEl.textContent) : 0;
+    const checkingEl = document.getElementById('checkingBalance');
+    const available = checkingEl ? parseBalanceText(checkingEl.textContent) : 0;
     if (amount > available) {
-      formError.textContent = 'Insufficient funds in High-Yield Savings.';
+      formError.textContent = 'Insufficient funds in Verceil Checking.';
       formError.classList.remove('hidden');
       return;
     }
@@ -80,7 +80,7 @@ export function init(root, ctx) {
       if (error) throw error;
 
       ctx.recordTransaction({
-        accountType: 'savings',
+        accountType: 'checking',
         amount: -Math.abs(pendingZelle.amount),
         title: `Zelle® to ${pendingZelle.name}`,
         iconText: '↑',
@@ -88,8 +88,8 @@ export function init(root, ctx) {
         reference: pendingZelle.ref,
       });
 
-      const fundingEl = document.getElementById('savingsBalance');
-      if (fundingEl) fundingEl.textContent = formatCurrency(parseBalanceText(fundingEl.textContent) - pendingZelle.amount);
+      const checkingEl = document.getElementById('checkingBalance');
+      if (checkingEl) checkingEl.textContent = formatCurrency(parseBalanceText(checkingEl.textContent) - pendingZelle.amount);
 
       const receiptData = { amount: formatCurrency(pendingZelle.amount), recipient: pendingZelle.name, confirmation: pendingZelle.ref };
       btn.disabled = false;

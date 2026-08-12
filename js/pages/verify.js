@@ -100,6 +100,8 @@ export function init(root, ctx) {
   // The product picked at sign-up, so the screen names the account this
   // verification is actually for rather than saying "your account".
   const REQUESTED_PRODUCT_NAMES = {
+    checking: 'Verceil Checking',
+    interest_checking: 'Verceil Interest Checking',
     investments: 'your Investment Account',
   };
 

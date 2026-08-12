@@ -148,7 +148,7 @@ export function init(root, ctx) {
   root.querySelector('#stAppVersion').textContent = APP_VERSION;
   // The routing number is the bank's, identical for every customer, and needed
   // often enough that it earns a line someone can always find.
-  root.querySelector('#stRoutingNumber').textContent = getAccountNumber('savings', 'routing');
+  root.querySelector('#stRoutingNumber').textContent = getAccountNumber('checking', 'routing');
 
   on(root.querySelector('#stLegalBtn'), 'click', () => showModal(
     'Terms & Disclosures',

@@ -107,7 +107,7 @@ export function init(root, ctx, side = 'buy', prefill = null) {
     tradeHoldingInfo.classList.add('hidden');
     tradeFormError.classList.add('hidden');
     tradeReviewError.classList.add('hidden');
-    tradeBuyingPower.textContent = document.getElementById('savingsBalance')?.textContent || '$0.00';
+    tradeBuyingPower.textContent = document.getElementById('checkingBalance')?.textContent || '$0.00';
     formStep.classList.remove('hidden');
     reviewStep.classList.add('hidden');
     setTradeTab(side === 'sell' ? 'sell' : 'buy');
@@ -153,9 +153,9 @@ export function init(root, ctx, side = 'buy', prefill = null) {
         return;
       }
     } else {
-      const available = parseBalanceText(document.getElementById('savingsBalance')?.textContent || '$0.00');
+      const available = parseBalanceText(document.getElementById('checkingBalance')?.textContent || '$0.00');
       if (total > available) {
-        tradeFormError.textContent = 'Insufficient funds in High-Yield Savings for this order.';
+        tradeFormError.textContent = 'Insufficient funds in Verceil Checking for this order.';
         tradeFormError.classList.remove('hidden');
         return;
       }
@@ -180,7 +180,7 @@ export function init(root, ctx, side = 'buy', prefill = null) {
       <div class="flex items-center justify-between py-[12px]"><span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">Order Type</span><span class="text-[14px] font-semibold text-[#111827] dark:text-white">${tradeOrderType.options[tradeOrderType.selectedIndex].text} · ${tradeDuration.options[tradeDuration.selectedIndex].text}</span></div>
       <div class="flex items-center justify-between py-[12px]"><span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">Quantity</span><span class="text-[14px] font-semibold text-[#111827] dark:text-white">${shares} shares @ ${formatCurrency(price)}</span></div>
       <div class="flex items-center justify-between py-[12px]"><span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">Estimated Total</span><span class="text-[16px] font-bold text-[#111827] dark:text-white">${formatCurrency(total)}</span></div>
-      <div class="flex items-center justify-between py-[12px]"><span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">Funding Account</span><span class="text-[14px] font-semibold text-[#111827] dark:text-white">High-Yield Savings</span></div>
+      <div class="flex items-center justify-between py-[12px]"><span class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">Funding Account</span><span class="text-[14px] font-semibold text-[#111827] dark:text-white">Verceil Checking</span></div>
     `;
     formStep.classList.add('hidden');
     reviewStep.classList.remove('hidden');
@@ -250,9 +250,9 @@ export function init(root, ctx, side = 'buy', prefill = null) {
             dividend_income: 0,
           });
         }
-        const fundingEl = document.getElementById('savingsBalance');
+        const checkingEl = document.getElementById('checkingBalance');
         const investmentsEl = document.getElementById('investmentsBalance');
-        if (fundingEl) fundingEl.textContent = formatCurrency(parseBalanceText(fundingEl.textContent) - pendingTrade.total);
+        if (checkingEl) checkingEl.textContent = formatCurrency(parseBalanceText(checkingEl.textContent) - pendingTrade.total);
         if (investmentsEl) investmentsEl.textContent = formatCurrency(parseBalanceText(investmentsEl.textContent) + pendingTrade.total);
       } else {
         const remainingShares = Number(pendingTrade.heldRow.shares) - pendingTrade.shares;
@@ -266,9 +266,9 @@ export function init(root, ctx, side = 'buy', prefill = null) {
             cost_basis: Number(pendingTrade.heldRow.cost_basis || 0) * proportion,
           }).eq('id', pendingTrade.heldRow.id);
         }
-        const fundingEl = document.getElementById('savingsBalance');
+        const checkingEl = document.getElementById('checkingBalance');
         const investmentsEl = document.getElementById('investmentsBalance');
-        if (fundingEl) fundingEl.textContent = formatCurrency(parseBalanceText(fundingEl.textContent) + pendingTrade.total);
+        if (checkingEl) checkingEl.textContent = formatCurrency(parseBalanceText(checkingEl.textContent) + pendingTrade.total);
         if (investmentsEl) investmentsEl.textContent = formatCurrency(Math.max(0, parseBalanceText(investmentsEl.textContent) - pendingTrade.total));
       }
 

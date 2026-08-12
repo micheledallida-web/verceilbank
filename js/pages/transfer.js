@@ -1,7 +1,7 @@
 import { showReceipt } from '../shared/receipt.js';
 
-const accountLabels = { savings: 'High-Yield Savings', investments: 'Investment Portfolio' };
-const accountBalanceIds = { savings: 'savingsBalance', investments: 'investmentsBalance' };
+const accountLabels = { checking: 'Verceil Checking', savings: 'High-Yield Savings', investments: 'Investment Portfolio' };
+const accountBalanceIds = { checking: 'checkingBalance', savings: 'savingsBalance', investments: 'investmentsBalance' };
 
 let listeners = [];
 function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el.removeEventListener(evt, fn)); }

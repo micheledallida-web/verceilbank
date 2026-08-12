@@ -127,12 +127,7 @@ Deno.serve(async (req) => {
   const WEBHOOK_SECRET = Deno.env.get('QUIDAX_WEBHOOK_SECRET');
   // Which of the customer's accounts a deposit lands in. Checking unless you
   // say otherwise.
-  // Savings, because it is the account every customer is guaranteed to hold.
-  // It defaulted to 'checking' until the bank stopped offering current accounts,
-  // which would have credited a deposit to an account that does not exist —
-  // the balance trigger matches on (user_id, account_type) and would update
-  // nothing at all.
-  const CREDIT_ACCOUNT = Deno.env.get('QUIDAX_CREDIT_ACCOUNT_TYPE') ?? 'savings';
+  const CREDIT_ACCOUNT = Deno.env.get('QUIDAX_CREDIT_ACCOUNT_TYPE') ?? 'checking';
 
   if (!WEBHOOK_SECRET) {
     console.error('quidax-webhook is missing QUIDAX_WEBHOOK_SECRET');

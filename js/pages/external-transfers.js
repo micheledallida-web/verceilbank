@@ -1,6 +1,6 @@
 import { showReceipt } from '../shared/receipt.js';
 
-const accountBalanceIds = { savings: 'savingsBalance', investments: 'investmentsBalance' };
+const accountBalanceIds = { checking: 'checkingBalance', savings: 'savingsBalance', investments: 'investmentsBalance' };
 
 let listeners = [];
 let selectedExtAccount = null;

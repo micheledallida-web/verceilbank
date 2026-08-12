@@ -78,9 +78,9 @@ export function init(root, ctx) {
       return;
     }
 
-    const fundingEl = document.getElementById('savingsBalance');
-    if (fundingEl && amount > parseBalanceText(fundingEl.textContent)) {
-      wireFormError.textContent = 'Insufficient funds in High-Yield Savings.';
+    const checkingEl = document.getElementById('checkingBalance');
+    if (checkingEl && amount > parseBalanceText(checkingEl.textContent)) {
+      wireFormError.textContent = 'Insufficient funds in Verceil Checking.';
       wireFormError.classList.remove('hidden');
       return;
     }
@@ -156,7 +156,7 @@ export function init(root, ctx) {
       // Submitted rather than completed: a wire is reviewed before it leaves,
       // and the ledger says so rather than showing money already gone.
       ctx.recordTransaction({
-        accountType: 'savings',
+        accountType: 'checking',
         amount: -Math.abs(Number(pendingWire.amount) + Number(pendingWire.fee || 0)),
         title: `Wire to ${pendingWire.recipient}`,
         iconText: '↑',
@@ -165,9 +165,9 @@ export function init(root, ctx) {
         status: 'pending',
       });
 
-      const fundingEl = document.getElementById('savingsBalance');
-      if (fundingEl) {
-        fundingEl.textContent = formatCurrency(parseBalanceText(fundingEl.textContent) - pendingWire.amount - pendingWire.fee);
+      const checkingEl = document.getElementById('checkingBalance');
+      if (checkingEl) {
+        checkingEl.textContent = formatCurrency(parseBalanceText(checkingEl.textContent) - pendingWire.amount - pendingWire.fee);
       }
 
       wireSubmitBtn.disabled = false;

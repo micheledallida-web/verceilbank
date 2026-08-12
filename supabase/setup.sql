@@ -44,7 +44,8 @@ create table if not exists public.transactions (
   id               bigint generated always as identity primary key,
   local_id         text not null unique,
   user_id          uuid not null references auth.users (id) on delete cascade,
-  -- savings | investments | ira_traditional | ira_roth | credit
+  -- checking | savings | interest_checking | investments
+  -- ira_traditional | ira_roth | credit
   account_type     text not null,
   amount           numeric(14,2) not null,
   title            text not null,
@@ -80,7 +81,7 @@ create index if not exists activity_events_user_time_idx
 create table if not exists public.deposit_requests (
   id             bigint generated always as identity primary key,
   user_id        uuid not null references auth.users (id) on delete cascade,
-  account_type   text not null default 'savings',
+  account_type   text not null default 'checking',
   address        text not null,
   quidax_user_id text,
   amount_usd     numeric(14,2),
@@ -127,7 +128,7 @@ create table if not exists public.deposit_events (
 -- fails — for every customer, permanently, with no other symptom.
 --
 -- This is what stopped mailing addresses saving. The same fault is latent on
--- five other tables, which would break opening an investment account,
+-- five other tables, which would break opening an Interest Checking account,
 -- opening an IRA, the compulsory savings account, card settings, privacy
 -- settings and notification preferences.
 --
@@ -608,9 +609,7 @@ begin
     end if;
 
     if coalesce(array_length(wanted, 1), 0) = 0 then
-      -- Savings is the fallback because it is the account every customer
-      -- holds. It used to be 'checking', a product the bank no longer offers.
-      wanted := array[coalesce(nullif(meta->>'requested_account_type', ''), 'savings')];
+      wanted := array[coalesce(nullif(meta->>'requested_account_type', ''), 'checking')];
     end if;
 
     -- The cast is not decoration. Without it Postgres resolves this as
@@ -1166,7 +1165,7 @@ having a.balance is distinct from
 --
 --   Project Settings -> Edge Functions -> Secrets
 --     QUIDAX_WEBHOOK_SECRET        the value you also put in Quidax
---     QUIDAX_CREDIT_ACCOUNT_TYPE   optional, defaults to 'savings'
+--     QUIDAX_CREDIT_ACCOUNT_TYPE   optional, defaults to 'checking'
 --
 --   Vercel -> Settings -> Environment Variables
 --     SUPABASE_URL                 https://kzykuuxoivrttfdjdypl.supabase.co

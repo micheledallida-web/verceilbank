@@ -11,28 +11,58 @@
 // `key` is the value written to accounts.account_type, and it is the only thing
 // in this file the database sees. Everything else is what a person reads.
 //
-// Savings is on the list but never offered: every customer already holds one —
-// it is opened alongside whatever they choose, at sign-up and here — so it can
-// never be something left to open. It is here so a savings row still has a
-// name and a description wherever one is printed.
+// `openWith` is WHERE a product can be chosen, and the two are not the same
+// place:
 //
-// THE BANK OFFERS TWO ACCOUNTS. Verceil Checking and Verceil Interest Checking
-// were here and are gone: the bank does not do current accounts. Everything
-// downstream of this list follows from it — sign-up, Open an Account, the
-// dashboard cards, the transfer screens' account pickers — because this array
-// is the catalogue and nothing else is allowed to hold a second opinion about
-// what a customer can hold.
+//   'signup' — the application form. An applicant picks the account they are
+//              opening, and every product is on offer there.
+//   'app'    — Open an Account, used by somebody who already banks here.
 //
-// If they are ever brought back, they come back here, and the screens pick them
-// up on their own.
+// The two checking products are 'signup' only. They are real accounts —
+// customers hold them, the dashboard shows them, money moves through them —
+// but they are chosen when you join rather than added later from the app.
+//
+// Savings has an empty list, which is a third thing again: it is never chosen
+// at all. It comes with whatever is, at sign-up and from Open an Account both,
+// so it appears as an Included card and never as an option. It is on this list
+// so a savings row still has a name and a description wherever one is printed.
 export const ACCOUNT_PRODUCTS = [
+  {
+    key: 'checking',
+    name: 'Verceil Checking',
+    tagline: 'Everyday banking for spending, direct deposit and transfers',
+    note: 'No monthly maintenance fee',
+    accent: '#2563EB',
+    openWith: ['signup'],
+    features: [
+      'No monthly maintenance fee',
+      'Direct deposit up to two days early',
+      'Zelle® transfers and mobile check deposit',
+      'FDIC insured to the applicable limits',
+    ],
+  },
+  {
+    key: 'interest_checking',
+    name: 'Verceil Interest Checking',
+    tagline: 'A checking account that earns interest on your balance',
+    note: 'Up to 4.00% APY · No monthly fees',
+    accent: '#1D4ED8',
+    openWith: ['signup'],
+    features: [
+      'Earn up to 4.00% APY on your balance',
+      'No monthly maintenance fee',
+      'Everything Verceil Checking does',
+      'FDIC insured to the applicable limits',
+    ],
+  },
   {
     key: 'savings',
     name: 'High-Yield Savings',
     tagline: 'Set money aside and earn on every dollar',
     note: '4.00% APY',
     accent: '#059669',
-    offerable: false,
+    // Never chosen anywhere. See the note above the list.
+    openWith: [],
     features: [
       '4.00% APY on the whole balance',
       'No minimum balance to earn interest',
@@ -46,6 +76,7 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Buy and hold stocks, ETFs and mutual funds',
     note: 'Not FDIC insured · May lose value',
     accent: '#8B5CF6',
+    openWith: ['signup', 'app'],
     // The one product on this list that can lose money, and the screens that
     // offer it say so where it is offered rather than in a footnote.
     risk: 'Investment products are not deposits, are not FDIC insured, are not guaranteed by the bank and may lose value.',
@@ -63,10 +94,11 @@ export const ACCOUNT_PRODUCTS_BY_KEY = ACCOUNT_PRODUCTS.reduce(
   {},
 );
 
-// What is genuinely on offer: everything except the accounts that come with
-// membership rather than being chosen.
-export function offerableProducts() {
-  return ACCOUNT_PRODUCTS.filter((product) => product.offerable !== false);
+// What a given surface may offer. Defaults to 'app', because Open an Account is
+// the only screen that reads this list — sign-up carries its own markup, and
+// this is the record of what it is allowed to show.
+export function offerableProducts(surface = 'app') {
+  return ACCOUNT_PRODUCTS.filter((product) => (product.openWith || []).includes(surface));
 }
 
 // ---------- How an account is owned ----------

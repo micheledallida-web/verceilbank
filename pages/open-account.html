@@ -31,8 +31,17 @@
     <div id="oaProducts" class="flex flex-col gap-[12px] mb-[16px]"></div>
 
     <div id="oaNothingLeft" class="hidden bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[16px]">
-      <div class="text-[14px] font-semibold text-[#111827] dark:text-white mb-[4px]">You hold every account we offer</div>
-      <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed">There is nothing left to open individually. To add a joint owner to an account you already hold, go back and choose joint ownership.</div>
+      <div class="text-[14px] font-semibold text-[#111827] dark:text-white mb-[4px]">Nothing left to open here</div>
+      <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed">You already hold everything this screen opens. To add a joint owner to an account you hold, go back and choose joint ownership.</div>
+    </div>
+
+    <!-- Checking is chosen when you join, not added from here — see `openWith`
+         in js/shared/account-products.js. A customer who wants one afterwards
+         would otherwise be looking at a list it is simply missing from, with
+         nothing to tell them where it went. -->
+    <div id="oaCheckingNote" class="bg-white/10 dark:bg-white/[0.04] border border-white/15 dark:border-white/[0.06] rounded-[16px] p-[14px] mb-[16px]">
+      <div class="text-[13px] font-semibold text-white dark:text-white mb-[3px]">Looking for a checking account?</div>
+      <div class="text-[12px] text-white/80 dark:text-[#8E9CBA] leading-relaxed">Verceil Checking and Interest Checking are opened when you join. <button type="button" id="oaCheckingSupportBtn" class="underline font-semibold cursor-pointer">Message support</button> and we'll add one to your profile.</div>
     </div>
 
     <div id="oaRiskNote" class="hidden text-[11px] text-white/70 dark:text-[#8E9CBA] leading-relaxed mb-[14px] px-[4px]"></div>
