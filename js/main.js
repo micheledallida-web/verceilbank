@@ -1069,6 +1069,103 @@ window.openSupportMessage = openSupportMessage;
 const greetingLine1 = document.getElementById('greetingLine1');
 const greetingLine2 = document.getElementById('greetingLine2');
 
+// ---------- The time where the customer is ----------
+// A US bank states the time in a US zone, and the one that matters to a
+// customer is their own. The browser already knows it — Intl resolves the
+// device's IANA zone — so nothing is asked, nothing is stored, and no location
+// permission is involved.
+//
+// Daylight saving is not handled here and must not be: Intl applies the rules
+// for the zone on the date being formatted, so EST becomes EDT on the right
+// morning without this code knowing those rules exist. The abbreviation is
+// re-read on every tick for exactly that reason.
+//
+// A customer outside the United States is shown Eastern time, labelled ET.
+// That is the bank's own clock — the hours its representatives keep and the
+// day its transfers settle on — which is the useful answer for somebody
+// travelling, and a more honest one than a US bank quoting Lagos time.
+const BANK_TIME_ZONE = 'America/New_York';
+
+function deviceTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// The zone's short name, and whether it is an American one, from a single
+// question. Intl gives 'EDT' / 'CST' / 'AKDT' / 'HST' for US zones and falls
+// back to a 'GMT+1' form elsewhere — so the shape of the answer IS the test,
+// and no list of IANA zone names has to be kept up to date here.
+function usZoneAbbreviation(timeZone) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'short' })
+      .formatToParts(new Date());
+    const name = (parts.find((part) => part.type === 'timeZoneName') || {}).value || '';
+    return /^(E|C|M|P|AK|H)[SD]T$/.test(name) ? name : '';
+  } catch (err) {
+    return '';
+  }
+}
+
+let clockTimer = null;
+
+function startClock() {
+  const wrap = document.getElementById('homeClock');
+  const timeEl = document.getElementById('homeClockTime');
+  const zoneEl = document.getElementById('homeClockZone');
+  if (!wrap || !timeEl || !zoneEl) return;
+
+  const device = deviceTimeZone();
+  const inTheStates = !!usZoneAbbreviation(device);
+  const zone = inTheStates ? device : BANK_TIME_ZONE;
+
+  let formatter;
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch (err) {
+    // No usable Intl. Showing nothing beats showing the wrong time to somebody
+    // deciding whether a transfer will land today.
+    console.error('Clock unavailable:', err);
+    return;
+  }
+
+  function render() {
+    timeEl.textContent = formatter.format(new Date());
+    zoneEl.textContent = inTheStates ? usZoneAbbreviation(zone) : 'ET';
+    wrap.classList.remove('hidden');
+  }
+
+  function tick() {
+    render();
+    // Scheduled to land on the next minute boundary rather than every 60s from
+    // whenever this happened to start, so the display changes when the minute
+    // does instead of drifting seconds away from every other clock the
+    // customer can see.
+    const now = new Date();
+    const untilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    clockTimer = setTimeout(tick, Math.max(250, untilNextMinute));
+  }
+
+  tick();
+
+  // A phone that slept comes back to a timer that never fired and a time that
+  // is minutes stale — the same trap the idle timeout had. Re-render the
+  // moment the tab is looked at, and restart the chain from the new boundary.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (clockTimer) clearTimeout(clockTimer);
+    tick();
+  });
+}
+
+startClock();
+
 // ---------- Header dropdown (More / Appearance / Messages / Profile) ----------
 const headerMenus = {
   // Quick Actions holds what is not already reachable from the home screen.
@@ -1869,6 +1966,35 @@ async function initSupabaseData() {
   // Checking line is the sum of these, so opening a second one adds to that
   // figure instead of adding a line beside it.
   const CHECKING_TYPES = ['checking', 'interest_checking'];
+
+  // What the figure on an account card MEANS, by account type.
+  //
+  // Savings was the one card that never said. It read "4.00% APY" where every
+  // other deposit account read "Available Balance", so the only card without a
+  // word for its own number was the one people check most.
+  //
+  // Written from here rather than left in the markup so it applies to accounts
+  // that do not exist yet: anything not named below is money you can spend and
+  // is labelled as such, which means a product added later is right by default
+  // and only an exception has to be remembered.
+  const BALANCE_LABEL_DEFAULT = 'Available Balance';
+  const BALANCE_LABELS = {
+    // Not deposits. A brokerage figure is what the holdings are worth today,
+    // not money available to spend, and calling it "available" on a bank
+    // screen would be a plain misstatement.
+    investments: 'Total Value',
+    ira_traditional: 'Total Value',
+    ira_roth: 'Total Value',
+  };
+
+  function applyBalanceLabels() {
+    document.querySelectorAll('[data-balance-label]').forEach((el) => {
+      const type = el.getAttribute('data-balance-label');
+      el.textContent = BALANCE_LABELS[type] || BALANCE_LABEL_DEFAULT;
+    });
+  }
+
+  applyBalanceLabels();
 
   // An IRA is not a deposit account and not the brokerage account either: the
   // money is locked away for retirement under its own tax rules, so it is never
