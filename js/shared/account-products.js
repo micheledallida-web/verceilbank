@@ -15,25 +15,26 @@
 // place:
 //
 //   'signup' — the application form. An applicant picks the account they are
-//              opening, and every product is on offer there.
-//   'app'    — Open an Account, used by somebody who already banks here.
+//              opening.
+//   'app'    — Open an Account, used by somebody who already banks here and
+//              wants another one: a second checking account, interest checking
+//              alongside it, an investment account.
 //
-// The two checking products are 'signup' only. They are real accounts —
-// customers hold them, the dashboard shows them, money moves through them —
-// but they are chosen when you join rather than added later from the app.
+// Both checking products and the investment account are on both surfaces. That
+// is the whole point of Open an Account — a member who already holds a checking
+// account and the savings that came with it, coming back for more.
 //
 // Savings is 'app' only, and the reason is the interesting one. It is not
 // chosen at sign-up because it is not optional there: provision_user opens it
 // alongside whatever the applicant picked, so a brand-new customer always has
 // one without ever being asked.
 //
-// That rule applies to becoming a customer, and to nothing after it. Somebody
-// who already banks here already has their savings account, and bundling a
-// second one onto every account they open afterwards is the bank deciding
-// something on their behalf that it has no reason to decide twice. So from
-// Open an Account, savings is an ordinary product: offered to a customer who
-// does not hold one, absent for a customer who does, and never added to
-// anything automatically.
+// That rule applies to becoming a customer, and to nothing after it. A member
+// opening a second checking account already has their savings, and bundling
+// another one onto it is the bank deciding something on their behalf it has no
+// reason to decide twice. So from Open an Account, savings is an ordinary
+// product: offered to a customer who somehow does not hold one, shown as
+// already held to everybody else, and never added to anything automatically.
 export const ACCOUNT_PRODUCTS = [
   {
     key: 'checking',
@@ -41,7 +42,7 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Everyday banking for spending, direct deposit and transfers',
     note: 'No monthly maintenance fee',
     accent: '#2563EB',
-    openWith: ['signup'],
+    openWith: ['signup', 'app'],
     features: [
       'No monthly maintenance fee',
       'Direct deposit up to two days early',
@@ -55,7 +56,7 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'A checking account that earns interest on your balance',
     note: 'Up to 4.00% APY · No monthly fees',
     accent: '#1D4ED8',
-    openWith: ['signup'],
+    openWith: ['signup', 'app'],
     features: [
       'Earn up to 4.00% APY on your balance',
       'No monthly maintenance fee',
