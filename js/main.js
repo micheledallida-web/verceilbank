@@ -630,7 +630,14 @@ function renderAccountNumberMasks() {
     const el = document.getElementById(id);
     if (!el) return;
     const number = getAccountNumber(masks[id], 'account');
-    el.textContent = number ? `•${String(number).slice(-4)}` : '';
+    const masked = number ? `•${String(number).slice(-4)}` : '';
+    // The rate rides on the same line as the number, which is where Interest
+    // Checking has always carried its own. Savings lost it when that cell's
+    // neighbour became "Available Balance", and the rate is the reason anybody
+    // keeps money in this account — so it goes back, in the row that already
+    // exists, with nothing moved to make space for it.
+    const suffix = el.getAttribute('data-suffix') || '';
+    el.textContent = [masked, suffix].filter(Boolean).join(' · ');
   });
 }
 
