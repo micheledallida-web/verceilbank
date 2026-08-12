@@ -196,6 +196,95 @@
       letter-spacing: 0.42em;
     }
 
+    /* ---- a code the bank would not take ----
+       Deliberately NOT the pink bordered box the other steps use. That box is
+       right when a step has five fields and the complaint could be about any of
+       them; here there is one field, the customer is looking straight at it,
+       and a panel underneath announcing a problem is louder than the problem.
+
+       So the field itself answers: the digits and the rule under them turn red,
+       and one line of text sits beneath in the same colour. Nothing is added to
+       the page and nothing moves — the message occupies its line whether or not
+       it has anything to say, so the Continue button does not jump down the
+       screen at the moment somebody is reaching for it. */
+    .input-group input.offer-code-input.is-invalid {
+      color: #dc2626;
+      border-bottom-color: #dc2626;
+    }
+
+    .input-group input.offer-code-input.is-invalid:focus {
+      border-bottom-color: #b91c1c;
+    }
+
+    .code-error {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4rem;
+      /* Reserved, not conjured. One line's worth of height is always here. */
+      min-height: 1.15rem;
+      margin-top: 0.55rem;
+      font-size: 0.85rem;
+      line-height: 1.35;
+      color: #dc2626;
+      /* Fades in rather than appearing, which reads as an answer rather than as
+         something having gone wrong with the page. */
+      opacity: 0;
+      transition: opacity 140ms ease-out;
+    }
+
+    .code-error.visible { opacity: 1; }
+
+    /* A filled disc with a white exclamation in it, drawn rather than fetched —
+       no image request, no icon font, nothing to fail to load on the one screen
+       that is telling somebody their invitation did not work.
+
+       It is a character in a circle rather than anything cleverer. The first
+       attempt cut the glyph out of the disc with a CSS mask, which needs
+       `mask-composite` spelled two different ways for two engines and renders
+       as a bare red tick-mark on the ones that disagree. This cannot render
+       wrong anywhere.
+
+       Decoration: the sentence beside it carries the message, and the parent is
+       the live region a screen reader reads. */
+    .code-error.visible::before {
+      content: "!";
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      margin-top: 0.06rem;
+      border-radius: 50%;
+      background: #dc2626;
+      color: #ffffff;
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      text-align: center;
+    }
+
+    /* A short, tight shake — the physical answer to "no". Two cycles, six
+       pixels, done in a fifth of a second: enough to read as a refusal, not
+       enough to feel like a toy. Fired by adding the class, and the class is
+       removed when it ends so the next rejection can fire it again. */
+    @keyframes code-refused {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      40%      { transform: translateX(5px); }
+      60%      { transform: translateX(-3px); }
+      80%      { transform: translateX(2px); }
+    }
+
+    .input-group.shake input.offer-code-input {
+      animation: code-refused 220ms ease-in-out;
+    }
+
+    /* Somebody who has asked the system for less motion gets the colour and the
+       sentence, which carry the whole message on their own. */
+    @media (prefers-reduced-motion: reduce) {
+      .input-group.shake input.offer-code-input { animation: none; }
+      .code-error { transition: none; }
+    }
+
     .input-group input:focus, .input-group select:focus {
       border-bottom-color: var(--vb-blue-dark);
     }
@@ -498,13 +587,22 @@
                the thing checking it. -->
           <input type="text" id="offerCode" class="offer-code-input" inputmode="numeric" autocomplete="one-time-code"
                  required aria-describedby="offerCodeNote">
+
+          <!-- The complaint belongs to the field, so it lives under the field.
+               It was down beneath the help text with the other steps' errors,
+               which on this step reads as a note about the page rather than as
+               an answer about the seven digits somebody just typed.
+
+               `aria-live` because it appears without the page moving or the
+               focus shifting: a screen reader that is not told will simply
+               never mention it. `role="status"` rather than `alert` — this is
+               an answer to something the customer did, not an interruption. -->
+          <div class="code-error" data-step-error="offer" role="status" aria-live="polite"></div>
         </div>
 
         <div class="step-note" id="offerCodeNote">
           Your code is in the invitation email or letter we sent you. Each code opens a limited number of accounts. If yours will not work, contact the person who invited you or call us on (800) 555-0123.
         </div>
-
-        <div class="step-error" data-step-error="offer"></div>
 
         <button type="button" class="btn-next-full" data-next="identity">Continue</button>
         <button type="button" class="btn-back-link" data-back="product">Back</button>
@@ -777,6 +875,35 @@
       if (!el) return;
       el.textContent = message || '';
       el.classList.toggle('visible', !!message);
+      if (key === 'offer') markOfferCode(!!message);
+    }
+
+    // The offer step's refusal, on the field rather than in a panel: the digits
+    // and the rule under them go red, the field shakes once, and the message
+    // fades in beneath. Called through setStepError so every path that can
+    // reject a code — the format check, the bank's answer at the step, and the
+    // sign-up itself failing at the very end — produces the same thing.
+    //
+    // Declared as a function rather than a const arrow because setStepError is
+    // called during set-up, before this line is reached; a hoisted declaration
+    // is what makes that safe.
+    function markOfferCode(invalid) {
+      const field = document.getElementById('offerCode');
+      if (!field) return;
+      const group = field.closest('.input-group');
+      field.classList.toggle('is-invalid', invalid);
+      // Announces the state to a screen reader, and is what a browser's own
+      // validation styling keys off.
+      field.setAttribute('aria-invalid', invalid ? 'true' : 'false');
+      if (!group) return;
+      // Restarted rather than toggled: adding a class that is already there
+      // does not replay an animation, and the second wrong code in a row has to
+      // shake as convincingly as the first.
+      group.classList.remove('shake');
+      if (invalid) {
+        void group.offsetWidth;
+        group.classList.add('shake');
+      }
     }
 
     function value(id) {
@@ -900,8 +1027,8 @@
       // separately below — this is what stops six digits being sent to find out.
       offer: () => {
         const digits = value('offerCode').replace(/\D/g, '');
-        if (!digits) return 'Enter the seven-digit offer code from your invitation.';
-        if (digits.length !== OFFER_CODE_LENGTH) return 'An offer code is seven digits. Check the code on your invitation.';
+        if (!digits) return 'Enter your seven-digit offer code.';
+        if (digits.length !== OFFER_CODE_LENGTH) return `Seven digits — you entered ${digits.length}.`;
         return '';
       },
       identity: () => {
@@ -956,7 +1083,7 @@
       offer: async () => {
         const verdict = await checkOfferCode(value('offerCode').replace(/\D/g, ''));
         if (verdict === 'invalid') {
-          return 'That code is not valid. Check the seven digits on your invitation, or contact whoever invited you.';
+          return 'That code is not valid.';
         }
         // 'unreachable' passes. See checkOfferCode.
         return '';
