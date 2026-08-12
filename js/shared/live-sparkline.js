@@ -154,9 +154,20 @@ export function createLiveSparkline(opts) {
     return { destroy() { destroyed = true; } };
   }
 
+  let onScreen = false;
+  // Declared before anything that reads them. Both onVisibility and the
+  // observer below do, and relying on callback timing for that is how a
+  // temporal-dead-zone crash gets introduced by a later edit.
+  let scrolling = false;
+  let idleTimer = null;
+
   // Don't burn frames on a hidden tab or a card scrolled out of view.
+  // Returning to the tab does NOT start it unconditionally: the card may be
+  // scrolled away, in which case starting here would burn frames on something
+  // nobody can see and undo what the observer decided.
   function onVisibility() {
-    if (document.hidden) stop(); else start();
+    if (document.hidden) stop();
+    else if (onScreen && !scrolling) start();
   }
   document.addEventListener('visibilitychange', onVisibility);
 
@@ -164,19 +175,53 @@ export function createLiveSparkline(opts) {
   if (window.IntersectionObserver) {
     observer = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
-        if (e.isIntersecting && !document.hidden) start(); else stop();
+        onScreen = e.isIntersecting;
+        if (onScreen && !document.hidden && !scrolling) start(); else stop();
       });
     }, { threshold: 0 });
     observer.observe(container);
   } else {
+    onScreen = true;
     start();
   }
+
+  // ---------- Never compete with a scroll ----------
+  //
+  // This loop rebuilds an SVG path on every frame, and it lives on the card
+  // directly below Interest Checking. So scrolling up from the bottom of the
+  // dashboard brought this card into view, the observer above started the
+  // loop, and the first frames of that scroll were spent rebuilding a path
+  // instead of moving the page. That is the hitch — always in the same place,
+  // always on the first attempt, gone on the second because by then the loop
+  // was already running.
+  //
+  // Scrolling wins. The animation stops the moment the page moves and starts
+  // again once it has been still for a moment, so the two never share a frame.
+  // Nobody watches a sparkline while they are scrolling past it.
+  function onScroll() {
+    if (!scrolling) {
+      scrolling = true;
+      stop();
+    }
+    if (idleTimer) clearTimeout(idleTimer);
+    // Long enough to cover the tail of a momentum scroll on iOS, short enough
+    // that the chart is moving again before anyone looks at it.
+    idleTimer = setTimeout(() => {
+      scrolling = false;
+      idleTimer = null;
+      if (onScreen && !document.hidden) start();
+    }, 180);
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
 
   return {
     destroy() {
       destroyed = true;
       stop();
+      if (idleTimer) clearTimeout(idleTimer);
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('scroll', onScroll);
       if (observer) observer.disconnect();
     },
   };
