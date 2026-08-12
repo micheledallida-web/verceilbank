@@ -1765,6 +1765,50 @@ function closeNavMenu() {
   }, 300);
 }
 
+// ---------- How much room the bottom bar needs ----------
+// The bar is fixed over the foot of every scrolling surface, so each one has to
+// end above it. That distance was a 90px guess written into the stylesheet, and
+// a guess is what put the last card almost against the bar: the bar is 76px
+// plus whatever a home indicator adds, so the guess left about fourteen pixels
+// and the page looked like it had stopped dead rather than run out.
+//
+// Here it is measured instead, and written to `--nav-h` for the stylesheet to
+// build `--scroll-end` out of. A ResizeObserver keeps it true, which is the
+// part that matters beyond today: the runway follows the bar if the browser's
+// font size changes, if the device rotates, if a fifth item is ever added to
+// the bar, or if the bar becomes a top bar on a wide screen. Nothing has to be
+// remembered or updated by hand.
+function trackNavHeight() {
+  const nav = document.querySelector('.home-nav');
+  if (!nav) return;
+
+  const apply = () => {
+    // getBoundingClientRect over offsetHeight: it is fractional, so a bar that
+    // lands on 76.5px does not round down into half a pixel of overlap.
+    const height = nav.getBoundingClientRect().height;
+    if (height > 0) htmlElement.style.setProperty('--nav-h', `${height}px`);
+  };
+
+  apply();
+
+  if (typeof ResizeObserver === 'function') {
+    new ResizeObserver(apply).observe(nav);
+  } else {
+    // Older browsers still get it right on rotate and on resize, which is where
+    // the height actually changes.
+    window.addEventListener('resize', apply);
+    window.addEventListener('orientationchange', apply);
+  }
+
+  // Web fonts land after first paint and change the height of the labels under
+  // the icons. Without this the runway would be measured against the fallback
+  // font and stay a couple of pixels out for the whole session.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(apply).catch(() => {});
+  }
+}
+trackNavHeight();
+
 navMenuCloseBtn.addEventListener('click', closeNavMenu);
 navMenuOverlay.addEventListener('click', closeNavMenu);
 document.getElementById('navAccounts').addEventListener('click', () => openNavMenu('navAccounts'));

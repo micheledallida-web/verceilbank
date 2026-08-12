@@ -79,13 +79,54 @@ html.hide-balances #detailAccountBalance {
   user-select: none;
 }
 
+/* ===================== THE FOOT OF A SCROLL =====================
+   Where a scrolling screen ends, relative to the bar fixed over the bottom of
+   it. Two numbers, and one of them is measured rather than guessed.
+
+   --nav-h is the bar's REAL height, written onto the root element at runtime by
+   js/main.js and kept in step by a ResizeObserver. It used to be a 90px guess
+   spelled out in four places, and a guess is what made the last card sit almost
+   against the bar: the bar is 76px plus whatever the home indicator adds, so
+   the guess left about fourteen pixels of daylight and the page appeared to
+   stop dead. Measuring it means the runway is right on a small phone, on a
+   large one, on a device with a home indicator and one without, at any browser
+   font size, and after anything is ever added to the bar itself.
+
+   --scroll-end-gap is the daylight on top of that — the deliberate part, and
+   the only number to change if this should breathe more or less. It is set to
+   what a bank leaves under the last card on a phone.
+
+   The fallback on --nav-h matches the bar as designed, so the layout is right
+   on the very first frame and stays right if the script never runs at all. */
+:root {
+  --nav-h: calc(76px + env(safe-area-inset-bottom, 0px));
+  --scroll-end-gap: 28px;
+  --scroll-end: calc(var(--nav-h) + var(--scroll-end-gap));
+}
+
 body {
   font-family: 'Inter', sans-serif;
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0;
   padding-top: 12px;
-  padding-bottom: 90px;
+  padding-bottom: var(--scroll-end);
+  /* Momentum, and no rubber-banding the page behind a sheet. */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Anchored jumps land clear of the bar rather than under it. */
+html {
+  scroll-padding-bottom: var(--scroll-end);
+}
+
+/* Smooth for anyone who has not asked otherwise. Reduced motion turns it off
+   entirely rather than merely shortening it — a page that slides when somebody
+   has said not to is worse than one that jumps. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 /* Light Mode: Blue background (#0B4CC2) */
 html:not(.dark) body {
@@ -2098,18 +2139,16 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 #page-root {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: var(--scroll-end);
   /* Anything scrolled to with an anchor clears the bar too. */
-  scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  scroll-padding-bottom: var(--scroll-end);
 }
 
-/* The home indicator and the notch. Zero on everything that has neither. */
-body {
-  padding-bottom: calc(90px + env(safe-area-inset-bottom));
-}
-
+/* The home indicator. Zero on everything that does not have one, and the one
+   place the inset is added by hand — everywhere else it arrives inside the
+   measured --nav-h, because it is part of how tall the bar actually is. */
 .home-nav {
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---- screens wider than the app itself ----
@@ -2177,9 +2216,15 @@ body {
    every bank's site does on a desktop, and the account list flows into two
    columns instead of one long ribbon nobody scrolls. */
 @media (min-width: 1024px) {
+  /* The bar is at the top of the page here, so there is nothing fixed over the
+     foot of the scroll to leave room for. One variable, and every surface below
+     follows it. */
+  :root {
+    --scroll-end: 48px;
+  }
+
   body {
     padding-top: 96px;
-    padding-bottom: 48px;
   }
 
   /* ---- navigation moves to the top ---- */
@@ -2254,8 +2299,6 @@ body {
      here, so the clearance reserved for it there is released. */
   #page-root {
     padding-top: 96px;
-    padding-bottom: 48px;
-    scroll-padding-bottom: 0;
   }
 
   /* The composer keeps the centring the narrower screens gave it; only its

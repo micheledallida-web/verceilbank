@@ -99,38 +99,57 @@ function selectableCard({ key, name, tagline, accent, points, selected }) {
   `;
 }
 
-// The savings account a customer ALREADY HOLDS, shown on the list without being
-// on offer.
+// The savings card, which asks a different question from every other card on
+// this screen and therefore looks different.
 //
-// This card exists for one reader: somebody who joined, was given a savings
-// account with their first product, and has now come here to open something
-// else. Leaving it off the list would make the screen look like the bank had
-// forgotten it. Offering it as a choice would be worse — it is a product they
-// already have, and the whole point of this change is that opening an account
-// no longer drags a second savings account along behind it.
+// The others are a radio group answering "which account are you opening?".
+// Savings is not one of those answers — it is the account that comes with
+// whichever one you pick, and a member might want it or might not. So it is a
+// CHECKBOX: tick it and it is opened alongside the account above, leave it and
+// nothing happens. Nobody is given a savings account they did not ask for, and
+// nobody has to make two trips through this screen to get one.
 //
-// So it is drawn in the same stack, same width and shape, with an INCLUDED
-// badge where the other cards carry their radio, and it says plainly that it
-// came with their first account. It is a div rather than a button and has no
-// `oa-choice` class, which is what keeps it out of the selection handler.
+// Two states, decided by whether they already hold one:
 //
-// A customer who does NOT hold savings never sees this card. For them savings
-// is an ordinary selectable product in the list above — see `openWith` in
-// js/shared/account-products.js.
-function heldSavingsCard() {
+//   held      — an INCLUDED badge and no control at all. There is nothing to
+//               decide: they have it, it came with their first account, and
+//               opening something else will not open a second.
+//   available — a checkbox, off by default. Off, because this screen exists to
+//               open the account somebody came here for, and adding a second
+//               one they did not ask about is the bank deciding for them.
+//
+// It is a div rather than a button in the held state and carries no `oa-choice`
+// class in either, which is what keeps it out of the radio group's handler.
+function savingsCard({ held, checked }) {
   const savings = ACCOUNT_PRODUCTS_BY_KEY.savings;
   if (!savings) return '';
 
+  const control = held
+    ? `<span class="text-[10px] font-bold uppercase tracking-[0.08em] px-[9px] py-[4px] rounded-full flex-shrink-0"
+         style="background:${savings.accent}1A; color:${savings.accent};">Included</span>`
+    : `<span class="w-[22px] h-[22px] rounded-[7px] flex items-center justify-center flex-shrink-0 border-2"
+         style="border-color:${checked ? savings.accent : '#D1D5DB'}; background:${checked ? savings.accent : 'transparent'};">
+         ${checked ? '<svg class="w-[12px] h-[12px] text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3.4"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+       </span>`;
+
+  const footer = held
+    ? 'Opened with your first account. Nothing here changes it, and opening another account does not open a second one.'
+    : 'Optional. Tick it and it opens alongside the account above; leave it and nothing happens.';
+
+  const tag = held ? 'div' : 'button';
+  const attrs = held
+    ? ''
+    : ' type="button" id="oaSavingsToggle" aria-pressed="' + String(!!checked) + '"';
+
   return `
-    <div class="w-full text-left rounded-[20px] p-[16px] shadow-lg bg-white dark:bg-[#0D1728] border-2 border-dashed"
-      style="border-color:${savings.accent}55;">
+    <${tag}${attrs} class="w-full text-left rounded-[20px] p-[16px] shadow-lg bg-white dark:bg-[#0D1728] border-2 border-dashed${held ? '' : ' cursor-pointer'}"
+      style="border-color:${checked && !held ? savings.accent : `${savings.accent}55`};">
       <div class="flex items-start justify-between gap-[12px] mb-[10px]">
         <div class="min-w-0">
           <div class="text-[15px] font-bold text-[#111827] dark:text-white">${savings.name}</div>
           <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">${savings.tagline}</div>
         </div>
-        <span class="text-[10px] font-bold uppercase tracking-[0.08em] px-[9px] py-[4px] rounded-full flex-shrink-0"
-          style="background:${savings.accent}1A; color:${savings.accent};">Included</span>
+        ${control}
       </div>
       ${savings.features.map((f) => `
         <div class="flex items-start gap-[8px] py-[3px]">
@@ -139,9 +158,9 @@ function heldSavingsCard() {
         </div>
       `).join('')}
       <div class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed mt-[10px] pt-[10px] border-t border-gray-100 dark:border-white/[0.06]">
-        Opened with your first account. Nothing here changes it, and opening another account does not open a second one.
+        ${footer}
       </div>
-    </div>
+    </${tag}>
   `;
 }
 
@@ -171,6 +190,9 @@ export function init(root, ctx, options = {}) {
   // The product asked for on the way in, if the customer arrived from an offer.
   let selectedKey = (options && options.product) || null;
   let ownedKeys = [];
+  // Whether to open a savings account alongside the one being chosen. Off until
+  // the customer says otherwise — see savingsCard().
+  let addSavings = false;
   let kycProfile = null;
   let jointEligibility = null;
 
@@ -214,19 +236,32 @@ export function init(root, ctx, options = {}) {
   // interest checking and the investment account. Which is the purpose of this
   // screen — a member who joined with one account coming back for another.
   function choosableProducts() {
-    return offerableProducts().filter((product) => !ownedKeys.includes(product.key));
+    const main = offerableProducts()
+      // The add-on is not one of the answers to "which account are you
+      // opening?" — it is drawn beneath them by savingsCard().
+      .filter((product) => !product.addOn && !ownedKeys.includes(product.key));
+    if (main.length) return main;
+
+    // Nothing else is left to open. If savings is still open to them it stops
+    // being an add-on and becomes the account they are here for — otherwise the
+    // screen would offer a tick box with no account to tick it against, and a
+    // primary button with nothing to do.
+    return offerableProducts().filter((product) => product.addOn && !ownedKeys.includes(product.key));
   }
 
   function renderProducts() {
     const choosable = choosableProducts();
 
     const holdsSavings = ownedKeys.includes('savings');
+    // When savings is the last thing left it is in the radio group above, and
+    // must not also appear as a tick box beneath it.
+    const savingsIsAChoice = choosable.some((product) => product.key === 'savings');
 
     if (!choosable.length) {
-      // Nothing left to choose. Savings is still worth stating to whoever holds
-      // it — it is the account they never picked, and this is the screen that
-      // explains where it came from.
-      productsWrap.innerHTML = holdsSavings ? heldSavingsCard() : '';
+      // Nothing left to choose. Savings is still worth stating either way: to
+      // whoever holds it, because it is the account they never picked, and to
+      // whoever does not, because it is the one thing still open to them.
+      productsWrap.innerHTML = savingsCard({ held: holdsSavings, checked: addSavings });
       nothingLeft.classList.remove('hidden');
       riskNote.classList.add('hidden');
       openBtn.classList.add('hidden');
@@ -250,7 +285,16 @@ export function init(root, ctx, options = {}) {
       accent: product.accent,
       points: product.features,
       selected: product.key === selectedKey,
-    })).join('') + (holdsSavings ? heldSavingsCard() : '');
+    })).join('') + (savingsIsAChoice ? '' : savingsCard({ held: holdsSavings, checked: addSavings }));
+
+    const savingsToggle = productsWrap.querySelector('#oaSavingsToggle');
+    if (savingsToggle) {
+      on(savingsToggle, 'click', () => {
+        addSavings = !addSavings;
+        ctx.recordEvent('open_account.savings_toggled', { add_savings: addSavings });
+        renderProducts();
+      });
+    }
 
     productsWrap.querySelectorAll('.oa-choice').forEach((btn) => {
       on(btn, 'click', () => {
@@ -348,11 +392,14 @@ export function init(root, ctx, options = {}) {
     const openingBalance = 0;
 
     try {
-      // Exactly what was chosen, and nothing else. Savings used to be opened
-      // alongside this, which is the sign-up rule applied where it does not
-      // belong: a customer who already holds one does not need a second, and
-      // one who does not hold one can choose it from this very list.
+      // The account they chose, and savings only if they ticked it. Savings was
+      // once opened here unconditionally, which is the sign-up rule applied
+      // where it does not belong — a member who already holds one does not need
+      // a second, and one who does not may simply not want one.
       await openAccountRow(product.key);
+      // Not when savings IS the account being opened — that is one account, not
+      // two, and asking for it twice would only earn a duplicate refusal.
+      if (addSavings && product.key !== 'savings') await openAccountRow('savings');
     } catch (err) {
       console.error('Open account error:', err);
       openBtn.disabled = false;
@@ -365,10 +412,14 @@ export function init(root, ctx, options = {}) {
       account_type: product.key,
       ownership: OWNERSHIP_INDIVIDUAL,
       product: product.name,
+      with_savings: addSavings && product.key !== 'savings',
       reference: confirmationNumber,
     });
 
-    root.querySelector('#oaConfirmTitle').textContent = `${product.name} opened`;
+    const savingsOpenedToo = addSavings && product.key !== 'savings';
+    root.querySelector('#oaConfirmTitle').textContent = savingsOpenedToo
+      ? `${product.name} and High-Yield Savings opened`
+      : `${product.name} opened`;
     root.querySelector('#oaConfirmTerms').textContent =
       `Your account opens with limited access. Deposit at least ${MINIMUM_OPENING_DEPOSIT_LABEL} within ${FUNDING_DEADLINE_DAYS} days for full access — an account left unfunded past that is closed.`;
     root.querySelector('#oaConfirmRef').textContent = confirmationNumber;
