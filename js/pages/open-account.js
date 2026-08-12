@@ -99,23 +99,25 @@ function selectableCard({ key, name, tagline, accent, points, selected }) {
   `;
 }
 
-// Verceil Savings, on the list with the products and not one of them.
+// The savings account a customer ALREADY HOLDS, shown on the list without being
+// on offer.
 //
-// Every customer holds one — it is opened alongside whatever they choose, here
-// and at sign-up — so it can never be a thing left to open, and offering it as
-// a choice would be offering something they already have. Leaving it off the
-// list entirely was worse: the screen then said "a savings account is opened
-// alongside it" in a line of prose above the cards and showed no such account
-// anywhere, so the one account that always comes along was the only one never
-// pictured.
+// This card exists for one reader: somebody who joined, was given a savings
+// account with their first product, and has now come here to open something
+// else. Leaving it off the list would make the screen look like the bank had
+// forgotten it. Offering it as a choice would be worse — it is a product they
+// already have, and the whole point of this change is that opening an account
+// no longer drags a second savings account along behind it.
 //
-// So it is drawn as a card in the same stack, same width and shape, with an
-// INCLUDED badge where the other cards carry their radio. It is a div rather
-// than a button and has no `oa-choice` class, which is what keeps it out of the
-// selection handler: there is nothing here to choose. Same object as the
-// "Included" card on the sign-up screen, which is where a customer sees this
-// rule stated for the first time.
-function includedSavingsCard() {
+// So it is drawn in the same stack, same width and shape, with an INCLUDED
+// badge where the other cards carry their radio, and it says plainly that it
+// came with their first account. It is a div rather than a button and has no
+// `oa-choice` class, which is what keeps it out of the selection handler.
+//
+// A customer who does NOT hold savings never sees this card. For them savings
+// is an ordinary selectable product in the list above — see `openWith` in
+// js/shared/account-products.js.
+function heldSavingsCard() {
   const savings = ACCOUNT_PRODUCTS_BY_KEY.savings;
   if (!savings) return '';
 
@@ -137,7 +139,7 @@ function includedSavingsCard() {
         </div>
       `).join('')}
       <div class="text-[11px] text-[#6B7280] dark:text-[#8E9CBA] leading-relaxed mt-[10px] pt-[10px] border-t border-gray-100 dark:border-white/[0.06]">
-        Nothing to choose and nothing to sign. If you already hold one, you keep it and its balance.
+        Opened with your first account. Nothing here changes it, and opening another account does not open a second one.
       </div>
     </div>
   `;
@@ -146,7 +148,7 @@ function includedSavingsCard() {
 export function init(root, ctx, options = {}) {
   const {
     close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency,
-    openSupportMessage, openAccountRow, openCompulsorySavings,
+    openSupportMessage, openAccountRow,
     MINIMUM_OPENING_DEPOSIT_LABEL, FUNDING_DEADLINE_DAYS,
   } = ctx;
 
@@ -224,11 +226,13 @@ export function init(root, ctx, options = {}) {
     const holdsAChecking = ownedKeys.includes('checking') || ownedKeys.includes('interest_checking');
     checkingNote.classList.toggle('hidden', holdsAChecking);
 
+    const holdsSavings = ownedKeys.includes('savings');
+
     if (!choosable.length) {
-      // Nothing left to choose, but savings is still worth stating — it is the
-      // account they hold that they never picked, and this is the screen that
-      // explains what comes with what.
-      productsWrap.innerHTML = includedSavingsCard();
+      // Nothing left to choose. Savings is still worth stating to whoever holds
+      // it — it is the account they never picked, and this is the screen that
+      // explains where it came from.
+      productsWrap.innerHTML = holdsSavings ? heldSavingsCard() : '';
       nothingLeft.classList.remove('hidden');
       riskNote.classList.add('hidden');
       openBtn.classList.add('hidden');
@@ -252,7 +256,7 @@ export function init(root, ctx, options = {}) {
       accent: product.accent,
       points: product.features,
       selected: product.key === selectedKey,
-    })).join('') + includedSavingsCard();
+    })).join('') + (holdsSavings ? heldSavingsCard() : '');
 
     productsWrap.querySelectorAll('.oa-choice').forEach((btn) => {
       on(btn, 'click', () => {
@@ -362,10 +366,11 @@ export function init(root, ctx, options = {}) {
     const openingBalance = 0;
 
     try {
+      // Exactly what was chosen, and nothing else. Savings used to be opened
+      // alongside this, which is the sign-up rule applied where it does not
+      // belong: a customer who already holds one does not need a second, and
+      // one who does not hold one can choose it from this very list.
       await openAccountRow(product.key);
-      // Savings comes with whatever is opened. Someone who already holds one
-      // keeps the one they have, balance and all.
-      await openCompulsorySavings();
     } catch (err) {
       console.error('Open account error:', err);
       openBtn.disabled = false;

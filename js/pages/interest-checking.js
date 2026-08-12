@@ -28,7 +28,7 @@ function revealDashboardAccount(formatCurrency, balance) {
 }
 
 export function init(root, ctx) {
-  const { close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency, openCompulsorySavings } = ctx;
+  const { close, loadPage, showModal, supabaseClient, getCurrentUser, genRef, formatCurrency } = ctx;
 
   const offerStep = root.querySelector('#icOfferStep');
   const confirmStep = root.querySelector('#icConfirmStep');
@@ -57,11 +57,11 @@ export function init(root, ctx) {
       if (supabaseClient) {
         const user = await getCurrentUser();
         if (user) {
+          // Just the account that was asked for. Savings comes with becoming a
+          // customer, not with every account opened afterwards — see the note
+          // on `openWith` in js/shared/account-products.js.
           await ctx.openAccountRow('interest_checking');
-          // Savings is opened with every account, not offered beside it.
-          // Whoever already holds one keeps the one they have.
-          await openCompulsorySavings();
-          ctx.recordEvent('account.opened', { account_type: 'interest_checking', with_savings: true, reference: confirmationNumber });
+          ctx.recordEvent('account.opened', { account_type: 'interest_checking', reference: confirmationNumber });
         }
       }
     } catch (err) {

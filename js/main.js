@@ -477,18 +477,6 @@ export async function openAccountRow(accountType) {
   return true;
 }
 
-// Savings comes with whatever else is opened, so every flow that opens an
-// account calls this rather than each one remembering to. Safe to call as often
-// as it likes: someone who already holds savings keeps the one they have and
-// its balance.
-export async function openCompulsorySavings() {
-  try {
-    await openAccountRow(COMPULSORY_ACCOUNT_TYPE);
-  } catch (err) {
-    console.error('Compulsory savings error:', err);
-  }
-}
-
 // ---------- Repairing a customer with no accounts ----------
 // Zero rows in `accounts` is not a state a customer can legitimately be in.
 // Everyone holds savings at the very least — it is opened alongside whatever
@@ -1034,7 +1022,6 @@ export async function loadPage(name, ...args) {
     applyTheme,
     isDarkTheme: () => htmlElement.classList.contains('dark'),
     openAccountRow,
-    openCompulsorySavings,
     // The ledger and the event log. Every flow that moves money calls
     // recordTransaction() so it lands in the account's activity list; anything
     // else worth keeping calls recordEvent(). Both queue locally first, so a
