@@ -495,11 +495,19 @@ begin
     from pg_class c
    where c.relnamespace = 'public'::regnamespace
      and c.relkind = 'r'
-     and not c.relrowsecurity;
+     and not c.relrowsecurity
+     -- The offer-code tables are secured by section 12, which has not run yet.
+     -- Naming them here would be true at this instant and wrong by the end of
+     -- the file, and a warning that is wrong by the time anybody reads it is
+     -- how people learn to skip warnings. Nothing is hidden by leaving them
+     -- out: the verification block sweeps EVERY public table with no
+     -- exceptions, after all of this has run, and that is the check that
+     -- decides whether the database is safe.
+     and c.relname <> all (array['offer_codes', 'offer_code_redemptions', 'offer_code_attempts']);
   if leaked is not null then
     raise warning 'TABLES WITH RLS OFF — readable by anyone holding the anon key: %', leaked;
   else
-    raise notice 'every public table has RLS enabled';
+    raise notice 'every public table has RLS enabled (or is secured later in this file)';
   end if;
 end $$;
 
@@ -1139,6 +1147,47 @@ create policy "own kyc documents update"
   on storage.objects for update to authenticated
   using (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'kyc-documents' and (storage.foldername(name))[1] = auth.uid()::text);
+
+
+-- ---------------------------------------------------------------------------
+-- RLS on the request table itself. Applied HERE and not by section 4, and the
+-- reason is an ordering bug worth spelling out because it left the single most
+-- sensitive table in this database open.
+--
+-- Section 4 secures verification_requests — it is in its list. But section 4
+-- runs eight hundred lines before this one, and on a project that has never had
+-- this table it finds nothing there and says so:
+--
+--     NOTICE: RLS: skipping verification_requests, table not present
+--
+-- Then this section creates it. RLS defaults to off, the table-level grants for
+-- `authenticated` are real, and the result is every customer able to read every
+-- other customer's legal name, date of birth, home address and the storage
+-- paths of their passport photographs. Only the SSN was protected, by the
+-- column grant above.
+--
+-- The end-of-file verification block is what caught it, saying
+-- 'verification_requests | EXPOSED — rls off' on a fresh run. It is fixed at
+-- the point of creation rather than by moving the table earlier, so it cannot
+-- come apart again if the sections are ever reordered.
+--
+-- Read and create your own, and nothing else: a submitted identity document is
+-- a record of what the bank was given, so a customer may not edit or withdraw
+-- one after the fact.
+alter table public.verification_requests enable row level security;
+
+drop policy if exists "own_verification_requests_select" on public.verification_requests;
+drop policy if exists "own_verification_requests_insert" on public.verification_requests;
+
+create policy "own_verification_requests_select"
+  on public.verification_requests for select to authenticated
+  using (auth.uid() = user_id);
+
+create policy "own_verification_requests_insert"
+  on public.verification_requests for insert to authenticated
+  with check (auth.uid() = user_id);
+
+revoke update, delete on public.verification_requests from authenticated, anon;
 
 
 -- =============================================================================
@@ -1853,9 +1902,17 @@ union all
 select 'row level security', c.relname,
        case when not c.relrowsecurity then 'EXPOSED — rls off'
             when exists (select 1 from pg_policy p where p.polrelid = c.oid) then 'ok'
-            -- The one table that is meant to have no policy: raw exchange
-            -- payloads, written by the webhook with the service key.
-            when c.relname = 'deposit_events' then 'ok (bank only, no customer access)'
+            -- The tables that are MEANT to have no policy. Deny-all is the
+            -- design, not an oversight: raw exchange payloads written by the
+            -- webhook with the service key, and the offer-code tables, which
+            -- are reached only through security-definer functions so that a
+            -- session can ask about one code and cannot list, count or alter
+            -- any of them. Without this they read as faults every time anybody
+            -- runs the file, which is how a real fault two lines below gets
+            -- skimmed past.
+            when c.relname in ('deposit_events', 'offer_codes',
+                               'offer_code_redemptions', 'offer_code_attempts')
+              then 'ok (bank only, no customer access)'
             else 'DENY-ALL — rls on, no policy; the app will read this as empty'
        end
   from pg_class c
