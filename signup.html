@@ -508,12 +508,12 @@
 
       <!-- ================= STEP 3 — SOCIAL SECURITY NUMBER ================= -->
       <div id="stepSsn" style="display:none;">
-        <h1>Your Social Security Number</h1>
-        <p class="subtitle">Federal law requires us to collect this to open a bank account. It is encrypted in transit and never shown back to you in full.</p>
+        <h1>Last four of your SSN</h1>
+        <p class="subtitle">Just the last four digits to start your application. We ask for the full number later, when we verify your identity.</p>
 
         <div class="input-group">
-          <label for="ssn">Social Security Number</label>
-          <input type="text" id="ssn" inputmode="numeric" autocomplete="off" placeholder="•••-••-••••" maxlength="11" required>
+          <label for="ssn">Last 4 digits</label>
+          <input type="text" id="ssn" inputmode="numeric" autocomplete="off" placeholder="••••" maxlength="4" required>
         </div>
 
         <div class="step-note">
@@ -680,7 +680,7 @@
     const STEPS = [
       { key: 'product', id: 'stepProduct', label: 'Choose your account' },
       { key: 'identity', id: 'stepIdentity', label: 'Your name and date of birth' },
-      { key: 'ssn', id: 'stepSsn', label: 'Social Security Number' },
+      { key: 'ssn', id: 'stepSsn', label: 'Last four of your SSN' },
       { key: 'address', id: 'stepAddress', label: 'Home address' },
       { key: 'email', id: 'stepEmail', label: 'Email address' },
       { key: 'password', id: 'stepPassword', label: 'Create your password' },
@@ -736,18 +736,22 @@
     }
 
     // ---------- Social Security Number ----------
-    // Typed as digits, shown as ###-##-####. The raw digits are what gets
-    // submitted; the dashes exist so somebody can read back what they typed.
+    // The last four digits, and only those.
+    //
+    // This step used to ask for all nine and then throw five of them away: the
+    // only thing sign-up has ever sent is ssn_last4, because the full number
+    // belongs on the verification record, written at identity check. Asking a
+    // stranger for a whole Social Security Number to hold an application that
+    // never uses it is collecting a liability, not a credential — and the five
+    // digits nobody wanted were still typed into a browser, still in the form,
+    // still in whatever the phone's keyboard remembers.
+    //
+    // No formatter now. Four digits have nothing to punctuate; the input simply
+    // refuses anything that is not a digit and stops at four.
     const ssnInput = document.getElementById('ssn');
 
-    function formatSsn(digits) {
-      const parts = [digits.slice(0, 3), digits.slice(3, 5), digits.slice(5, 9)].filter(Boolean);
-      return parts.join('-');
-    }
-
     ssnInput.addEventListener('input', () => {
-      const digits = ssnInput.value.replace(/\D/g, '').slice(0, 9);
-      ssnInput.value = formatSsn(digits);
+      ssnInput.value = ssnInput.value.replace(/\D/g, '').slice(0, 4);
     });
 
     // ---------- Per-step validation ----------
@@ -785,7 +789,7 @@
       },
       ssn: () => {
         const digits = value('ssn').replace(/\D/g, '');
-        if (digits.length !== 9) return 'Enter all nine digits of your Social Security Number.';
+        if (digits.length !== 4) return 'Enter the last four digits of your Social Security Number.';
         return '';
       },
       address: () => {
@@ -918,10 +922,15 @@
               city: value('city'),
               state: value('state'),
               postal_code: value('postalCode'),
-              // Only the last four. The full number is written to the
-              // verification record over a server-side call at identity
-              // check, never onto the auth user, where it would sit in every
-              // session payload this browser holds.
+              // The last four, which is now all this screen ever collects.
+              // The full number is written to the verification record at
+              // identity check, never onto the auth user, where it would sit
+              // in every session payload this browser holds.
+              //
+              // slice(-4) is kept rather than passing `ssn` straight through:
+              // it is the guarantee that this field cannot carry more than
+              // four digits onto the auth user even if the step above is ever
+              // changed back.
               ssn_last4: ssn.slice(-4),
               // The product chosen in step one. It is a request, not an
               // account: it tells the bank what to open once this person has
