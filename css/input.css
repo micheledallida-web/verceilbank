@@ -24,8 +24,32 @@
    `!important` — nothing does today, and nothing should. */
 .hidden { display: none !important; }
 
-/* Anything you previously had in a <style> block in the old single file goes here. */
-*, *::before, *::after {
+/* ===================== THE THEME CROSSFADE =====================
+   Light and dark fade into one another rather than snapping. That is the whole
+   job of this rule, and it used to be written as an unconditional
+   `*, *::before, *::after { transition: ... }` — a colour transition armed on
+   every element on the page, for the entire life of the page, to serve an
+   event that happens when somebody taps the theme switch.
+
+   The browser has to carry that. Every element gets a transition set to track,
+   and any style change that touches one of those four properties — a class
+   toggled, a hidden panel shown, a card marked active by a finger landing on
+   it mid-scroll — starts an animation and the repaints that come with it,
+   instead of just being drawn. On a long scrolling page that is paid for in
+   frames.
+
+   So it is armed only while a theme change is actually happening. js/main.js
+   puts `theme-anim` on <html> when the theme flips and takes it off when the
+   fade is done; the rest of the time nothing on this page is transitioning
+   colour, because nothing on this page is changing colour.
+
+   Deliberately NOT `!important`: components that declare their own transition
+   (the cards' `transform`, the buttons' scale) keep it and always did — the
+   shorthand here loses to theirs on specificity, exactly as before. This is
+   the same rule, on a switch. */
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
   transition: background-color 250ms ease-in-out, border-color 250ms ease-in-out, color 250ms ease-in-out, box-shadow 250ms ease-in-out;
 }
 
@@ -100,19 +124,65 @@ html.hide-balances #detailAccountBalance {
    on the very first frame and stays right if the script never runs at all. */
 :root {
   --nav-h: calc(76px + env(safe-area-inset-bottom, 0px));
-  --scroll-end-gap: 28px;
+  --scroll-end-gap: 32px;
   --scroll-end: calc(var(--nav-h) + var(--scroll-end-gap));
+}
+
+/* ===================== THE SPACING SCALE =====================
+   Vertical rhythm on the home screen, in one place, because it was being
+   guessed a card at a time and it showed: ten pixels between two cards that
+   each carry a 20px drop shadow reads as no gap at all, so the offers ran into
+   one another — the white Signature Card and the Get Started banner in
+   particular looked like one two-tone block rather than two products.
+
+   Every number here is a multiple of four and hangs off the column's own 16px
+   gutter, which is how a bank's app is built: the space between two cards is
+   the same as the space beside them, so the page has one margin rather than a
+   different one in every direction.
+
+     --gap-card    12px  rows of the same thing (account cards). Tighter on
+                         purpose — they are one list, not four objects.
+     --gap-offer   16px  the offer cards. Full gutter: each one is a separate
+                         product with its own surface and its own shadow, and
+                         they need to read as separate.
+     --gap-block   20px  between two different KINDS of thing, e.g. the last
+                         account and Open an Account under it.
+     --gap-section 32px  above a section heading — the biggest gap on the
+                         screen, because it is the only one that means "new
+                         section" rather than "next item".
+     --gap-label   12px  a heading to the first card beneath it. Small, so the
+                         heading belongs to what follows rather than floating
+                         between the two.
+
+   Change a number here and the whole screen moves with it. */
+:root {
+  --gap-card: 12px;
+  --gap-offer: 16px;
+  --gap-block: 20px;
+  --gap-section: 32px;
+  --gap-label: 12px;
 }
 
 body {
   font-family: 'Inter', sans-serif;
+  /* `svh`, NOT `dvh`. The dynamic unit is exactly what its name says: it
+     re-resolves as the browser's own chrome slides in and out, so on a phone
+     every frame of the address bar collapsing relaid out the body — and the
+     address bar collapses while you are scrolling, which is why the first
+     flick down felt like it caught. `svh` is the small viewport, fixed for the
+     life of the page: the tallest chrome, measured once, never changing.
+     Nothing on the page is sized to the viewport, so this only ever set a
+     floor, and a floor does not need to be animated. */
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100svh;
   margin: 0;
   padding-top: 12px;
   padding-bottom: var(--scroll-end);
   /* Momentum, and no rubber-banding the page behind a sheet. */
   -webkit-overflow-scrolling: touch;
+  /* A scroll that reaches the end of this page stops there instead of handing
+     the rest of the gesture to whatever is behind it. */
+  overscroll-behavior-y: contain;
 }
 
 /* Anchored jumps land clear of the bar rather than under it. */
@@ -138,9 +208,16 @@ html:not(.dark) body {
   color: #111827;
 }
 /* Dark Mode: Deep banking dark navy aesthetic matching screenshot */
+/* No `background-attachment: fixed` here, and it is not an omission. It was on
+   this rule, and a fixed attachment asks the compositor to hold the background
+   still while the content moves over it — which on a phone means repainting the
+   whole viewport every frame of every scroll, and on iOS is the single most
+   reliable way to make a page stutter. It bought nothing: the background is one
+   flat colour, so a fixed one and a scrolling one are the same pixels. <html>
+   paints the same colour behind this anyway, so the page cannot run out of
+   background at either end of a rubber-band. */
 html.dark body {
   background: #060B14;
-  background-attachment: fixed;
   color: #FFFFFF;
 }
 
@@ -1317,7 +1394,7 @@ html.dark body {
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  margin: 24px 0 10px 4px;
+  margin: var(--gap-section) 0 var(--gap-label) 4px;
 }
 
 /* ---- account cards ---- */
@@ -1325,8 +1402,8 @@ html.dark body {
   background: #FFFFFF;
   border: 1px solid transparent;
   border-radius: 20px;
-  padding: 16px 18px;
-  margin-bottom: 10px;
+  padding: 17px 18px;
+  margin-bottom: var(--gap-card);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
   cursor: pointer;
   transition: transform 0.12s ease;
@@ -1354,8 +1431,11 @@ html.dark body {
   background: transparent;
   border: 1.5px dashed rgba(255, 255, 255, 0.32);
   border-radius: 20px;
-  padding: 15px 18px;
-  margin-top: 14px;
+  padding: 16px 18px;
+  /* A block gap above, because the card above it is an account and this is not
+     one; nothing below, because the next thing down is a section heading that
+     brings its own. */
+  margin-top: var(--gap-block);
   text-align: left;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease;
@@ -1655,12 +1735,17 @@ html.dark body .home-sell {
 .home-promo {
   position: relative;
   overflow: hidden;
+  /* The card is a closed box: `overflow: hidden` already clips it, the artwork
+     inside is absolutely positioned against it, and nothing in it can change
+     the height of anything else. Saying so lets the browser treat each offer as
+     its own paint and layout unit while the page moves under the finger. */
+  contain: layout paint;
   width: 100%;
-  min-height: 148px;
+  min-height: 152px;
   border: 1px solid transparent;
   border-radius: 22px;
-  padding: 18px;
-  margin-bottom: 10px;
+  padding: 20px;
+  margin-bottom: var(--gap-offer);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1687,13 +1772,15 @@ html.dark body .home-sell {
 
 .home-promo-art svg { width: 100%; height: 100%; }
 
-/* The two promo illustrations are the only things on this page carrying an SVG
-   blur filter, and a filter is re-rasterised every time the element it is on
-   moves — which, on a scrolling page, is every frame. `contain: paint` tells
-   the browser nothing inside can affect anything outside, so the filter is
-   rasterised once into its own box and the rest of the scroll costs nothing.
-   This is the difference between a page that glides and one that grinds on the
-   two cards at the bottom of it. */
+/* The heaviest drawing on the home screen: four illustrations, each a couple of
+   dozen vector shapes with gradients over them, all of them below the fold and
+   therefore all of them first painted mid-scroll.
+
+   `contain: paint` tells the browser nothing inside the box can affect anything
+   outside it, so each illustration is rasterised into its own tile once and the
+   rest of the scroll reuses it instead of re-deriving what overlaps what. It is
+   the difference between a page that glides and one that grinds on the last
+   four cards. (The card itself is contained too — see .home-promo below.) */
 .home-promo-art {
   contain: paint;
 }
@@ -1709,7 +1796,7 @@ html.dark body .home-sell {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .home-promo-eyebrow {

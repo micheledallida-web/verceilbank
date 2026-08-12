@@ -654,8 +654,34 @@ function renderAccountNumberMasks() {
 const htmlElement = document.documentElement;
 const THEME_KEY = 'vercel_bank_theme';
 
+// How long the colour crossfade runs. Matches the 250ms in the `.theme-anim`
+// rule in css/input.css, plus a frame's grace so nothing is cut off mid-fade.
+const THEME_ANIM_MS = 300;
+let themeAnimTimer = null;
+
+// The crossfade is armed for the length of the fade and disarmed after it.
+//
+// It used to be armed permanently: a colour transition on every element of the
+// page, all the time, so that a theme switch would fade. Everything else on the
+// page paid for that — every class toggled, every panel shown, every card the
+// finger touched mid-scroll started a transition and the repaints that go with
+// it. Now the one event that wants the fade turns it on and turns it off again.
+function animateThemeChange() {
+  // Not during the first frame. `theme-boot` is on <html> precisely to stop the
+  // page animating in from whatever the previous theme was, and this would undo
+  // that.
+  if (htmlElement.classList.contains('theme-boot')) return;
+  htmlElement.classList.add('theme-anim');
+  if (themeAnimTimer) clearTimeout(themeAnimTimer);
+  themeAnimTimer = setTimeout(() => {
+    themeAnimTimer = null;
+    htmlElement.classList.remove('theme-anim');
+  }, THEME_ANIM_MS);
+}
+
 export function applyTheme(isDark) {
   const changed = htmlElement.classList.contains('dark') !== isDark;
+  if (changed) animateThemeChange();
   htmlElement.classList.toggle('dark', isDark);
   document.body.classList.toggle('dark', isDark);
   // Only an actual change, not the call at boot that re-asserts what the head

@@ -1,3 +1,5 @@
+import { downloadDocument, documentFileName } from '../shared/documents.js';
+
 const taxDocLabels = {
   '1099': '1099 Form',
   interest: 'Interest Statement',
@@ -8,6 +10,9 @@ const taxDocLabels = {
 let listeners = [];
 let activeTaxDocTab = '1099';
 let currentTaxDocs = [];
+// The screen's context, kept here because renderTaxDocs is called from three
+// places and its handlers need the Supabase client and the modal.
+let pageCtx = null;
 
 function on(el, evt, fn) {
   if (!el) return;
@@ -25,14 +30,6 @@ function setActiveTab(root) {
     btn.classList.toggle('text-[#111827]', !active);
     btn.classList.toggle('dark:text-white', !active);
   });
-}
-
-function openPrintableWindow(title, bodyHtml, autoPrint = false) {
-  const win = window.open('', '_blank', 'noopener,noreferrer');
-  if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>${title}</title><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:32px;color:#111827}h1{font-size:20px;margin:0 0 8px}p{font-size:13px;line-height:1.5;color:#4B5563} .row{display:flex;justify-content:space-between;margin:0 0 16px}</style></head><body>${bodyHtml}</body></html>`);
-  win.document.close();
-  if (autoPrint) setTimeout(() => win.print(), 250);
 }
 
 async function loadTaxDocs({ supabaseClient, getCurrentUser }) {
@@ -66,17 +63,33 @@ function renderTaxDocs(root) {
   `).join('');
 
   list.querySelectorAll('.td-download').forEach((btn) => {
-    on(btn, 'click', () => {
+    on(btn, 'click', async () => {
       const doc = currentTaxDocs.find((item) => String(item.id) === btn.getAttribute('data-id'));
       if (!doc) return;
-      openPrintableWindow(`${taxDocLabels[doc.doc_type] || doc.doc_type} — ${doc.period}`, `
-        <h1>${taxDocLabels[doc.doc_type] || doc.doc_type}</h1>
-        <p>Verceil Bank tax document summary.</p>
-        <div class="row"><span>Period</span><strong>${doc.period}</strong></div>
-        <div class="row"><span>Document Type</span><strong>${taxDocLabels[doc.doc_type] || doc.doc_type}</strong></div>
-        <div class="row"><span>Generated</span><strong>${new Date(doc.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong></div>
-        <p>This is a system-generated summary and not a substitute for a certified tax filing record.</p>
-      `);
+      const label = taxDocLabels[doc.doc_type] || doc.doc_type;
+      try {
+        await downloadDocument({
+          supabaseClient: pageCtx && pageCtx.supabaseClient,
+          row: doc,
+          fileName: documentFileName(label, doc.period),
+          pdf: {
+            title: label,
+            subtitle: `Tax year ${doc.period}`,
+            rows: [
+              ['Period', doc.period || '—'],
+              ['Document Type', label],
+              ['Generated', new Date(doc.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })],
+            ],
+            note: 'This is a system-generated summary and not a substitute for a certified tax filing record. '
+              + 'File your return from the official form issued by the bank.',
+          },
+        });
+      } catch (err) {
+        console.error('Download tax document error:', err);
+        if (pageCtx && pageCtx.showModal) {
+          pageCtx.showModal('Could Not Download', 'This document could not be downloaded right now. Please try again.');
+        }
+      }
     });
   });
 
@@ -91,6 +104,7 @@ function renderTaxDocs(root) {
 
 export async function init(root, ctx) {
   const { loadPage, showModal, supabaseClient, getCurrentUser } = ctx;
+  pageCtx = ctx;
   on(root.querySelector('[data-action="back"]'), 'click', () => loadPage('profile'));
 
   setActiveTab(root);
@@ -124,4 +138,5 @@ export function cleanup() {
   listeners = [];
   activeTaxDocTab = '1099';
   currentTaxDocs = [];
+  pageCtx = null;
 }

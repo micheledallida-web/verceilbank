@@ -1,3 +1,5 @@
+import { downloadDocument, documentFileName, storedFileFor } from '../shared/documents.js';
+
 let listeners = [];
 function on(el, evt, fn) {
   if (!el) return;
@@ -27,6 +29,13 @@ export function init(root, ctx, options = null) {
     cost_basis: 'Cost Basis Report',
     tax_form: 'Tax Form',
   };
+
+  // The one line of copy that has to be true of whichever document the customer
+  // ends up with — the downloaded PDF, the print view, or both. Declared here so
+  // there is exactly one of it and everything below reads the same sentence.
+  const SUMMARY_NOTE = 'This is a system-generated summary based on your account records at the '
+    + 'time of generation. It is not a substitute for an official audited statement — request one '
+    + 'from the actions menu on this statement.';
 
   let currentStatements = [];
   let activeStmtPeriod = 'monthly';
@@ -75,9 +84,65 @@ export function init(root, ctx, options = null) {
       <div style="display:flex;justify-content:space-between;margin-bottom:16px;"><span>Ending Balance</span><strong>${formatCurrency(stmt.ending_balance || 0)}</strong></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:16px;"><span>Document Type</span><strong>${docTypeLabels[stmt.doc_type] || stmt.doc_type}</strong></div>
       <div style="display:flex;justify-content:space-between;margin-bottom:16px;"><span>Generated</span><strong>${new Date(stmt.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong></div>
-      <p style="color:#6B7280;font-size:12px;margin-top:24px;">This is a system-generated summary based on your account records at the time of generation. It is not a substitute for an official audited statement.</p>
+      <p style="color:#6B7280;font-size:12px;margin-top:24px;">${SUMMARY_NOTE}</p>
     `;
     statementPrintView.classList.remove('hidden');
+  }
+
+  // ---------- Download ----------
+  function statementLabel(stmt) {
+    return docTypeLabels[stmt.doc_type] || stmt.doc_type;
+  }
+
+  function accountEnding(stmt) {
+    return stmt.account_number ? String(stmt.account_number).slice(-4) : '----';
+  }
+
+  // Everything the generated PDF prints, which is deliberately everything the
+  // print view prints — a customer who downloads and a customer who prints must
+  // not end up holding two different documents.
+  function statementPdfSpec(stmt) {
+    return {
+      title: statementLabel(stmt),
+      subtitle: `${stmt.statement_period} · Account ending ${accountEnding(stmt)}`,
+      rows: [
+        ['Statement Period', stmt.statement_period || '—'],
+        ['Account Number', stmt.account_number || '—'],
+        ['Ending Balance', formatCurrency(stmt.ending_balance || 0)],
+        ['Document Type', statementLabel(stmt)],
+        ['Generated', new Date(stmt.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })],
+      ],
+      note: SUMMARY_NOTE,
+    };
+  }
+
+  // A download that fails has to say so. The old handler closed the sheet and
+  // opened a print view, so a customer who tapped Download PDF got neither a
+  // download nor a PDF and no indication that anything had gone wrong.
+  async function downloadStatement(stmt) {
+    try {
+      const kind = await downloadDocument({
+        supabaseClient,
+        row: stmt,
+        fileName: documentFileName(statementLabel(stmt), stmt.statement_period),
+        pdf: statementPdfSpec(stmt),
+      });
+      // Only worth saying when the customer might otherwise wonder why the file
+      // is a summary rather than the bank's own statement.
+      if (kind === 'generated' && storedFileFor(stmt)) {
+        showModal(
+          'Downloaded a Summary',
+          'The official file for this period could not be reached, so a summary of your account '
+          + 'record was downloaded instead. Try again later, or request an official copy.',
+        );
+      }
+    } catch (err) {
+      console.error('Download statement error:', err);
+      showModal(
+        'Could Not Download',
+        'This statement could not be downloaded right now. Please check your connection and try again.',
+      );
+    }
   }
 
   function openStatementActionsSheet(stmt) {
@@ -145,8 +210,9 @@ export function init(root, ctx, options = null) {
   on(root.querySelector('#statementPrintNowBtn'), 'click', () => window.print());
   on(root.querySelector('#stmtActionDownload'), 'click', () => {
     if (!activeStatementForActions) return;
+    const stmt = activeStatementForActions;
     closeStatementActionsSheet();
-    openStatementPrintView(activeStatementForActions);
+    downloadStatement(stmt);
   });
   on(root.querySelector('#stmtActionPrint'), 'click', () => {
     if (!activeStatementForActions) return;

@@ -808,6 +808,75 @@ piece that issues an address per request is the remaining work.
 
 ---
 
+## 5f. Statement downloads — where the file comes from
+
+**Download PDF now downloads a PDF.** It used to open a second window with an
+HTML summary in it and leave the customer to find *Print → Save as PDF* — which
+on a phone is not a download at all, and on iOS is a window Safari often refuses
+to open in the first place.
+
+There are two paths behind that one button, and the app picks between them per
+row:
+
+1. **The bank's own file.** If the statement row carries a
+   `storage_object_path`, the app asks Storage for a signed URL for that object
+   — this customer, ten minutes, `download` set so it arrives as a file rather
+   than opening in a tab — and downloads it.
+2. **A generated summary.** If the row has no path (or the object behind it
+   cannot be reached), the app renders the row into a real one-page PDF in the
+   browser and saves that. No library, no CDN — see `js/shared/documents.js`.
+
+Path 2 means the button works today, on every row already in the table, with
+nothing set up. Path 1 is what turns each row into the real document, and it
+needs section 11 of `setup.sql`: the private `statements` bucket, its read
+policy, and the pointer columns on `investment_statements` and
+`account_documents`.
+
+### Generating the files
+
+Whatever produces the PDFs — a scheduled job, an edge function, a back-office
+tool — writes with the **service key**, never from a browser. The bucket has a
+read policy and nothing else, deliberately: a customer session that could write
+here could write its own statement.
+
+Two rules, both of them load-bearing:
+
+**The path starts with the owner's user id.**
+
+```
+statements/<user-id>/<period>-<doc-type>.pdf
+```
+
+The read policy checks `(storage.foldername(name))[1] = auth.uid()`, so a file
+stored under any other shape is one its owner cannot read.
+
+**Regenerating a period updates the row, it does not add one.** Upload the
+object, then upsert on user + `statement_period` + `doc_type`:
+
+```sql
+insert into public.investment_statements
+       (user_id, period_type, doc_type, statement_period,
+        storage_object_path, file_name, mime_type, file_size_bytes, file_generated_at)
+values (:user_id, :period_type, :doc_type, :statement_period,
+        :path, :file_name, 'application/pdf', :bytes, now())
+on conflict (user_id, statement_period, doc_type) do update
+   set storage_object_path = excluded.storage_object_path,
+       file_name           = excluded.file_name,
+       mime_type           = excluded.mime_type,
+       file_size_bytes     = excluded.file_size_bytes,
+       file_generated_at   = excluded.file_generated_at;
+```
+
+The unique constraint that makes that an upsert is added by section 11 — but
+only if the table does not already hold duplicate period/type rows. If it does,
+the script warns and leaves the constraint off rather than failing; dedupe those
+rows and re-run it.
+
+Nothing else changes in the app when a path appears in a row. The next download
+is the real file.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -888,4 +957,5 @@ Never put the service key in these variables.
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
 - [ ] `bank_settings.btc_usd_rate` added and set (section 5d)
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
+- [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

@@ -1,4 +1,9 @@
+import { downloadDocument, documentFileName } from '../shared/documents.js';
+
 const balanceSourceIds = { checking: 'checkingBalance', savings: 'savingsBalance', investments: 'investmentsBalance' };
+const SUMMARY_NOTE = 'This is a system-generated summary based on your account records at the time '
+  + 'of generation. It is not a substitute for an official audited statement — request one with the '
+  + 'Official button on this document.';
 const docTypeLabels = {
   monthly_statement: 'Monthly Statement',
   account_document: 'Account Document',
@@ -91,7 +96,7 @@ function renderDocs(root, ctx) {
           <div class="text-[13px] font-bold text-[#111827] dark:text-white">${doc.doc_type}</div>
           <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] mt-[2px]">${doc.period} · Ending ${ctx.formatCurrency(doc.ending_balance || 0)}</div>
         </div>
-        <button class="adh-print w-[36px] h-[36px] rounded-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-[#2563EB] cursor-pointer" data-id="${doc.id}"><svg class="w-[16px] h-[16px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"></path></svg></button>
+        <button class="adh-print w-[36px] h-[36px] rounded-full bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-[#2563EB] cursor-pointer" data-id="${doc.id}" aria-label="Print"><svg class="w-[16px] h-[16px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4h12v5M6 18h12v4H6v-4zM6 14h12a2 2 0 002-2v-3a2 2 0 00-2-2H6a2 2 0 00-2 2v3a2 2 0 002 2z"></path></svg></button>
       </div>
       <div class="grid grid-cols-3 gap-[8px] mt-[12px]">
         <button class="adh-download h-[38px] rounded-[12px] bg-[#2563EB] text-white text-[11px] font-semibold cursor-pointer" data-id="${doc.id}">Download PDF</button>
@@ -101,18 +106,42 @@ function renderDocs(root, ctx) {
     </div>
   `).join('') : '<div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] px-[16px] shadow-lg py-4 text-center text-[13px] text-[#6B7280] dark:text-[#8E9CBA]">No documents yet.</div>';
 
-  list.querySelectorAll('.adh-download, .adh-print').forEach((btn) => {
+  // The two buttons are two different things and used not to be: both of them
+  // opened a print window, so "Download PDF" downloaded nothing.
+  const documentRows = (doc) => [
+    ['Statement Period', doc.period || '—'],
+    ['Account Number', ctx.getAccountNumber(doc.account_type || 'checking', 'account')],
+    ['Ending Balance', ctx.formatCurrency(doc.ending_balance || 0)],
+    ['Generated', new Date(doc.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })],
+  ];
+
+  list.querySelectorAll('.adh-download').forEach((btn) => {
+    on(btn, 'click', async () => {
+      const doc = currentDocs.find((item) => String(item.id) === btn.getAttribute('data-id'));
+      if (!doc) return;
+      try {
+        await downloadDocument({
+          supabaseClient: ctx.supabaseClient,
+          row: doc,
+          fileName: documentFileName(doc.doc_type, doc.period),
+          pdf: { title: doc.doc_type, subtitle: doc.period, rows: documentRows(doc), note: SUMMARY_NOTE },
+        });
+      } catch (err) {
+        console.error('Download document error:', err);
+        ctx.showModal('Could Not Download', 'This document could not be downloaded right now. Please try again.');
+      }
+    });
+  });
+
+  list.querySelectorAll('.adh-print').forEach((btn) => {
     on(btn, 'click', () => {
       const doc = currentDocs.find((item) => String(item.id) === btn.getAttribute('data-id'));
       if (!doc) return;
       openPrintableWindow(`${doc.doc_type} — ${doc.period}`, `
         <h1>${doc.doc_type}</h1>
-        <div class="row"><span>Statement Period</span><strong>${doc.period}</strong></div>
-        <div class="row"><span>Account Number</span><strong>${ctx.getAccountNumber(doc.account_type || 'checking', 'account')}</strong></div>
-        <div class="row"><span>Ending Balance</span><strong>${ctx.formatCurrency(doc.ending_balance || 0)}</strong></div>
-        <div class="row"><span>Generated</span><strong>${new Date(doc.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</strong></div>
-        <p>This is a system-generated summary based on your account records at the time of generation. It is not a substitute for an official audited statement.</p>
-      `, btn.classList.contains('adh-print'));
+        ${documentRows(doc).map(([label, value]) => `<div class="row"><span>${label}</span><strong>${value}</strong></div>`).join('')}
+        <p>${SUMMARY_NOTE}</p>
+      `, true);
     });
   });
 
