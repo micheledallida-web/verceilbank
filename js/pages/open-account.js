@@ -123,7 +123,16 @@ export function init(root, ctx, options = {}) {
   // a default that leads somewhere is better than no default at all.
   let ownership = OWNERSHIP_INDIVIDUAL;
   // The product asked for on the way in, if the customer arrived from an offer.
-  let selectedKey = (options && options.product) || null;
+  // More than one answer is allowed now: somebody opening a savings account
+  // alongside an investment account should not have to make two trips through
+  // this screen. Order is preserved so the confirmation reads in the order the
+  // cards were pressed.
+  let selectedKeys = (options && options.product) ? [options.product] : [];
+  // Which question this opening is asking. Open an Account asks the 'app' one —
+  // which everyday account. The Invest entry asks the 'invest' one, which is
+  // the investment account and savings. One screen, two surfaces, rather than a
+  // second screen that answers the same thing differently.
+  const surface = (options && options.surface) || 'app';
   let ownedKeys = [];
   let kycProfile = null;
   let jointEligibility = null;
@@ -170,7 +179,7 @@ export function init(root, ctx, options = {}) {
   // Which leaves this screen doing one thing: a member who joined with one
   // checking account coming back for the other.
   function choosableProducts() {
-    return offerableProducts()
+    return offerableProducts(surface)
       .filter((product) => !ownedKeys.includes(product.key));
   }
 
@@ -192,12 +201,10 @@ export function init(root, ctx, options = {}) {
     nothingLeft.classList.add('hidden');
     openBtn.classList.remove('hidden');
 
-    // Whatever was asked for on the way in, as long as it is still open to be
-    // opened. Nothing is selected otherwise — there is no longer a forced
-    // default, because a default cannot be un-chosen and this list can be.
-    if (!choosable.some((product) => product.key === selectedKey)) {
-      selectedKey = null;
-    }
+    // Anything chosen that is no longer on the list — a product asked for on
+    // the way in that turns out to be held already — quietly drops out. Nothing
+    // is selected by default: a default cannot be un-chosen, and this list can.
+    selectedKeys = selectedKeys.filter((key) => choosable.some((p) => p.key === key));
 
     productsWrap.innerHTML = choosable.map((product) => selectableCard({
       key: product.key,
@@ -205,27 +212,31 @@ export function init(root, ctx, options = {}) {
       tagline: product.tagline,
       accent: product.accent,
       points: product.features,
-      selected: product.key === selectedKey,
+      selected: selectedKeys.includes(product.key),
     })).join('');
 
     productsWrap.querySelectorAll('.oa-choice').forEach((btn) => {
       on(btn, 'click', () => {
         const key = btn.getAttribute('data-key');
-        // One at a time, and never stuck. Pressing a different card moves the
-        // mark to it; pressing the marked one again clears it. A radio group
-        // that cannot be cleared leaves somebody who opened this screen by
-        // accident with an account already chosen for them.
-        selectedKey = selectedKey === key ? null : key;
+        // Each card is its own yes or no. Press to add it, press again to take
+        // it back — so one account, both accounts, or none are all said with
+        // the same control, and nothing is ever stuck selected.
+        selectedKeys = selectedKeys.includes(key)
+          ? selectedKeys.filter((k) => k !== key)
+          : selectedKeys.concat(key);
         renderProducts();
         applyCtaState();
       });
     });
 
     // The risk warning belongs to the product, so it appears when that product
-    // is the one selected and not as permanent small print under every account.
-    const product = ACCOUNT_PRODUCTS_BY_KEY[selectedKey];
-    riskNote.textContent = (product && product.risk) || '';
-    riskNote.classList.toggle('hidden', !(product && product.risk));
+    // is among the ones chosen and not as permanent small print under every
+    // account.
+    const risky = selectedKeys
+      .map((key) => ACCOUNT_PRODUCTS_BY_KEY[key])
+      .find((product) => product && product.risk);
+    riskNote.textContent = (risky && risky.risk) || '';
+    riskNote.classList.toggle('hidden', !risky);
   }
 
   // ---------- Step 2B: joint ----------
@@ -299,39 +310,54 @@ export function init(root, ctx, options = {}) {
 
   // ---------- Opening it ----------
   async function openAccount() {
-    const product = ACCOUNT_PRODUCTS_BY_KEY[selectedKey];
-    if (!product) return;
+    const products = selectedKeys.map((key) => ACCOUNT_PRODUCTS_BY_KEY[key]).filter(Boolean);
+    if (!products.length) return;
 
     openBtn.disabled = true;
-    openBtn.textContent = 'Opening Account...';
+    openBtn.textContent = products.length > 1 ? 'Opening Accounts...' : 'Opening Account...';
 
     const confirmationNumber = genRef();
     const openingBalance = 0;
 
+    // One at a time rather than in parallel. These are inserts against the same
+    // table for the same customer, and a failure part-way through should leave
+    // the accounts that already opened alone — which it does, because each is
+    // its own row and openAccountRow treats an existing one as success.
+    const opened = [];
     try {
-      // The account they chose, and only that. Savings is not offered on this
-      // screen any more — it and the investment account are reached from
-      // Invest — so nothing rides along with the choice. A new applicant still
-      // gets savings automatically; that happens in provision_user, not here.
-      await openAccountRow(product.key);
+      for (const product of products) {
+        await openAccountRow(product.key);
+        opened.push(product);
+      }
     } catch (err) {
       console.error('Open account error:', err);
       openBtn.disabled = false;
-      openBtn.textContent = `Open ${product.name}`;
-      showModal('Could Not Open Account', 'Something went wrong opening your account. Please try again, or contact support if it keeps happening.');
+      openBtn.textContent = `Open ${chosenLabel()}`;
+      showModal(
+        'Could Not Open Account',
+        opened.length
+          // Said plainly, because the customer is now in a different state from
+          // the one they were in when they pressed the button.
+          ? `${opened.map((p) => p.name).join(' and ')} opened, but the rest did not. Please try the remaining ones again, or contact support if it keeps happening.`
+          : 'Something went wrong opening your account. Please try again, or contact support if it keeps happening.',
+      );
       return;
     }
 
     ctx.recordEvent('account.opened', {
-      account_type: product.key,
+      account_types: products.map((p) => p.key),
       ownership: OWNERSHIP_INDIVIDUAL,
-      product: product.name,
+      products: products.map((p) => p.name),
       reference: confirmationNumber,
     });
 
-    root.querySelector('#oaConfirmTitle').textContent = `${product.name} opened`;
-    root.querySelector('#oaConfirmTerms').textContent =
-      `Your account opens with limited access. Deposit at least ${MINIMUM_OPENING_DEPOSIT_LABEL} within ${FUNDING_DEADLINE_DAYS} days for full access — an account left unfunded past that is closed.`;
+    const names = products.map((p) => p.name);
+    root.querySelector('#oaConfirmTitle').textContent = names.length > 1
+      ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} opened`
+      : `${names[0]} opened`;
+    root.querySelector('#oaConfirmTerms').textContent = products.length > 1
+      ? `Your accounts open with limited access. Deposit at least ${MINIMUM_OPENING_DEPOSIT_LABEL} within ${FUNDING_DEADLINE_DAYS} days for full access — an account left unfunded past that is closed.`
+      : `Your account opens with limited access. Deposit at least ${MINIMUM_OPENING_DEPOSIT_LABEL} within ${FUNDING_DEADLINE_DAYS} days for full access — an account left unfunded past that is closed.`;
     root.querySelector('#oaConfirmRef').textContent = confirmationNumber;
     root.querySelector('#oaConfirmBalance').textContent = formatCurrency(openingBalance);
 
@@ -361,19 +387,29 @@ export function init(root, ctx, options = {}) {
     ctaHandler = handler;
   }
 
+  // What the button calls what is about to be opened. One account by name, two
+  // or more by count — "Open Verceil Checking and High-Yield Savings and an
+  // Investment Account" is a button nobody can read at a glance.
+  function chosenLabel() {
+    if (selectedKeys.length === 1) {
+      const only = ACCOUNT_PRODUCTS_BY_KEY[selectedKeys[0]];
+      return only ? only.name : '';
+    }
+    return `${selectedKeys.length} accounts`;
+  }
+
   function applyCtaState() {
-    const product = ACCOUNT_PRODUCTS_BY_KEY[selectedKey];
-    // Nothing chosen — which is now a state somebody can reach deliberately, by
-    // pressing the marked card again. The button says what is missing rather
-    // than sitting there enabled with nothing to act on.
-    if (!product) {
+    // Nothing chosen — a state somebody can reach deliberately, by pressing the
+    // marked card again. The button says what is missing rather than sitting
+    // there enabled with nothing to act on.
+    if (!selectedKeys.length) {
       setCta('Select an account to open', '', () => {}, false);
       return;
     }
     const status = kycProfile ? kycProfile.kyc_status : null;
 
     if (status === 'verified' || status === 'manually_approved') {
-      setCta(`Open ${product.name}`, '', openAccount);
+      setCta(`Open ${chosenLabel()}`, '', openAccount);
       return;
     }
     if (status === 'pending') {

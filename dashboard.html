@@ -117,22 +117,29 @@
     <div class="home-hero">
       <p class="home-hero-lab">Total balance</p>
       <p class="amount-pending home-hero-amt" id="homeTotalBalance"></p>
+      <!-- It said "Deposits" and one number, which told a customer nothing
+           about where their money actually is. It now names the accounts and
+           gives each its own balance.
+           Two lines, and only two: Checking and Savings. They are the everyday
+           money, they are what the total above adds up, and they are the two
+           every customer holds.
+           An investment account is not everyday spending — its value moves on
+           its own and is reported on its own card — so it is not here and is
+           not inside the total.
+           A second checking account of any kind rolls INTO the Checking line
+           rather than adding a third one. The line is the product, not the
+           row: two interest checking accounts show one Checking figure with
+           both balances in it, and nothing is counted twice.
+           Each line is hidden until the account behind it is actually open,
+           and appears on its own the moment one is. -->
       <div class="home-hero-row">
-        <div>
-          <span class="home-hero-k">Deposits</span>
-          <span class="amount-pending home-hero-v" id="homeDeposits"></span>
+        <div id="homeCheckingStat" class="hidden">
+          <span class="home-hero-k">Checking</span>
+          <span class="amount-pending home-hero-v" id="homeCheckingTotal"></span>
         </div>
-        <!-- Both of these are hidden until the customer actually holds the
-             thing they report. A line reading "Investments $0.00" to somebody
-             who has never opened an investment account is not a summary, it is
-             an account they were never given. -->
-        <div id="homeInvestmentsStat" class="hidden">
-          <span class="home-hero-k">Investments</span>
-          <span class="amount-pending home-hero-v" id="homeInvestments"></span>
-        </div>
-        <div id="homeCardStat" class="hidden">
-          <span class="home-hero-k">Card balance</span>
-          <span class="amount-pending home-hero-v" id="homeCardBalance"></span>
+        <div id="homeSavingsStat" class="hidden">
+          <span class="home-hero-k">Savings</span>
+          <span class="amount-pending home-hero-v" id="homeSavingsTotal"></span>
         </div>
       </div>
     </div>

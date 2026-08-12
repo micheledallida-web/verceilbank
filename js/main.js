@@ -1426,11 +1426,11 @@ document.getElementById('offerCredit').addEventListener('click', () => loadPage(
 // tapping "Open" on the Investment Account offer and picking it off the list.
 document.getElementById('homeOpenAccount').addEventListener('click', () => loadPage('open-account'));
 document.getElementById('offerChecking').addEventListener('click', () => loadPage('open-account', { product: 'checking' }));
-// Not to Open an Account any more. That screen no longer offers the investment
-// account, so sending this tile there would land somebody on a list their
-// product is not on — the offer would simply stop working. The account's own
-// screen is where it lives now.
-document.getElementById('offerInvestments').addEventListener('click', () => loadPage('account-detail', 'investments'));
+// Back to Open an Account, but asking a narrower question: the investment
+// account and savings, and nothing else. It is the same screen rather than a
+// second one, so the ownership step, the identity gate and the opening terms
+// are the ones every other account already goes through.
+document.getElementById('offerInvestments').addEventListener('click', () => loadPage('open-account', { surface: 'invest' }));
 
 // ---------- Quick actions (from the old account summary) ----------
 document.getElementById('homeQuickTransfer').addEventListener('click', () => loadPage('transfer'));
@@ -1473,7 +1473,7 @@ const navMenus = {
     // tools. They came off Open an Account, which now answers only "which
     // checking account?", so this is where they are reached — and they open
     // the same account screens the dashboard cards do.
-    items: ['High-Yield Savings', 'Investment Account', 'Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
+    items: ['High-Yield Savings', 'Investment Account', 'Open Investment or Savings', 'Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
   },
   navSupport: {
     title: 'Support',
@@ -1522,6 +1522,10 @@ const navMenuRoutes = {
   // land on one implementation rather than two that can drift apart.
   'High-Yield Savings': () => loadPage('account-detail', 'savings'),
   'Investment Account': () => loadPage('account-detail', 'investments'),
+  // The pair, on the picker, with everything else filtered out — so a member
+  // can take an investment account, a savings account, or both, from the
+  // section those two belong to.
+  'Open Investment or Savings': () => loadPage('open-account', { surface: 'invest' }),
   'Portfolio Overview': () => loadPage('portfolio'),
   'Watchlist': () => loadPage('watchlist'),
   'Buy & Sell Investments': () => loadPage('trade'),
@@ -1861,6 +1865,10 @@ async function initSupabaseData() {
   }
 
   const DEPOSIT_TYPES = ['checking', 'savings', 'interest_checking'];
+  // Everything that is a checking account, whatever it is called. The hero's
+  // Checking line is the sum of these, so opening a second one adds to that
+  // figure instead of adding a line beside it.
+  const CHECKING_TYPES = ['checking', 'interest_checking'];
 
   // An IRA is not a deposit account and not the brokerage account either: the
   // money is locked away for retirement under its own tax rules, so it is never
@@ -1922,16 +1930,19 @@ async function initSupabaseData() {
     const cardDebt = sumCents(isActiveCard);
 
     // Each card shows the total across every account of its type, so the
-    // hero's Deposits is exactly the three cards beneath it added up.
+    // hero's two lines are exactly the deposit cards beneath them added up.
     setText('checkingBalance', sumCents(acc => acc.account_type === 'checking'));
     setText('savingsBalance', sumCents(acc => acc.account_type === 'savings'));
     setText('interestCheckingBalance', sumCents(acc => acc.account_type === 'interest_checking'));
     setText('investmentsBalance', investments);
     setText('creditBalance', cardDebt);
 
-    setText('homeDeposits', deposits);
-    setText('homeInvestments', investments);
-    setText('homeCardBalance', cardDebt);
+    // The hero's breakdown: the money, by the account it is in. Checking is
+    // every checking-type account added together — a member holding two
+    // interest checking accounts sees one Checking figure containing both,
+    // which is why this sums a list of types rather than reading one row.
+    setText('homeCheckingTotal', sumCents(acc => CHECKING_TYPES.includes(acc.account_type)));
+    setText('homeSavingsTotal', sumCents(acc => acc.account_type === 'savings'));
     // Total balance is deposit money only, the way a bank states it. Investment
     // value is a market figure that moves on its own and is reported beside the
     // total, not inside it; a card balance is money owed to the issuer, so it
@@ -1978,14 +1989,16 @@ async function initSupabaseData() {
       toggleSection('sectionInterestChecking', 'promoBanner', has('interest_checking'));
       toggleSection('sectionCredit', 'offerCredit', !!card);
 
-      // The hero's two conditional figures. Deposits and the total are always
-      // shown — every customer holds a savings account, so both always mean
-      // something — but a line for investments or a card is only a summary of
-      // something that exists.
-      const investmentsStat = document.getElementById('homeInvestmentsStat');
-      const cardStat = document.getElementById('homeCardStat');
-      if (investmentsStat) investmentsStat.classList.toggle('hidden', !has('investments'));
-      if (cardStat) cardStat.classList.toggle('hidden', !card);
+      // The hero's two lines. An account that is not open is not listed —
+      // a line reading "Checking $0.00" to somebody who holds no checking
+      // account is not a summary of their money, it is an account they were
+      // never given. Opening one makes its line appear on the next render,
+      // which Realtime triggers without a refresh.
+      const hasChecking = CHECKING_TYPES.some(has);
+      const checkingStat = document.getElementById('homeCheckingStat');
+      const savingsStat = document.getElementById('homeSavingsStat');
+      if (checkingStat) checkingStat.classList.toggle('hidden', !hasChecking);
+      if (savingsStat) savingsStat.classList.toggle('hidden', !has('savings'));
     }
 
     if (card) {
