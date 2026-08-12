@@ -160,7 +160,6 @@ export function init(root, ctx, options = {}) {
   const ownershipOptions = root.querySelector('#oaOwnershipOptions');
   const productsWrap = root.querySelector('#oaProducts');
   const nothingLeft = root.querySelector('#oaNothingLeft');
-  const checkingNote = root.querySelector('#oaCheckingNote');
   const riskNote = root.querySelector('#oaRiskNote');
   const openBtn = root.querySelector('#oaOpenBtn');
   const ctaHelper = root.querySelector('#oaCtaHelper');
@@ -211,20 +210,15 @@ export function init(root, ctx, options = {}) {
   // customer holds is not something to open, and offering it would end in the
   // database refusing a duplicate.
   //
-  // offerableProducts() defaults to the 'app' surface, which is what leaves the
-  // two checking products off this list: they are chosen on the sign-up
-  // application, not added from inside the app. They are still real accounts in
-  // every other respect, and #oaCheckingNote below says where to get one.
+  // offerableProducts() defaults to the 'app' surface: both checking products,
+  // interest checking and the investment account. Which is the purpose of this
+  // screen — a member who joined with one account coming back for another.
   function choosableProducts() {
     return offerableProducts().filter((product) => !ownedKeys.includes(product.key));
   }
 
   function renderProducts() {
     const choosable = choosableProducts();
-
-    // Only worth saying to somebody who does not already hold one.
-    const holdsAChecking = ownedKeys.includes('checking') || ownedKeys.includes('interest_checking');
-    checkingNote.classList.toggle('hidden', holdsAChecking);
 
     const holdsSavings = ownedKeys.includes('savings');
 
@@ -331,18 +325,6 @@ export function init(root, ctx, options = {}) {
 
   on(root.querySelector('#oaBackToOwnership'), 'click', () => showStep('ownership'));
   on(root.querySelector('#oaJointBackBtn'), 'click', () => showStep('ownership'));
-
-  // A checking account after joining goes through support, which is the honest
-  // answer rather than a list the product is quietly missing from.
-  on(root.querySelector('#oaCheckingSupportBtn'), 'click', () => {
-    ctx.recordEvent('open_account.checking_requested', {});
-    openSupportMessage({
-      category: 'account_ownership',
-      subject: 'Add a checking account',
-      body: 'I would like to add a Verceil Checking or Interest Checking account to my profile. '
-        + 'Please tell me what you need from me to open one.',
-    });
-  });
 
   on(root.querySelector('#oaJointEmailBtn'), 'click', () => {
     ctx.recordEvent('open_account.joint_support_requested', {});
