@@ -26,8 +26,9 @@
 --  10. Identity verification THE ONE THAT MAKES ID UPLOAD WORK
 --  11. Statement files       THE ONE THAT MAKES DOWNLOAD PDF HAND OVER A FILE
 --  12. Offer codes           THE ONE THAT MAKES SIGN-UP INVITE-ONLY
---  13. Verification          run this at the end and read the output
---  14. Optional: pg_cron
+--  13. External accounts     THE ONE THAT MAKES "ADD A BANK" SAVE ANYTHING
+--  14. Verification          run this at the end and read the output
+--  15. Optional: pg_cron
 -- =============================================================================
 
 
@@ -1868,7 +1869,118 @@ end $$;
 
 
 -- =============================================================================
--- 13. VERIFICATION
+-- 13. EXTERNAL ACCOUNTS — THE ONE THAT MAKES "ADD A BANK" SAVE ANYTHING
+--
+-- Three screens read and write `public.external_accounts` — Link Account,
+-- Linked Accounts, and External Transfers — and nothing has ever created it.
+-- The RLS pass in section 4 lists it and then skips it every run:
+--
+--     NOTICE: RLS: skipping external_accounts, table not present
+--
+-- So on a project that never made the table by hand, adding a bank fails on the
+-- insert and the screen says "Could not save this account right now", which is
+-- true and tells nobody anything. Here it is.
+--
+-- The interesting column is `status`, and the interesting fact about it is who
+-- may write it.
+--
+-- Linking an account and being allowed to send money to it are two different
+-- things. Anybody may link one: the details are theirs, the row is written, it
+-- appears in their list immediately. Sending is held, because the shape of an
+-- account takeover is — get into somebody's online banking, add an account you
+-- control, empty the balance into it, leave. The hold is what turns that from
+-- minutes into something the real customer gets a chance to notice.
+--
+-- Thirty days, and then a person. The wait alone is not enough, because an
+-- attacker patient enough to wait a month still wins if the link then activates
+-- itself. Activation is done by customer care, who can check that whoever is
+-- asking is the customer whose money it is.
+--
+-- Which is why `status` is not a column a customer session may write. If it
+-- were, the hold would be a thirty-day inconvenience for the attacker and no
+-- protection at all: the same stolen session that added the account could mark
+-- it active. The grants below are what make that true — RLS decides which ROWS
+-- a session may write, never which COLUMNS, so the column list has to be taken
+-- away separately. Same shape as `accounts.balance` in section 4, and for the
+-- same reason.
+-- =============================================================================
+
+create table if not exists public.external_accounts (
+  id             bigint generated always as identity primary key,
+  user_id        uuid not null references auth.users (id) on delete cascade,
+  bank_name      text not null,
+  routing_number text not null,
+  account_number text not null,
+  account_type   text not null default 'checking',
+  -- 'manual' today. 'plaid' when instant linking is wired up.
+  link_method    text not null default 'manual',
+  created_at     timestamptz not null default now()
+);
+
+-- Added separately so a project that already made this table by hand gains only
+-- what it is missing.
+alter table public.external_accounts
+  add column if not exists bank_name      text,
+  add column if not exists routing_number text,
+  add column if not exists account_number text,
+  add column if not exists account_type   text not null default 'checking',
+  add column if not exists link_method    text not null default 'manual',
+  -- 'pending' until customer care says otherwise. Only 'active' can be sent to.
+  add column if not exists status         text not null default 'pending',
+  add column if not exists activated_at   timestamptz,
+  -- Why an account was refused, for whoever picks up the next phone call.
+  add column if not exists status_note    text,
+  add column if not exists created_at     timestamptz not null default now();
+
+create index if not exists external_accounts_user_idx
+  on public.external_accounts (user_id, created_at desc);
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.external_accounts'::regclass
+       and conname = 'external_accounts_status_check'
+  ) then
+    if exists (select 1 from public.external_accounts
+                where status not in ('pending', 'active', 'refused', 'closed')) then
+      raise warning 'external_accounts holds an unrecognised status — constraint NOT added';
+    else
+      alter table public.external_accounts
+        add constraint external_accounts_status_check
+        check (status in ('pending', 'active', 'refused', 'closed'));
+    end if;
+  end if;
+end $$;
+
+-- Whatever section 4 granted, narrowed here.
+--
+-- A customer may add one, read their own, and remove one. They may not update
+-- any column of it — there is nothing on the row they have a reason to change,
+-- and `status` is the reason to be sure of that. They may not set `status` or
+-- `activated_at` AT INSERT either, which is the half that is easy to miss: a
+-- default only applies when the column is absent from the INSERT, so without
+-- this a session could simply supply `status: 'active'` and link an account it
+-- could send to that afternoon.
+revoke insert, update on public.external_accounts from authenticated, anon;
+
+grant insert (user_id, bank_name, routing_number, account_number, account_type, link_method)
+  on public.external_accounts to authenticated;
+
+-- Activation, for whoever is doing it with the service key after the phone call.
+-- Kept here so the one command an operator needs is written down next to the
+-- rule it satisfies rather than remembered:
+--
+--   update public.external_accounts
+--      set status = 'active', activated_at = now()
+--    where id = :id;
+--
+-- Thirty days is the app's rule and the app enforces it before it will even
+-- offer the transfer; this is the second half of it, and it is a person.
+
+
+-- =============================================================================
+-- 14. VERIFICATION
 --
 -- Run this section on its own afterwards and read the output. Every row should
 -- say 'ok'. Anything that says 'MISSING' is not set up.
@@ -2062,6 +2174,25 @@ select 'offer codes', 'codes not readable by customer sessions',
              or has_table_privilege('authenticated', 'public.offer_codes', 'SELECT')
             then 'EXPOSED — a session can list every code' else 'ok' end
 
+-- Without the table, "Add External Bank" fails on the insert and says nothing
+-- useful. Without the grants, the thirty-day hold is decoration: the same
+-- session that links an account could mark it active.
+union all
+select 'external accounts', 'external_accounts table',
+       case when to_regclass('public.external_accounts') is not null then 'ok' else 'MISSING — linking a bank cannot save' end
+
+union all
+select 'external accounts', 'status not settable at insert',
+       case when to_regclass('public.external_accounts') is null then 'table missing'
+            when has_column_privilege('authenticated', 'public.external_accounts', 'status', 'INSERT')
+            then 'EXPOSED — a session can link an account already active' else 'ok' end
+
+union all
+select 'external accounts', 'status not updatable by customers',
+       case when to_regclass('public.external_accounts') is null then 'table missing'
+            when has_column_privilege('authenticated', 'public.external_accounts', 'status', 'UPDATE')
+            then 'EXPOSED — a session can activate its own linked account' else 'ok' end
+
 union all
 select 'realtime', 'accounts replica identity',
        case when to_regclass('public.accounts') is null then 'table missing'
@@ -2094,7 +2225,7 @@ having a.balance is distinct from
 
 
 -- =============================================================================
--- 14. OPTIONAL — pg_cron
+-- 15. OPTIONAL — pg_cron
 --
 -- Not run by the statements above. Enable the pg_cron extension first
 -- (Database -> Extensions), then run this block on its own if you want it.

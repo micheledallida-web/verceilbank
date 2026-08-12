@@ -1097,6 +1097,95 @@ provisioning can never fail a sign-up. The console always gets the raw error.
 
 ---
 
+## 5h. External accounts — linking one, and being allowed to send to it
+
+**`public.external_accounts` was never created by anything.** Three screens read
+and write it — Link Account, Linked Accounts, External Transfers — and the RLS
+pass skipped it every run:
+
+```
+NOTICE: RLS: skipping external_accounts, table not present
+```
+
+So on a project that never made the table by hand, "Add External Bank" failed on
+the insert and said *"Could not save this account right now"*, which is true and
+tells nobody anything. Section 13 of `setup.sql` creates it.
+
+### Linking is instant. Sending is held for 30 days.
+
+Anybody may link an account — the details are theirs, the row is written, it
+appears in their list immediately. Sending money to it is held, because the
+shape of an account takeover is: get into somebody's online banking, add an
+account you control, empty the balance into it, leave. The hold turns that from
+minutes into something the real customer gets a chance to notice.
+
+Thirty days, **and then a person.** The wait alone is not enough — an attacker
+patient enough to wait a month still wins if the link then activates itself — so
+activation is done by customer care, who can confirm the request with the
+customer whose money it is.
+
+### Which is why `status` is not a customer-writable column
+
+If it were, the hold would be a thirty-day inconvenience for an attacker and no
+protection at all: the same stolen session that added the account could mark it
+active. RLS decides which **rows** a session may write, never which **columns**,
+so the column list is taken away separately — the same shape as
+`accounts.balance`:
+
+```sql
+revoke insert, update on public.external_accounts from authenticated, anon;
+grant insert (user_id, bank_name, routing_number, account_number,
+              account_type, link_method)
+  on public.external_accounts to authenticated;
+```
+
+Note the `insert` half, which is the one that is easy to miss: a column default
+only applies when the column is **absent** from the INSERT, so without this a
+session could simply supply `status: 'active'` and link an account it could send
+to that afternoon.
+
+### Activating one, after the phone call
+
+```sql
+update public.external_accounts
+   set status = 'active', activated_at = now()
+ where id = :id;
+```
+
+Run with the service key or from the SQL editor. To see what is waiting:
+
+```sql
+select id, user_id, bank_name, right(account_number, 4) as last4,
+       status, created_at::date as linked_on,
+       (created_at + interval '30 days')::date as eligible_from
+  from public.external_accounts
+ where status = 'pending'
+ order by created_at;
+```
+
+### What the customer sees
+
+The app never shows a linked account as "Verified" any more — it showed that on
+every row regardless, including one added thirty seconds earlier that could not
+be sent to. The badge now reads its actual standing: **Pending**, **Activation
+required** once thirty days have passed, or **Active**.
+
+The refusal itself lands at the moment a transfer is attempted, not when the
+account is added, and says what to do rather than stating a policy:
+
+- **inside 30 days** — *"Transfers to a newly linked account become available 30
+  days after it is added — for this account, on September 11, 2026 (in 30 days).
+  From that date, call customer care on (800) 555-0123 to activate it."*
+- **past 30 days, still pending** — *"This account has not been activated yet.
+  Call Verceil Bank customer care on (800) 555-0123 and we will activate it once
+  we have confirmed the request with you."*
+
+Both come from `readExternalAccountStanding()` in `js/shared/account-products.js`,
+so the transfer screen and the linked-accounts list cannot disagree about the
+same account.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -1178,5 +1267,6 @@ Never put the service key in these variables.
 - [ ] `bank_settings.btc_usd_rate` added and set (section 5d)
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
+- [ ] `external_accounts` table with the narrowed insert grant (section 5h) — **without it, linking a bank silently fails; without the grant, the 30-day hold is decoration**
 - [ ] `offer_codes` table, the `on_auth_user_offer_code` trigger, **and at least one usable code** (section 5g) — **with the requirement on and no codes issued, nobody can sign up**
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

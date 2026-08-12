@@ -1,3 +1,5 @@
+import { readExternalAccountStanding } from '../shared/account-products.js';
+
 let listeners = [];
 let addType = null;
 
@@ -30,7 +32,14 @@ async function loadLinkedAccountsSection(root, ctx) {
   try {
     const { data: banks } = await supabaseClient.from('external_accounts').select('*').eq('user_id', user.id);
     root.querySelector('#laExternalBanksList').innerHTML = (banks && banks.length)
-      ? banks.map((bank) => `<div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[14px] p-[12px] shadow-lg flex items-center justify-between"><span class="text-[13px] font-semibold text-[#111827] dark:text-white">${bank.bank_name} ••${String(bank.account_number || '').slice(-4)}</span><span class="text-[11px] text-[#16A34A]">Verified</span></div>`).join('')
+      ? banks.map((bank) => {
+          // Same badge as the External Transfers screen, from the same function,
+          // because two screens showing the same account different standings is
+          // how somebody ends up on the phone asking which one to believe.
+          const standing = readExternalAccountStanding(bank);
+          const tone = standing.canTransfer ? 'text-[#16A34A]' : 'text-[#B45309] dark:text-[#FBBF24]';
+          return `<div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[14px] p-[12px] shadow-lg flex items-center justify-between"><span class="text-[13px] font-semibold text-[#111827] dark:text-white">${bank.bank_name} ••${String(bank.account_number || '').slice(-4)}</span><span class="text-[11px] ${tone} flex-shrink-0">${standing.label}</span></div>`;
+        }).join('')
       : emptyState('None linked yet.');
 
     const { data: linked } = await supabaseClient.from('linked_accounts').select('*').eq('user_id', user.id);

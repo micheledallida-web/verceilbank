@@ -1,9 +1,15 @@
 import { showReceipt } from '../shared/receipt.js';
+import {
+  readExternalAccountStanding,
+  externalAccountHoldMessage,
+} from '../shared/account-products.js';
 
 const accountBalanceIds = { checking: 'checkingBalance', savings: 'savingsBalance', investments: 'investmentsBalance' };
 
 let listeners = [];
 let selectedExtAccount = null;
+// The rows as the database returned them, by id.
+let accountsById = new Map();
 
 function on(el, evt, fn) { el.addEventListener(evt, fn); listeners.push(() => el.removeEventListener(evt, fn)); }
 
@@ -43,20 +49,37 @@ export function init(root, ctx) {
         return;
       }
 
-      extAccountsList.innerHTML = data.map((account) => `
-        <button class="ext-account-row w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between cursor-pointer text-left" data-id="${account.id}" data-name="${account.bank_name}">
+      // Every row used to be stamped "Verified" in green, whatever the bank
+      // actually thought of it — including one added thirty seconds ago that
+      // cannot be sent to. A badge that says the same thing on every card is
+      // not a badge, it is decoration, and this one was decoration that read as
+      // a safety assurance.
+      accountsById = new Map(data.map((account) => [String(account.id), account]));
+
+      extAccountsList.innerHTML = data.map((account) => {
+        const standing = readExternalAccountStanding(account);
+        const tone = standing.canTransfer
+          ? 'text-[#16A34A] dark:text-[#22C55E]'
+          : 'text-[#B45309] dark:text-[#FBBF24]';
+        return `
+        <button class="ext-account-row w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between cursor-pointer text-left" data-id="${account.id}">
           <div class="min-w-0">
             <div class="text-[14px] font-semibold text-[#111827] dark:text-white truncate">${account.bank_name}</div>
             <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA]">${account.account_type} • ****${String(account.account_number).slice(-4)}</div>
           </div>
-          <span class="text-[11px] font-semibold text-[#16A34A] dark:text-[#22C55E] flex-shrink-0">Verified</span>
-        </button>
-      `).join('');
+          <span class="text-[11px] font-semibold ${tone} flex-shrink-0">${standing.label}</span>
+        </button>`;
+      }).join('');
 
       extAccountsList.querySelectorAll('.ext-account-row').forEach((row) => {
         on(row, 'click', () => {
-          selectedExtAccount = { id: row.getAttribute('data-id'), name: row.getAttribute('data-name') };
-          extTransferHeader.textContent = `Transfer to ${selectedExtAccount.name}`;
+          // The whole row is kept, not two attributes off the DOM. The submit
+          // handler has to re-read the account's standing, and reading it back
+          // out of markup the same page wrote is how a check ends up being
+          // performed against the thing it was meant to check.
+          selectedExtAccount = accountsById.get(row.getAttribute('data-id')) || null;
+          if (!selectedExtAccount) return;
+          extTransferHeader.textContent = `Transfer to ${selectedExtAccount.bank_name}`;
           extTransferAmount.value = '';
           extTransferDate.value = new Date().toISOString().slice(0, 10);
           extTransferError.classList.add('hidden');
@@ -77,6 +100,26 @@ export function init(root, ctx) {
     const amount = parseFloat(extTransferAmount.value);
 
     if (!selectedExtAccount) return;
+
+    // The hold, checked HERE and not when the account was linked.
+    //
+    // Linking is allowed to succeed quietly — the details are the customer's,
+    // the row is theirs, and refusing at that moment would be the bank telling
+    // somebody off for doing the thing it asked them to do. The refusal belongs
+    // at the point it means something, which is the moment money is about to
+    // move, and it is worded as what to do next rather than as a policy.
+    //
+    // This is a courtesy, not the control. A browser can be made to skip it.
+    // What cannot be skipped is that `status` is not a column a customer
+    // session may write — see section 13 of setup.sql — so an account that has
+    // not been through customer care stays 'pending' whatever this screen does.
+    const standing = readExternalAccountStanding(selectedExtAccount);
+    if (!standing.canTransfer) {
+      extTransferError.textContent = externalAccountHoldMessage(standing);
+      extTransferError.classList.remove('hidden');
+      return;
+    }
+
     if (!amount || amount <= 0) {
       extTransferError.textContent = 'Please enter a valid amount.';
       extTransferError.classList.remove('hidden');
@@ -126,7 +169,7 @@ export function init(root, ctx) {
       extSubmitTransferBtn.disabled = false;
       extSubmitTransferBtn.textContent = 'Submit Transfer';
       close();
-      showReceipt({ amount: formatCurrency(amount), recipient: selectedExtAccount.name, confirmation: ref });
+      showReceipt({ amount: formatCurrency(amount), recipient: selectedExtAccount.bank_name, confirmation: ref });
     } catch (err) {
       console.error('External transfer error:', err);
       extSubmitTransferBtn.disabled = false;
@@ -143,4 +186,5 @@ export function cleanup() {
   listeners.forEach(off => off());
   listeners = [];
   selectedExtAccount = null;
+  accountsById = new Map();
 }
