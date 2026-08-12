@@ -974,30 +974,57 @@ tunnel would be the form inventing a rejection the bank never made.
 
 ### If you already had an `offer_codes` table
 
-Section 12 adapts one in place rather than expecting a clean slate. It keeps
-your surrogate key and any extra columns (a `campaign`, say), and fixes the two
-things a hand-rolled version usually has:
+The script adapts one in place rather than expecting a clean slate — it does not
+rename your columns out from under whatever else reads them. Instead it works
+out what your table calls things and generates `offer_code_status`,
+`consume_offer_code` and `offer_codes_usable` against those names. It reports
+what it bound to:
+
+```
+NOTICE:  OFFER CODES bound to: code column = code_7_digit, active column = is_active
+```
+
+**The code column.** `code_7_digit` if your table has one, otherwise `code`. A
+table with both is the giveaway — `code` there is a campaign slug or an internal
+reference, and the seven digits are in the other one. Bind to the wrong one and
+the gate matches nothing, which is at least fail-closed and obvious on the first
+test.
+
+**The active column.** `is_active` or `active`, whichever exists. This one is
+not safe to get wrong in the other direction: blindly adding an `active` column
+to a table that already has `is_active` leaves two flags, the new one defaulting
+to true, and **every code you had switched off goes on working** — because the
+switch being read is not the switch being set. Nothing adds a flag without
+looking for one first.
+
+It also fixes three things a hand-rolled version usually has:
 
 - **`code` stored as a number.** It is the obvious choice and it is wrong: a
   seven-digit code is not a quantity, it is a string made of digits. As an
   integer, `0123456` **is** `123456` — the leading zero is not hidden, it is
   gone, and roughly one code in ten becomes a six-digit code that will never
-  match what its owner types. The column is converted to `text` with a plain
-  cast, which changes no value. Anything left shorter than seven digits is a
-  code that already lost its zeros before you ran this, so the format constraint
-  refuses to be added and says so — only whoever issued those codes knows what
-  they were.
-- **`code` not unique.** Everything here keys on it, and a campaign-plus-code
-  model lets the same seven digits exist twice, in which case spending one
-  spends both.
+  match what its owner types. Converted to `text` with a plain cast, which
+  changes no value. Anything left shorter than seven digits already lost its
+  zeros before you ran this; the format constraint refuses to be added and says
+  so, because only whoever issued those codes knows what they were.
+- **The code not unique.** Everything keys on it, and a campaign-plus-code model
+  lets the same seven digits exist twice, in which case spending one spends
+  both.
+- **`used_count` null.** A tally that is NULL is not a code with no limit, it is
+  a code that has never been counted — which is zero. Left alone it reads as
+  unusable for ever, because `null < max_uses` matches no row. Backfilled to 0,
+  given a default, and coalesced in every predicate.
 
-Both run as `NOTICE`/`WARNING`, so read the output.
+A NULL in the active column is read as **off**, everywhere, deliberately: an
+unknown answer to "is this code live?" is not a yes. The script warns if it
+finds any, because a column added without a default leaves a table full of them
+and every one of those codes stops working with no other symptom.
 
-One thing the script will **not** touch: a `consume_offer_code` of your own with
-a different signature — `(campaign text, code integer)`, say. Postgres keeps
-both as overloads, so nothing breaks, but only
-`consume_offer_code(text, uuid)` is the one the trigger calls. Drop yours once
-you have moved off it.
+One thing it will **not** touch: a `consume_offer_code` of your own with a
+different signature — `(campaign text, code integer)`, say. Postgres keeps both
+as overloads, so nothing breaks, but only `consume_offer_code(text, uuid)` is
+the one the trigger calls. Drop yours once you have moved off it. If your column
+was converted to `text`, yours will error when called — loudly, not silently.
 
 ### Turning it off
 
