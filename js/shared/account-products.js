@@ -20,9 +20,18 @@
 //              wants another one: a second checking account, interest checking
 //              alongside it, an investment account.
 //
-// Both checking products and the investment account are on both surfaces. That
-// is the whole point of Open an Account — a member who already holds a checking
-// account and the savings that came with it, coming back for more.
+// Both checking products are on both surfaces. That is the whole point of Open
+// an Account — a member who already holds a checking account and the savings
+// that came with it, coming back for more.
+//
+// The investment account is 'app' only. It was on the sign-up form, which meant
+// offering a product that can lose money to somebody the bank had not yet
+// identified; it now follows the rule the credit card and the IRA already
+// follow, and is opened from Open an Account behind a session.
+//
+// Nothing reads the 'signup' surface yet — signup.html carries its cards in
+// markup — so this list and that page have to be kept in step by hand until it
+// does. They are in step: there is no investment card on the sign-up form.
 //
 // Savings is 'app' only, and the reason is the interesting one. It is not
 // chosen at sign-up because it is not optional there: provision_user opens it
@@ -94,7 +103,13 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Buy and hold stocks, ETFs and mutual funds',
     note: 'Not FDIC insured · May lose value',
     accent: '#8B5CF6',
-    openWith: ['signup', 'app'],
+    // 'app' only, like savings but for the opposite reason. Savings is off the
+    // sign-up surface because it is not a choice there; this is off it because
+    // it is not a choice the bank should offer to somebody it has not yet
+    // identified. An investment account is opened from Open an Account, which
+    // is behind a session and a verified identity — the same rule the credit
+    // card and the IRA have always followed.
+    openWith: ['app'],
     // The one product on this list that can lose money, and the screens that
     // offer it say so where it is offered rather than in a footnote.
     risk: 'Investment products are not deposits, are not FDIC insured, are not guaranteed by the bank and may lose value.',

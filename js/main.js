@@ -1465,7 +1465,10 @@ const navMenus = {
   },
   navInvest: {
     title: 'Invest',
-    items: ['Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
+    // The two balances open the same account screens the dashboard cards do.
+    // They sit at the top because a customer coming here to look at what they
+    // hold should not have to pass the tools to reach them.
+    items: ['High-Yield Savings', 'Checking', 'Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
   },
   navSupport: {
     title: 'Support',
@@ -1509,6 +1512,10 @@ const navMenuRoutes = {
   'Wire Transfers': () => loadPage('wire-transfers'),
 
   // Invest
+  // The savings screen under its product name. 'Savings' in the Accounts menu
+  // opens the same screen — the label differs because the menus do, and both
+  // land on one implementation rather than two that can drift apart.
+  'High-Yield Savings': () => loadPage('account-detail', 'savings'),
   'Portfolio Overview': () => loadPage('portfolio'),
   'Watchlist': () => loadPage('watchlist'),
   'Buy & Sell Investments': () => loadPage('trade'),
