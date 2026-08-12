@@ -430,14 +430,11 @@
             </span>
           </button>
 
-          <button type="button" class="product-card" data-product="investments">
-            <span class="product-radio"></span>
-            <span>
-              <span class="product-name">Investment Account</span>
-              <span class="product-desc">Buy and hold stocks, ETFs and mutual funds.</span>
-              <span class="product-note">Not FDIC insured · May lose value</span>
-            </span>
-          </button>
+          <!-- No Investment Account here, by the same rule that keeps the
+               credit card off this screen: it is opened from the dashboard
+               after identity has been verified, not applied for by somebody
+               the bank has not identified yet. The subtitle above already
+               tells the applicant that. -->
         </div>
 
         <div class="included-card">
@@ -457,6 +454,12 @@
         <div class="step-note">
           Opening this jointly with someone else? A joint account is opened with customer care on (800) 555-0123 once both owners have been identified, and a joint owner can be added to an account after it has been held for 60 days. Open your own account first — everything you enter here counts toward it.
         </div>
+
+        <!-- This step never had one, because it never had a way to fail. It
+             does now: the product validator refuses anything that is not on
+             the list above, and a validator whose complaint has nowhere to
+             render blocks the customer with no explanation at all. -->
+        <div class="step-error" data-step-error="product"></div>
 
         <button type="button" class="btn-next-full" data-next="identity">Continue</button>
       </div>
@@ -693,9 +696,17 @@
     // it here at all.
     let selectedProduct = 'checking';
 
+    // What this screen is allowed to request. Investment accounts and credit
+    // cards are both opened after identity is verified, so neither may arrive
+    // from here — and this is checked rather than assumed, because the value
+    // is read off the DOM and the DOM is editable by whoever is looking at it.
+    const SIGNUP_PRODUCTS = ['checking', 'interest_checking'];
+
     productCards.forEach((card) => {
       card.addEventListener('click', () => {
-        selectedProduct = card.getAttribute('data-product');
+        const product = card.getAttribute('data-product');
+        if (!SIGNUP_PRODUCTS.includes(product)) return;
+        selectedProduct = product;
         productCards.forEach((other) => other.classList.toggle('selected', other === card));
       });
     });
@@ -744,7 +755,12 @@
     // moves forward until its own step is right, so an error can only ever be
     // about the fields on screen.
     const VALIDATORS = {
-      product: () => '',
+      // Re-checked on submit as well as on click. The card handler refuses an
+      // unlisted product, but the submit path is the one that reaches the
+      // server, so it is the one that has to be right.
+      product: () => (SIGNUP_PRODUCTS.includes(selectedProduct)
+        ? ''
+        : 'Choose one of the accounts listed to continue.'),
       identity: () => {
         if (!value('firstName')) return 'Enter your first name as it appears on your ID.';
         if (!value('lastName')) return 'Enter your last name as it appears on your ID.';
