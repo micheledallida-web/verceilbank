@@ -1295,102 +1295,6 @@ create table if not exists public.offer_codes (
   created_at timestamptz not null default now()
 );
 
--- ---------------------------------------------------------------------------
--- A table that was already here, brought into the shape the rest of this
--- section needs. Two things get fixed, and both of them are things a project
--- that rolled its own offer codes is likely to have.
---
--- 1. `code` STORED AS A NUMBER.
---
---    It is the obvious choice — the codes are digits — and it is wrong, because
---    a seven-digit code is not a quantity, it is a string that happens to be
---    made of digits. Stored as an integer, 0123456 is 123456: the leading zero
---    is not hidden, it is gone, and one code in ten is silently a six-digit
---    code that will never match what its owner types. Nothing else in this
---    section works against a number either — you cannot regex-match one, and
---    comparing it to the text the browser sends is an error rather than a
---    mismatch.
---
---    Converted in place with a plain cast, which changes no value. If that
---    leaves anything shorter than seven digits, the constraint below refuses to
---    be added and names the rows: those are the codes the leading zeros were
---    already lost from, and only whoever issued them knows what they were.
---
--- 2. `code` NOT UNIQUE.
---
---    Everything below keys on it. A campaign-plus-code model lets the same
---    seven digits exist twice, and then spending it updates both rows.
--- ---------------------------------------------------------------------------
-do $$
-declare
-  coltype text;
-begin
-  select data_type into coltype
-    from information_schema.columns
-   where table_schema = 'public' and table_name = 'offer_codes' and column_name = 'code';
-
-  if coltype is null then
-    -- No `code` column at all. The ALTER below adds it.
-    null;
-  elsif coltype <> 'text' then
-    execute 'alter table public.offer_codes alter column code type text using code::text';
-    raise notice 'offer_codes.code converted from % to text — check for codes that lost a leading zero', coltype;
-  end if;
-
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.offer_codes'::regclass
-       and contype in ('p', 'u')
-       and pg_get_constraintdef(oid) like '%(code)'
-  ) then
-    if exists (select code from public.offer_codes group by code having count(*) > 1) then
-      raise warning 'offer_codes holds the same code more than once — uniqueness NOT enforced, and spending one of them will spend all of them';
-    else
-      alter table public.offer_codes add constraint offer_codes_code_key unique (code);
-      raise notice 'offer_codes.code is now unique';
-    end if;
-  end if;
-end $$;
-
-alter table public.offer_codes
-  add column if not exists code       text,
-  -- What this code is for, for whoever reads the table later: 'launch-2026',
-  -- 'branch-referral'. Never shown to an applicant.
-  add column if not exists label      text,
-  -- Null means unlimited. A number means that many sign-ups, total.
-  add column if not exists max_uses   integer,
-  add column if not exists used_count integer not null default 0,
-  add column if not exists active     boolean not null default true,
-  add column if not exists expires_at timestamptz,
-  add column if not exists created_at timestamptz not null default now();
-
--- Seven digits, exactly. Enforced here as well as in the form, because the form
--- is not what decides what a valid code looks like.
--- The pattern is a variable rather than a literal typed twice, because the
--- check that decides whether the constraint CAN be added and the constraint
--- itself have to be the same rule — and written out twice, three lines apart,
--- they are two rules that merely happen to agree today.
---
--- This is the only place in this file that says what a code looks like. The
--- sign-up trigger below deliberately does not repeat it.
-do $$
-declare
-  pattern constant text := '^[0-9]{7}$';
-begin
-  if not exists (
-    select 1 from pg_constraint
-     where conrelid = 'public.offer_codes'::regclass and conname = 'offer_codes_seven_digits'
-  ) then
-    if exists (select 1 from public.offer_codes where code !~ pattern) then
-      raise warning 'offer_codes holds codes that are not seven digits — format constraint NOT added, fix those rows first';
-    else
-      execute format(
-        'alter table public.offer_codes add constraint offer_codes_seven_digits check (code ~ %L)',
-        pattern);
-    end if;
-  end if;
-end $$;
-
 -- Who spent what. The bank's record of how an account was opened — `used_count`
 -- is a tally and answers "how many left"; this answers "who, and when".
 create table if not exists public.offer_code_redemptions (
@@ -1433,88 +1337,392 @@ create index if not exists offer_code_redemptions_code_idx
   on public.offer_code_redemptions (code, redeemed_at desc);
 
 -- Both tables are the bank's, not the customer's. RLS on with no policy at all
--- is a deliberate deny-all: every read below goes through a security-definer
--- function instead, so a session holding the anon key can ask whether one code
--- works and cannot list, count or alter any of them.
+-- is a deliberate deny-all: every read goes through a security-definer function
+-- instead, so a session holding the anon key can ask whether one code works and
+-- cannot list, count or alter any of them.
 alter table public.offer_codes            enable row level security;
 alter table public.offer_code_redemptions enable row level security;
 revoke all on public.offer_codes            from anon, authenticated;
 revoke all on public.offer_code_redemptions from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- Is this code usable? The one question a stranger is allowed to ask.
+-- THROTTLING THE ORACLE
 --
--- 'ok' or 'invalid', and nothing else — NOT 'expired', NOT 'already used up'.
--- A code is seven digits, so the whole space is ten million; an answer that
--- distinguishes "no such code" from "that code is spent" turns this into an
--- oracle that confirms which of those ten million are real. One word costs the
--- applicant a slightly vaguer message and costs an enumerator everything.
+-- `offer_code_status` answers one question for anybody holding the anon key:
+-- does this code work. That is the whole point of it — it is what lets the form
+-- say "check that code" at the step instead of at the end of a six-screen
+-- application. It is also, unthrottled, a brute-force oracle.
 --
--- It does not consume anything. It exists so the form can say "check that
--- code" at the step rather than at the end of the application, and it is not
--- what enforces the rule — the trigger below is.
+-- The arithmetic is the thing. Seven digits with a leading digit of 1-9 is a
+-- space of nine million. With N live codes in it, a random guess hits one with
+-- probability N/9,000,000:
+--
+--       100 live codes  ->  1 in 90,000  ->  ~90,000 guesses expected
+--     2,000 live codes  ->  1 in  4,500  ->   ~4,500 guesses expected
+--
+-- Four and a half thousand cheap requests is minutes of scripting. The size of
+-- the space stops being a defence somewhere between those two rows, and it is
+-- not the sort of thing to discover after issuing the codes.
+--
+-- So the oracle is rate limited per caller. What it is NOT is a second gate:
+-- a throttled caller is told "cannot check right now", the form waves them
+-- through, and the trigger on auth.users decides at submit exactly as it would
+-- have anyway. The throttle costs an attacker their cheap yes/no feed and costs
+-- a real applicant nothing but a message they will never see.
+--
+-- Sign-up itself is a separate path with its own limit — Supabase's own auth
+-- rate limiting, under Authentication -> Rate Limits. This does not and cannot
+-- cover that: GoTrue talks to Postgres directly rather than through PostgREST,
+-- so the trigger has no request headers to identify a caller by. Check that
+-- setting is sane; it is what governs guessing by repeated sign-up.
 -- ---------------------------------------------------------------------------
-create or replace function public.offer_code_status(p_code text)
+
+-- One row per caller. Small — it is bounded by distinct client addresses, not
+-- by attempts — and prunable, see the end of this section.
+create table if not exists public.offer_code_attempts (
+  client       text primary key,
+  window_start timestamptz not null default now(),
+  attempts     integer     not null default 0,
+  last_seen    timestamptz not null default now()
+);
+
+-- The bank's, like the codes themselves. Deny-all: a caller who could read this
+-- could see how close they were to the limit, and one who could write it could
+-- reset their own.
+alter table public.offer_code_attempts enable row level security;
+revoke all on public.offer_code_attempts from anon, authenticated;
+
+-- Who is asking.
+--
+-- PostgREST puts the request's headers in a GUC. `x-forwarded-for` is set by
+-- Supabase's edge on every browser request and its first entry is the client;
+-- `cf-connecting-ip` is the fallback for a project fronted by Cloudflare.
+--
+-- NULL when there is no request to look at — a psql session, a server-side
+-- call, anything that is not PostgREST. That is deliberate and it is read as
+-- "do not throttle" rather than as one shared bucket: an unidentifiable caller
+-- put in a shared bucket means the first script to run empties everybody's
+-- allowance and sign-up stops working for every real applicant at once. An
+-- availability failure to defend against an enumeration risk is a bad trade,
+-- and the header is always there for the callers this is aimed at.
+create or replace function public.offer_code_client()
 returns text
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select case when exists (
-    select 1 from public.offer_codes oc
-     where oc.code = p_code
-       and oc.active
-       and (oc.max_uses   is null or oc.used_count < oc.max_uses)
-       and (oc.expires_at is null or oc.expires_at > now())
-  ) then 'ok' else 'invalid' end;
-$$;
-
-grant execute on function public.offer_code_status(text) to anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- Spend one. Returns true if it was spent, false if it could not be.
---
--- The guard is the UPDATE's own WHERE clause, which is what makes this safe
--- under concurrency: two applications racing for the last use of a code both
--- try to update the same row, Postgres serialises them on the row lock, and the
--- second one re-evaluates `used_count < max_uses` against the first one's
--- committed value and matches nothing. A read-then-write would let both
--- through.
---
--- Not callable by a session. It is invoked by the trigger, with definer rights,
--- and a customer who could call it directly could spend other people's codes.
--- ---------------------------------------------------------------------------
-create or replace function public.consume_offer_code(p_code text, p_user_id uuid)
-returns boolean
 language plpgsql
+stable
 security definer
 set search_path = public
 as $$
 declare
-  spent boolean := false;
+  headers json;
 begin
-  update public.offer_codes oc
-     set used_count = oc.used_count + 1
-   where oc.code = p_code
-     and oc.active
-     and (oc.max_uses   is null or oc.used_count < oc.max_uses)
-     and (oc.expires_at is null or oc.expires_at > now())
-  returning true into spent;
-
-  if not coalesce(spent, false) then
-    return false;
+  begin
+    headers := nullif(current_setting('request.headers', true), '')::json;
+  exception when others then
+    return null;
+  end;
+  if headers is null then
+    return null;
   end if;
-
-  insert into public.offer_code_redemptions (user_id, code)
-  values (p_user_id, p_code)
-  on conflict (user_id) do update set code = excluded.code, redeemed_at = now();
-
-  return true;
+  return coalesce(
+    nullif(btrim(split_part(headers->>'x-forwarded-for', ',', 1)), ''),
+    nullif(btrim(headers->>'cf-connecting-ip'), '')
+  );
 end;
 $$;
 
-revoke all on function public.consume_offer_code(text, uuid) from public, anon, authenticated;
+revoke all on function public.offer_code_client() from public, anon, authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- BINDING TO THE TABLE THAT IS ACTUALLY THERE
+--
+-- A project that rolled its own offer codes did not use these column names, and
+-- there is no reason it should have. Rather than rename its columns out from
+-- under whatever else reads them, this works out what the table calls things
+-- and builds the rest of the section against those names.
+--
+-- Two bindings are worked out, and getting either wrong has a cost:
+--
+--   THE CODE COLUMN — where the seven digits the applicant types actually live.
+--   `code_7_digit` if the table has one, otherwise `code`. A table with both is
+--   the giveaway: `code` there is a campaign slug or an internal reference and
+--   the digits are in the other one. Bind to the wrong one and the gate matches
+--   nothing — which is at least fail-closed, and obvious on the first test.
+--
+--   THE ACTIVE COLUMN — `is_active` or `active`, whichever exists. THIS one is
+--   not safe to get wrong in the other direction: blindly adding an `active`
+--   column to a table that already has `is_active` leaves you with two flags,
+--   the new one defaulting to true, and every code the bank had switched off
+--   goes on working — because the switch being read is not the switch being
+--   set. That is a hole, not an inconvenience, and it is why nothing here adds
+--   a flag without looking for one first.
+--
+-- The three functions below are generated from those two names, and the notice
+-- this raises plus the verification block both report what was bound, so it is
+-- never something you have to take on trust.
+-- ---------------------------------------------------------------------------
+do $do$
+declare
+  code_col   text;
+  active_col text;
+  coltype    text;
+  offenders  bigint;
+  pattern    constant text := '^[0-9]{7}$';
+begin
+  -- ---- which column holds the seven digits ----
+  code_col := case
+    when exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'offer_codes'
+                    and column_name = 'code_7_digit')
+    then 'code_7_digit' else 'code' end;
+
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'offer_codes'
+                    and column_name = code_col) then
+    execute format('alter table public.offer_codes add column %I text', code_col);
+  end if;
+
+  -- ---- stored as a number ----
+  -- Converted with a plain cast, which changes no value. A seven-digit code is
+  -- not a quantity, it is a string that happens to be made of digits: stored as
+  -- an integer, 0123456 IS 123456 — the leading zero is not hidden, it is gone,
+  -- and roughly one code in ten becomes a six-digit code that can never match
+  -- what its owner types. Nothing here works against a number either; you
+  -- cannot regex-match one, and comparing it to the text the browser sends is
+  -- an error rather than a mismatch.
+  select data_type into coltype
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'offer_codes' and column_name = code_col;
+
+  if coltype is distinct from 'text' then
+    execute format('alter table public.offer_codes alter column %I type text using %I::text', code_col, code_col);
+    raise notice 'offer_codes.% converted from % to text — check for codes that lost a leading zero', code_col, coltype;
+  end if;
+
+  -- ---- which column is the on/off switch ----
+  active_col := case
+    when exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'offer_codes'
+                    and column_name = 'is_active') then 'is_active'
+    when exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'offer_codes'
+                    and column_name = 'active')    then 'active'
+    else null end;
+
+  if active_col is null then
+    alter table public.offer_codes add column active boolean not null default true;
+    active_col := 'active';
+  end if;
+
+  -- ---- everything else the gate reads ----
+  -- `label` only if nothing is already playing its part. A table with a
+  -- `campaign` column does not need a second name for the same idea.
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'offer_codes'
+                    and column_name in ('label', 'campaign')) then
+    alter table public.offer_codes add column label text;
+  end if;
+
+  alter table public.offer_codes
+    -- Null means unlimited. A number means that many sign-ups, total.
+    add column if not exists max_uses   integer,
+    add column if not exists used_count integer not null default 0,
+    add column if not exists expires_at timestamptz,
+    add column if not exists created_at timestamptz not null default now();
+
+  -- A tally that is NULL is not a code with no limit, it is a code that has
+  -- never been counted — which is zero. Left as NULL it would read as unusable
+  -- for ever, because `null < max_uses` matches no row. Backfilled and given a
+  -- default so the next insert cannot recreate the problem. The predicates
+  -- below coalesce as well; this is belt and braces on a column that decides
+  -- whether somebody can open an account.
+  update public.offer_codes set used_count = 0 where used_count is null;
+  alter table public.offer_codes alter column used_count set default 0;
+
+  -- A switch that is NULL is read as OFF, everywhere below, deliberately: an
+  -- unknown answer to "is this code live?" is not a yes. But it is worth
+  -- saying out loud, because a column added without a default leaves a table
+  -- full of them and every one of those codes stops working with no other
+  -- symptom.
+  execute format('select count(*) from public.offer_codes where %I is null', active_col) into offenders;
+  if offenders > 0 then
+    raise warning 'offer_codes.% is NULL on % code(s) — those are treated as switched OFF. Set them true or false explicitly', active_col, offenders;
+  end if;
+
+  -- ---- the code has to be unique ----
+  -- Everything below keys on it, and a campaign-plus-code table lets the same
+  -- seven digits exist twice — where spending one spends both.
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_codes'::regclass
+       and contype in ('p', 'u')
+       and pg_get_constraintdef(oid) like '%(' || code_col || ')'
+  ) then
+    execute format('select count(*) from (select %I from public.offer_codes group by %I having count(*) > 1) d',
+                   code_col, code_col) into offenders;
+    if offenders > 0 then
+      raise warning 'offer_codes.% holds the same code more than once — uniqueness NOT enforced, and spending one of them will spend all of them', code_col;
+    else
+      execute format('alter table public.offer_codes add constraint offer_codes_code_key unique (%I)', code_col);
+      raise notice 'offer_codes.% is now unique', code_col;
+    end if;
+  end if;
+
+  -- ---- what a code looks like, said once ----
+  -- Seven digits exactly, enforced here rather than in the form, because the
+  -- form is not what decides. This is the ONLY place in this file that states
+  -- the pattern — the sign-up trigger below deliberately does not repeat it.
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_codes'::regclass and conname = 'offer_codes_seven_digits'
+  ) then
+    execute format('select count(*) from public.offer_codes where %I !~ %L', code_col, pattern) into offenders;
+    if offenders > 0 then
+      raise warning 'offer_codes.% holds % code(s) that are not seven digits — format constraint NOT added. Those are the ones that lost a leading zero back when the column was a number; only whoever issued them knows what they were', code_col, offenders;
+    else
+      execute format('alter table public.offer_codes add constraint offer_codes_seven_digits check (%I ~ %L)', code_col, pattern);
+    end if;
+  end if;
+
+  raise notice 'OFFER CODES bound to: code column = %, active column = %', code_col, active_col;
+
+  -- -------------------------------------------------------------------------
+  -- The three functions, generated against those two names.
+  --
+  -- Generated rather than written out, because they are the only things that
+  -- have to know what the columns are called — and a hand-written copy would be
+  -- right for one project's table and quietly wrong for the next one's.
+  -- -------------------------------------------------------------------------
+
+  -- Is this code usable? The one question a stranger is allowed to ask.
+  --
+  -- Three answers, and only three:
+  --
+  --   'ok'        spend it, it works
+  --   'invalid'   it does not — and NOT which kind of invalid. Never 'expired',
+  --               never 'already used up'. An answer that separated "no such
+  --               code" from "that code is spent" would confirm which of nine
+  --               million strings are real, one guess at a time.
+  --   'throttled' this caller has asked too often. Says nothing about the code.
+  --
+  -- It consumes nothing and it enforces nothing. It exists so the form can say
+  -- "check that code" at the step rather than at the end of a six-screen
+  -- application; the trigger below is what decides whether an account opens.
+  -- A caller who is throttled is not refused a sign-up, only a preview of the
+  -- answer.
+  --
+  -- Getting it right forgives the misses that led there: somebody who mistypes
+  -- four times and then reads their invitation properly walks away with a clean
+  -- record, while a script that only ever misses keeps every one of them.
+  execute format($fn$
+    create or replace function public.offer_code_status(p_code text)
+    returns text language plpgsql security definer set search_path = public as $body$
+    declare
+      -- Ten tries per ten minutes. An applicant needs one, or two if the letter
+      -- is smudged; nobody legitimately needs ten. Both numbers are here rather
+      -- than anywhere else, so this is where to change them.
+      max_tries constant integer  := 10;
+      window_for constant interval := interval '10 minutes';
+      -- v_ prefixed, and not decoratively: `client` is also the name of the
+      -- column this writes to, and in plpgsql the variable wins. `where client
+      -- = client` would then be `where true` — the success path below would
+      -- clear every caller's counter in the table instead of this one's, which
+      -- is a throttle that quietly turns itself off the first time anybody
+      -- enters a correct code.
+      v_client  text;
+      tries     integer;
+      verdict   text;
+    begin
+      v_client := public.offer_code_client();
+
+      -- No identifiable caller, no throttle. See offer_code_client.
+      if v_client is not null then
+        insert into public.offer_code_attempts as a (client, window_start, attempts, last_seen)
+        values (v_client, now(), 1, now())
+        on conflict (client) do update
+          set window_start = case when now() - a.window_start > window_for then now() else a.window_start end,
+              attempts     = case when now() - a.window_start > window_for then 1    else a.attempts + 1 end,
+              last_seen    = now()
+        returning a.attempts into tries;
+
+        if tries > max_tries then
+          return 'throttled';
+        end if;
+      end if;
+
+      select case when exists (
+        select 1 from public.offer_codes oc
+         where oc.%1$I = p_code
+           and oc.%2$I
+           and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
+           and (oc.expires_at is null or oc.expires_at > now())
+      ) then 'ok' else 'invalid' end into verdict;
+
+      if verdict = 'ok' and v_client is not null then
+        update public.offer_code_attempts set attempts = 0 where client = v_client;
+      end if;
+
+      return verdict;
+    end;
+    $body$;
+  $fn$, code_col, active_col);
+
+  -- Spend one. True if it was spent, false if it could not be.
+  --
+  -- The guard is the UPDATE's own WHERE clause, and that is what makes this
+  -- safe under concurrency: two applications racing for the last use of a code
+  -- both try to update the same row, Postgres serialises them on the row lock,
+  -- and the second re-evaluates `used_count < max_uses` against the first one's
+  -- committed value and matches nothing. A read-then-write would let both
+  -- through.
+  --
+  -- Not callable by a session — a customer who could call it could spend other
+  -- people's codes.
+  execute format($fn$
+    create or replace function public.consume_offer_code(p_code text, p_user_id uuid)
+    returns boolean language plpgsql security definer set search_path = public as $body$
+    declare
+      spent boolean := false;
+    begin
+      update public.offer_codes oc
+         set used_count = coalesce(oc.used_count, 0) + 1
+       where oc.%1$I = p_code
+         and oc.%2$I
+         and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
+         and (oc.expires_at is null or oc.expires_at > now())
+      returning true into spent;
+
+      if not coalesce(spent, false) then
+        return false;
+      end if;
+
+      insert into public.offer_code_redemptions (user_id, code)
+      values (p_user_id, p_code)
+      on conflict (user_id) do update set code = excluded.code, redeemed_at = now();
+
+      return true;
+    end;
+    $body$;
+  $fn$, code_col, active_col);
+
+  -- How many codes could be spent right now. Read by the warning at the end of
+  -- this section and by the verification block, so neither of those has to know
+  -- the column names either.
+  execute format($fn$
+    create or replace function public.offer_codes_usable()
+    returns integer language sql security definer stable set search_path = public as $body$
+      select count(*)::integer from public.offer_codes oc
+       where oc.%1$I
+         and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
+         and (oc.expires_at is null or oc.expires_at > now());
+    $body$;
+  $fn$, active_col);
+end $do$;
+
+grant  execute on function public.offer_code_status(text)          to anon, authenticated;
+revoke all     on function public.consume_offer_code(text, uuid) from public, anon, authenticated;
+revoke all     on function public.offer_codes_usable()           from public, anon, authenticated;
+
 
 -- ---------------------------------------------------------------------------
 -- The gate.
@@ -1598,11 +1806,9 @@ do $$
 declare
   usable integer;
 begin
-  select count(*) into usable
-    from public.offer_codes oc
-   where oc.active
-     and (oc.max_uses   is null or oc.used_count < oc.max_uses)
-     and (oc.expires_at is null or oc.expires_at > now());
+  -- Through the generated function, so this does not need to know whether the
+  -- switch on this project's table is called `active` or `is_active`.
+  usable := public.offer_codes_usable();
 
   if usable = 0 and coalesce((select offer_code_required from public.bank_settings where id = 1), true) then
     raise warning 'OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP. Issue one, e.g. insert into public.offer_codes (code, label, max_uses) values (''1234567'', ''launch-2026'', 500);';
@@ -1776,11 +1982,22 @@ select 'offer codes', 'usable codes available',
        case when to_regclass('public.offer_codes') is null then 'table missing'
             when not coalesce((select offer_code_required from public.bank_settings where id = 1), true)
               then 'n/a — requirement is off'
-            when exists (select 1 from public.offer_codes
-                          where active
-                            and (max_uses   is null or used_count < max_uses)
-                            and (expires_at is null or expires_at > now()))
+            when public.offer_codes_usable() > 0
             then 'ok' else 'NONE — nobody can sign up; issue a code' end
+
+union all
+select 'offer codes', 'code checks are rate limited',
+       case when to_regclass('public.offer_code_attempts') is null
+              then 'MISSING — the anon key can brute-force the code space'
+            when not exists (select 1 from pg_proc where proname = 'offer_code_client')
+              then 'MISSING — no way to tell callers apart, so no throttle'
+            else 'ok' end
+
+union all
+select 'offer codes', 'attempt counters not readable by sessions',
+       case when has_table_privilege('anon', 'public.offer_code_attempts', 'SELECT')
+             or has_table_privilege('authenticated', 'public.offer_code_attempts', 'SELECT')
+            then 'EXPOSED — a caller can see its own allowance' else 'ok' end
 
 union all
 select 'offer codes', 'codes not readable by customer sessions',
