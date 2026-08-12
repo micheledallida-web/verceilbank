@@ -877,6 +877,118 @@ is the real file.
 
 ---
 
+## 5g. Offer codes — sign-up is invite-only
+
+**Nobody opens an account without a seven-digit offer code.** The form asks for
+one as its second step, before the applicant's name — deliberately, because it
+is the only step that can end the application, and asking somebody for their
+date of birth, four digits of their SSN and their home address before telling
+them they cannot open an account is collecting a stranger's identity for
+nothing.
+
+### Where the rule actually lives
+
+Not in the form. `auth.signUp` is a public endpoint that anybody can POST to
+with the anon key, and the field on the page is editable by whoever is looking
+at it. The gate is a **`BEFORE INSERT` trigger on `auth.users`**
+(`on_auth_user_offer_code`, section 12 of `setup.sql`), and the ordering is the
+whole design:
+
+- The trigger raises → the insert never happens → no auth user, no profile, no
+  accounts, and the code is **not** spent.
+- The trigger passes → the increment and the user row commit **together**. If
+  anything later in that transaction fails, both roll back.
+
+That is why the code is consumed from a trigger rather than called from the
+client before sign-up: the client-side order burns a code every time a sign-up
+fails after the check, and leaves the decision with the browser.
+
+### Issue a code
+
+`setup.sql` creates no codes, on purpose — a code committed to a source file is
+a code everybody has. Issue your own:
+
+```sql
+-- 500 accounts, no expiry
+insert into public.offer_codes (code, label, max_uses)
+values ('4820917', 'launch-2026', 500);
+
+-- one-shot, expires at the end of the month
+insert into public.offer_codes (code, label, max_uses, expires_at)
+values ('3051764', 'branch-referral', 1, '2026-09-01T00:00:00Z');
+```
+
+`max_uses` null means unlimited. `active = false` switches a code off without
+deleting it, which keeps the redemption history attached to something.
+
+If the requirement is on and there are no usable codes, **nobody can sign up** —
+so the script says so loudly when you run it:
+
+```
+WARNING: OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP.
+```
+
+### Watching them
+
+```sql
+-- how much of each code is left
+select code, label, used_count, max_uses, active, expires_at
+  from public.offer_codes order by created_at desc;
+
+-- who came in on what, most recent first
+select r.code, r.redeemed_at, u.email
+  from public.offer_code_redemptions r
+  join auth.users u on u.id = r.user_id
+ order by r.redeemed_at desc limit 50;
+```
+
+Both tables are RLS-on with **no policy at all** — a deliberate deny-all. Read
+them with the service key or from the SQL editor. A customer session cannot list
+codes, count them, or see who redeemed what.
+
+### What a stranger is allowed to ask
+
+Exactly one thing: `offer_code_status('1234567')`, a security-definer function
+granted to `anon`, which answers **`'ok'` or `'invalid'` and nothing else**.
+
+It will not say *which kind* of invalid, and that is not laziness. A code is
+seven digits, so the space is ten million; a function that distinguished "no
+such code" from "that code is used up" would confirm which of those ten million
+are real, one guess at a time. One word costs an applicant a slightly vaguer
+message and costs an enumerator everything.
+
+The form calls it as the offer step is cleared, so an applicant is told at the
+step instead of at the end. It is a courtesy, not the rule — and a failure to
+reach it is **not** treated as a bad code: the applicant goes through and the
+trigger decides, because refusing somebody because their train went into a
+tunnel would be the form inventing a rejection the bank never made.
+
+### Turning it off
+
+For creating a user by hand in the Supabase dashboard, or to open sign-ups to
+everyone:
+
+```sql
+update public.bank_settings set offer_code_required = false where id = 1;
+-- ... add the user ...
+update public.bank_settings set offer_code_required = true  where id = 1;
+```
+
+The switch lives in `bank_settings` so this never means dropping the trigger. It
+defaults to **on**, because a gate that defaults to open is not a gate — and a
+missing `bank_settings` row reads as on for the same reason.
+
+### One thing to know about the error
+
+When the trigger refuses, GoTrue does not always pass the reason through — on
+most projects the browser gets a flat `Database error saving new user`. The app
+reads that as an offer-code rejection (`js/auth-errors.js`), which is a guess,
+but a good one here: the gate is the only trigger on `auth.users` that can
+raise, and `handle_new_user` swallows everything it hits by design so that
+provisioning can never fail a sign-up. The console always gets the raw error.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -958,4 +1070,5 @@ Never put the service key in these variables.
 - [ ] `bank_settings.btc_usd_rate` added and set (section 5d)
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
+- [ ] `offer_codes` table, the `on_auth_user_offer_code` trigger, **and at least one usable code** (section 5g) — **with the requirement on and no codes issued, nobody can sign up**
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

@@ -25,8 +25,9 @@
 --   9. Reference data
 --  10. Identity verification THE ONE THAT MAKES ID UPLOAD WORK
 --  11. Statement files       THE ONE THAT MAKES DOWNLOAD PDF HAND OVER A FILE
---  12. Verification          run this at the end and read the output
---  13. Optional: pg_cron
+--  12. Offer codes           THE ONE THAT MAKES SIGN-UP INVITE-ONLY
+--  13. Verification          run this at the end and read the output
+--  14. Optional: pg_cron
 -- =============================================================================
 
 
@@ -227,7 +228,12 @@ alter table public.user_profile
   add column if not exists city          text,
   add column if not exists state         text,
   add column if not exists postal_code   text,
-  add column if not exists ssn_last4     text;
+  add column if not exists ssn_last4     text,
+  -- The seven-digit code the account was opened with. Added here rather than
+  -- in section 12 where the rest of the offer-code machinery lives, because
+  -- provision_user writes it and provision_user runs — over every existing
+  -- customer — in section 5, long before section 12 is reached.
+  add column if not exists offer_code    text;
 
 -- The account number the app assigns at opening, and who owns the account.
 --
@@ -559,7 +565,7 @@ begin
       user_id, first_name, middle_name, last_name, suffix, date_of_birth,
       address_line1, address_line2, city, state, postal_code, ssn_last4,
       res_street, res_apt, res_city, res_state, res_zip,
-      email, kyc_locked
+      email, offer_code, kyc_locked
     ) values (
       new_id,
       nullif(meta->>'first_name', ''),
@@ -581,6 +587,11 @@ begin
       nullif(meta->>'state', ''),
       nullif(meta->>'postal_code', ''),
       p_email,
+      -- Which code opened this account. By the time this runs the BEFORE INSERT
+      -- trigger in section 12 has already spent it, so this is a copy for
+      -- reading, not the record of the spend — `offer_code_redemptions` is that.
+      -- Null on every customer who signed up before the codes existed.
+      nullif(trim(coalesce(meta->>'offer_code', '')), ''),
       true
     )
     on conflict (user_id) do nothing;
@@ -1252,7 +1263,275 @@ create policy "own statements read"
 
 
 -- =============================================================================
--- 12. VERIFICATION
+-- 12. OFFER CODES — THE ONE THAT MAKES SIGN-UP INVITE-ONLY
+--
+-- Nobody opens an account without a seven-digit offer code.
+--
+-- The sign-up form asks for one and checks it before it will move past the
+-- step, but a form is a courtesy, not a gate: the field is editable, the
+-- validator is JavaScript, and `auth.signUp` is a public endpoint anybody can
+-- POST to with the anon key. The gate is the trigger at the bottom of this
+-- section, on `auth.users` itself. Nothing reaches the user table without a
+-- code that could be spent.
+--
+-- BEFORE INSERT, and consumed in the same transaction as the user row. That
+-- ordering is the whole design:
+--
+--   * The trigger raises  -> the INSERT never happens -> no auth user, no
+--     profile, no accounts, and the code is untouched.
+--   * The trigger passes  -> the increment and the user row commit together.
+--     If anything later in that transaction fails, both roll back.
+--
+-- The alternative — consume the code from the client, then create the user —
+-- burns a code every time a sign-up fails after the check, and hands the
+-- decision to the browser. This cannot do either.
+-- =============================================================================
+
+-- The codes themselves. Keyed on `code`, deliberately: this section never
+-- refers to the primary key, so it does not matter whether an existing
+-- offer_codes table has a uuid id, a bigint id, or no surrogate key at all.
+create table if not exists public.offer_codes (
+  code       text primary key,
+  created_at timestamptz not null default now()
+);
+
+alter table public.offer_codes
+  add column if not exists code       text,
+  -- What this code is for, for whoever reads the table later: 'launch-2026',
+  -- 'branch-referral'. Never shown to an applicant.
+  add column if not exists label      text,
+  -- Null means unlimited. A number means that many sign-ups, total.
+  add column if not exists max_uses   integer,
+  add column if not exists used_count integer not null default 0,
+  add column if not exists active     boolean not null default true,
+  add column if not exists expires_at timestamptz,
+  add column if not exists created_at timestamptz not null default now();
+
+-- Seven digits, exactly. Enforced here as well as in the form, because the form
+-- is not what decides what a valid code looks like.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_codes'::regclass and conname = 'offer_codes_seven_digits'
+  ) then
+    if exists (select 1 from public.offer_codes where code !~ '^[0-9]{7}$') then
+      raise warning 'offer_codes holds codes that are not seven digits — format constraint NOT added, fix those rows first';
+    else
+      alter table public.offer_codes
+        add constraint offer_codes_seven_digits check (code ~ '^[0-9]{7}$');
+    end if;
+  end if;
+end $$;
+
+-- Who spent what. The bank's record of how an account was opened — `used_count`
+-- is a tally and answers "how many left"; this answers "who, and when".
+create table if not exists public.offer_code_redemptions (
+  user_id     uuid primary key,
+  code        text not null,
+  redeemed_at timestamptz not null default now()
+);
+
+-- The foreign key is added separately and DEFERRABLE INITIALLY DEFERRED, and
+-- both halves of that are load bearing.
+--
+-- The row is written from a BEFORE INSERT trigger on auth.users, so at the
+-- moment it is written the user it refers to does not exist yet — the insert
+-- that creates them has not run. An ordinary foreign key is checked at
+-- statement time and rejects it, which fails the trigger, which fails the
+-- sign-up: every valid code would be refused. Deferring the check to COMMIT
+-- moves it to a point where the user row is there, and keeps both the integrity
+-- and the ON DELETE CASCADE that an FK is worth having for.
+--
+-- Added rather than inlined so a table left behind by an earlier run gets the
+-- same treatment as a new one.
+do $$
+begin
+  alter table public.offer_code_redemptions
+    drop constraint if exists offer_code_redemptions_user_id_fkey;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_code_redemptions'::regclass
+       and conname = 'offer_code_redemptions_user_fk'
+  ) then
+    alter table public.offer_code_redemptions
+      add constraint offer_code_redemptions_user_fk
+      foreign key (user_id) references auth.users (id) on delete cascade
+      deferrable initially deferred;
+  end if;
+end $$;
+
+create index if not exists offer_code_redemptions_code_idx
+  on public.offer_code_redemptions (code, redeemed_at desc);
+
+-- Both tables are the bank's, not the customer's. RLS on with no policy at all
+-- is a deliberate deny-all: every read below goes through a security-definer
+-- function instead, so a session holding the anon key can ask whether one code
+-- works and cannot list, count or alter any of them.
+alter table public.offer_codes            enable row level security;
+alter table public.offer_code_redemptions enable row level security;
+revoke all on public.offer_codes            from anon, authenticated;
+revoke all on public.offer_code_redemptions from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Is this code usable? The one question a stranger is allowed to ask.
+--
+-- 'ok' or 'invalid', and nothing else — NOT 'expired', NOT 'already used up'.
+-- A code is seven digits, so the whole space is ten million; an answer that
+-- distinguishes "no such code" from "that code is spent" turns this into an
+-- oracle that confirms which of those ten million are real. One word costs the
+-- applicant a slightly vaguer message and costs an enumerator everything.
+--
+-- It does not consume anything. It exists so the form can say "check that
+-- code" at the step rather than at the end of the application, and it is not
+-- what enforces the rule — the trigger below is.
+-- ---------------------------------------------------------------------------
+create or replace function public.offer_code_status(p_code text)
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select case when exists (
+    select 1 from public.offer_codes oc
+     where oc.code = p_code
+       and oc.active
+       and (oc.max_uses   is null or oc.used_count < oc.max_uses)
+       and (oc.expires_at is null or oc.expires_at > now())
+  ) then 'ok' else 'invalid' end;
+$$;
+
+grant execute on function public.offer_code_status(text) to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Spend one. Returns true if it was spent, false if it could not be.
+--
+-- The guard is the UPDATE's own WHERE clause, which is what makes this safe
+-- under concurrency: two applications racing for the last use of a code both
+-- try to update the same row, Postgres serialises them on the row lock, and the
+-- second one re-evaluates `used_count < max_uses` against the first one's
+-- committed value and matches nothing. A read-then-write would let both
+-- through.
+--
+-- Not callable by a session. It is invoked by the trigger, with definer rights,
+-- and a customer who could call it directly could spend other people's codes.
+-- ---------------------------------------------------------------------------
+create or replace function public.consume_offer_code(p_code text, p_user_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  spent boolean := false;
+begin
+  update public.offer_codes oc
+     set used_count = oc.used_count + 1
+   where oc.code = p_code
+     and oc.active
+     and (oc.max_uses   is null or oc.used_count < oc.max_uses)
+     and (oc.expires_at is null or oc.expires_at > now())
+  returning true into spent;
+
+  if not coalesce(spent, false) then
+    return false;
+  end if;
+
+  insert into public.offer_code_redemptions (user_id, code)
+  values (p_user_id, p_code)
+  on conflict (user_id) do update set code = excluded.code, redeemed_at = now();
+
+  return true;
+end;
+$$;
+
+revoke all on function public.consume_offer_code(text, uuid) from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- The gate.
+--
+-- BEFORE INSERT on auth.users. It reads the code off the metadata the sign-up
+-- form sends and spends it, and if it cannot, it refuses the insert — which
+-- GoTrue reports to the browser as a failed sign-up and which leaves no user
+-- behind.
+--
+-- The switch is in bank_settings so an operator can turn the requirement off
+-- without dropping the trigger, and so creating a user by hand in the Supabase
+-- dashboard is possible: flip it, add the user, flip it back. It defaults to
+-- ON, because a gate that defaults to open is not a gate.
+-- ---------------------------------------------------------------------------
+alter table public.bank_settings
+  add column if not exists offer_code_required boolean not null default true;
+
+create or replace function public.require_offer_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  required boolean;
+  code     text;
+begin
+  select coalesce(bs.offer_code_required, true) into required
+    from public.bank_settings bs where bs.id = 1;
+
+  -- No settings row is not permission to skip the check. An absent row means
+  -- the reference data has not been loaded, and the safe reading of that is
+  -- "the bank has not said this is open".
+  if not coalesce(required, true) then
+    return new;
+  end if;
+
+  code := nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), '');
+
+  if code is null or code !~ '^[0-9]{7}$' then
+    raise exception 'offer code required'
+      using errcode = 'check_violation',
+            hint    = 'Sign-up needs a valid seven-digit offer code.';
+  end if;
+
+  if not public.consume_offer_code(code, new.id) then
+    raise exception 'offer code not usable'
+      using errcode = 'check_violation',
+            hint    = 'That offer code does not exist, has expired, or has been fully used.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_offer_code on auth.users;
+create trigger on_auth_user_offer_code
+  before insert on auth.users
+  for each row execute function public.require_offer_code();
+
+-- A gate with no keys is a closed bank. This does not invent one — a code
+-- committed to a source file is a code everybody has, which is the opposite of
+-- what this section is for — but it will not let the situation pass quietly
+-- either.
+do $$
+declare
+  usable integer;
+begin
+  select count(*) into usable
+    from public.offer_codes oc
+   where oc.active
+     and (oc.max_uses   is null or oc.used_count < oc.max_uses)
+     and (oc.expires_at is null or oc.expires_at > now());
+
+  if usable = 0 and coalesce((select offer_code_required from public.bank_settings where id = 1), true) then
+    raise warning 'OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP. Issue one, e.g. insert into public.offer_codes (code, label, max_uses) values (''1234567'', ''launch-2026'', 500);';
+  else
+    raise notice 'offer codes: % usable', usable;
+  end if;
+end $$;
+
+
+-- =============================================================================
+-- 13. VERIFICATION
 --
 -- Run this section on its own afterwards and read the output. Every row should
 -- say 'ok'. Anything that says 'MISSING' is not set up.
@@ -1392,6 +1671,41 @@ select 'statement files', 'investment_statements.storage_object_path',
                             and column_name = 'storage_object_path')
             then 'ok' else 'MISSING — every download will be a generated summary' end
 
+-- The invite-only gate. Read all four together: the trigger is what enforces
+-- it, and a requirement switched on with no usable codes behind it is a bank
+-- nobody can open an account at.
+union all
+select 'offer codes', 'offer_codes table',
+       case when to_regclass('public.offer_codes') is not null then 'ok' else 'MISSING' end
+
+union all
+select 'offer codes', 'sign-up gate trigger',
+       case when exists (select 1 from pg_trigger where tgname = 'on_auth_user_offer_code'
+                           and tgrelid = 'auth.users'::regclass)
+            then 'ok' else 'MISSING — anyone can sign up without a code' end
+
+union all
+select 'offer codes', 'requirement switched on',
+       case when coalesce((select offer_code_required from public.bank_settings where id = 1), true)
+            then 'ok' else 'OFF — bank_settings.offer_code_required is false' end
+
+union all
+select 'offer codes', 'usable codes available',
+       case when to_regclass('public.offer_codes') is null then 'table missing'
+            when not coalesce((select offer_code_required from public.bank_settings where id = 1), true)
+              then 'n/a — requirement is off'
+            when exists (select 1 from public.offer_codes
+                          where active
+                            and (max_uses   is null or used_count < max_uses)
+                            and (expires_at is null or expires_at > now()))
+            then 'ok' else 'NONE — nobody can sign up; issue a code' end
+
+union all
+select 'offer codes', 'codes not readable by customer sessions',
+       case when has_table_privilege('anon', 'public.offer_codes', 'SELECT')
+             or has_table_privilege('authenticated', 'public.offer_codes', 'SELECT')
+            then 'EXPOSED — a session can list every code' else 'ok' end
+
 union all
 select 'realtime', 'accounts replica identity',
        case when to_regclass('public.accounts') is null then 'table missing'
@@ -1424,7 +1738,7 @@ having a.balance is distinct from
 
 
 -- =============================================================================
--- 13. OPTIONAL — pg_cron
+-- 14. OPTIONAL — pg_cron
 --
 -- Not run by the statements above. Enable the pg_cron extension first
 -- (Database -> Extensions), then run this block on its own if you want it.

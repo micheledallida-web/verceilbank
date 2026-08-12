@@ -86,6 +86,22 @@
 
     if (status === 429 || /rate limit|too many requests|only request this after|after \d+ seconds/.test(m)) return 'rate_limited';
 
+    // The invite-only gate — the BEFORE INSERT trigger on auth.users, which
+    // refuses a sign-up whose offer code cannot be spent.
+    //
+    // Two shapes, because GoTrue reports a trigger's exception two different
+    // ways. On a project that surfaces the database's own words we get the
+    // message the trigger raised; on one that does not, every exception from
+    // that insert comes back as the same flat "Database error saving new user".
+    //
+    // Both are read as this. The second is a guess — but it is a very good one
+    // on this project: the only trigger on auth.users that can raise is the
+    // offer-code gate, and the other one, handle_new_user, swallows everything
+    // it hits by design so that provisioning can never fail a sign-up. The copy
+    // below is written to be true either way.
+    if (/offer code/.test(m)) return 'offer_code';
+    if (/database error saving new user|error saving new user/.test(m)) return 'offer_code';
+
     if (/signups? not allowed|signups? are disabled|signup is disabled/.test(m)) return 'signups_disabled';
     if (/already registered|already been registered|user already exists/.test(m)) return 'already_registered';
     if (/email not confirmed|not confirmed|confirm your email/.test(m)) return 'unconfirmed';
@@ -124,6 +140,14 @@
     already_registered: {
       signup: 'An account already exists for that email address. Sign in instead, or use "Forgot password" if you cannot get in.',
       any: 'That email address is already in use.',
+    },
+    offer_code: {
+      // Says what to do about it without asserting which of the several
+      // possible reasons it was — the server deliberately does not tell us, and
+      // a code that was fine three screens ago is most often one somebody else
+      // has just taken the last use of.
+      signup: 'We could not open an account with that offer code. It may have expired or been fully used since you started. Check the seven digits on your invitation, or contact whoever invited you.',
+      any: 'That offer code could not be used.',
     },
     unconfirmed: {
       signin: 'Confirm your email address first — check your inbox for the link we sent when you applied.',
