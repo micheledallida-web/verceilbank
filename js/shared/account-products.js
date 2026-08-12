@@ -79,8 +79,11 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Set money aside and earn on every dollar',
     note: '4.00% APY',
     accent: '#059669',
-    // Automatic at sign-up, a choice afterwards. See the note above the list.
-    openWith: ['app'],
+    // Automatic at sign-up, and no longer offered on Open an Account either —
+    // it sits with the investment account under Invest instead. provision_user
+    // still opens it alongside whatever a new applicant picks, so nobody is
+    // left without one; this only stops it being a tick box on that screen.
+    openWith: [],
     // Offered ALONGSIDE another account rather than instead of one. Every other
     // product on this list answers "which account are you opening?"; savings
     // answers "and do you want one of these with it?", which is a different
@@ -103,13 +106,15 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Buy and hold stocks, ETFs and mutual funds',
     note: 'Not FDIC insured · May lose value',
     accent: '#8B5CF6',
-    // 'app' only, like savings but for the opposite reason. Savings is off the
-    // sign-up surface because it is not a choice there; this is off it because
-    // it is not a choice the bank should offer to somebody it has not yet
-    // identified. An investment account is opened from Open an Account, which
-    // is behind a session and a verified identity — the same rule the credit
-    // card and the IRA have always followed.
-    openWith: ['app'],
+    // Neither surface. It came off sign-up because it offers a product that can
+    // lose money to somebody the bank has not identified, and it is now off
+    // Open an Account as well: the investment account and savings are their own
+    // pair, reached from Invest, rather than two more answers to "which
+    // checking account are you opening?".
+    //
+    // Nothing else reads this list for the investment account, so it is the one
+    // switch — but see the note at the top of this file about what that leaves.
+    openWith: [],
     // The one product on this list that can lose money, and the screens that
     // offer it say so where it is offered rather than in a footnote.
     risk: 'Investment products are not deposits, are not FDIC insured, are not guaranteed by the bank and may lose value.',

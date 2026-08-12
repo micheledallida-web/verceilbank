@@ -1426,7 +1426,11 @@ document.getElementById('offerCredit').addEventListener('click', () => loadPage(
 // tapping "Open" on the Investment Account offer and picking it off the list.
 document.getElementById('homeOpenAccount').addEventListener('click', () => loadPage('open-account'));
 document.getElementById('offerChecking').addEventListener('click', () => loadPage('open-account', { product: 'checking' }));
-document.getElementById('offerInvestments').addEventListener('click', () => loadPage('open-account', { product: 'investments' }));
+// Not to Open an Account any more. That screen no longer offers the investment
+// account, so sending this tile there would land somebody on a list their
+// product is not on — the offer would simply stop working. The account's own
+// screen is where it lives now.
+document.getElementById('offerInvestments').addEventListener('click', () => loadPage('account-detail', 'investments'));
 
 // ---------- Quick actions (from the old account summary) ----------
 document.getElementById('homeQuickTransfer').addEventListener('click', () => loadPage('transfer'));
@@ -1465,10 +1469,11 @@ const navMenus = {
   },
   navInvest: {
     title: 'Invest',
-    // The two balances open the same account screens the dashboard cards do.
-    // They sit at the top because a customer coming here to look at what they
-    // hold should not have to pass the tools to reach them.
-    items: ['High-Yield Savings', 'Checking', 'Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
+    // The two accounts that belong to Invest, standing on their own above the
+    // tools. They came off Open an Account, which now answers only "which
+    // checking account?", so this is where they are reached — and they open
+    // the same account screens the dashboard cards do.
+    items: ['High-Yield Savings', 'Investment Account', 'Portfolio Overview', 'Watchlist', 'Buy & Sell Investments', 'Retirement Accounts', 'Joint Accounts', 'Wealth Insights', 'Investment Statements', 'Financial Advisor'],
   },
   navSupport: {
     title: 'Support',
@@ -1516,6 +1521,7 @@ const navMenuRoutes = {
   // opens the same screen — the label differs because the menus do, and both
   // land on one implementation rather than two that can drift apart.
   'High-Yield Savings': () => loadPage('account-detail', 'savings'),
+  'Investment Account': () => loadPage('account-detail', 'investments'),
   'Portfolio Overview': () => loadPage('portfolio'),
   'Watchlist': () => loadPage('watchlist'),
   'Buy & Sell Investments': () => loadPage('trade'),
