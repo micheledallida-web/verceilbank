@@ -22,10 +22,18 @@
 // customers hold them, the dashboard shows them, money moves through them —
 // but they are chosen when you join rather than added later from the app.
 //
-// Savings has an empty list, which is a third thing again: it is never chosen
-// at all. It comes with whatever is, at sign-up and from Open an Account both,
-// so it appears as an Included card and never as an option. It is on this list
-// so a savings row still has a name and a description wherever one is printed.
+// Savings is 'app' only, and the reason is the interesting one. It is not
+// chosen at sign-up because it is not optional there: provision_user opens it
+// alongside whatever the applicant picked, so a brand-new customer always has
+// one without ever being asked.
+//
+// That rule applies to becoming a customer, and to nothing after it. Somebody
+// who already banks here already has their savings account, and bundling a
+// second one onto every account they open afterwards is the bank deciding
+// something on their behalf that it has no reason to decide twice. So from
+// Open an Account, savings is an ordinary product: offered to a customer who
+// does not hold one, absent for a customer who does, and never added to
+// anything automatically.
 export const ACCOUNT_PRODUCTS = [
   {
     key: 'checking',
@@ -61,12 +69,12 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Set money aside and earn on every dollar',
     note: '4.00% APY',
     accent: '#059669',
-    // Never chosen anywhere. See the note above the list.
-    openWith: [],
+    // Automatic at sign-up, a choice afterwards. See the note above the list.
+    openWith: ['app'],
     features: [
       '4.00% APY on the whole balance',
       'No minimum balance to earn interest',
-      'Opened alongside every Verceil account',
+      'Opened with your first account when you join',
       'FDIC insured to the applicable limits',
     ],
   },
