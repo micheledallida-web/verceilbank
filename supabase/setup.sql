@@ -1295,6 +1295,63 @@ create table if not exists public.offer_codes (
   created_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- A table that was already here, brought into the shape the rest of this
+-- section needs. Two things get fixed, and both of them are things a project
+-- that rolled its own offer codes is likely to have.
+--
+-- 1. `code` STORED AS A NUMBER.
+--
+--    It is the obvious choice — the codes are digits — and it is wrong, because
+--    a seven-digit code is not a quantity, it is a string that happens to be
+--    made of digits. Stored as an integer, 0123456 is 123456: the leading zero
+--    is not hidden, it is gone, and one code in ten is silently a six-digit
+--    code that will never match what its owner types. Nothing else in this
+--    section works against a number either — you cannot regex-match one, and
+--    comparing it to the text the browser sends is an error rather than a
+--    mismatch.
+--
+--    Converted in place with a plain cast, which changes no value. If that
+--    leaves anything shorter than seven digits, the constraint below refuses to
+--    be added and names the rows: those are the codes the leading zeros were
+--    already lost from, and only whoever issued them knows what they were.
+--
+-- 2. `code` NOT UNIQUE.
+--
+--    Everything below keys on it. A campaign-plus-code model lets the same
+--    seven digits exist twice, and then spending it updates both rows.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  coltype text;
+begin
+  select data_type into coltype
+    from information_schema.columns
+   where table_schema = 'public' and table_name = 'offer_codes' and column_name = 'code';
+
+  if coltype is null then
+    -- No `code` column at all. The ALTER below adds it.
+    null;
+  elsif coltype <> 'text' then
+    execute 'alter table public.offer_codes alter column code type text using code::text';
+    raise notice 'offer_codes.code converted from % to text — check for codes that lost a leading zero', coltype;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.offer_codes'::regclass
+       and contype in ('p', 'u')
+       and pg_get_constraintdef(oid) like '%(code)'
+  ) then
+    if exists (select code from public.offer_codes group by code having count(*) > 1) then
+      raise warning 'offer_codes holds the same code more than once — uniqueness NOT enforced, and spending one of them will spend all of them';
+    else
+      alter table public.offer_codes add constraint offer_codes_code_key unique (code);
+      raise notice 'offer_codes.code is now unique';
+    end if;
+  end if;
+end $$;
+
 alter table public.offer_codes
   add column if not exists code       text,
   -- What this code is for, for whoever reads the table later: 'launch-2026',
@@ -1309,17 +1366,27 @@ alter table public.offer_codes
 
 -- Seven digits, exactly. Enforced here as well as in the form, because the form
 -- is not what decides what a valid code looks like.
+-- The pattern is a variable rather than a literal typed twice, because the
+-- check that decides whether the constraint CAN be added and the constraint
+-- itself have to be the same rule — and written out twice, three lines apart,
+-- they are two rules that merely happen to agree today.
+--
+-- This is the only place in this file that says what a code looks like. The
+-- sign-up trigger below deliberately does not repeat it.
 do $$
+declare
+  pattern constant text := '^[0-9]{7}$';
 begin
   if not exists (
     select 1 from pg_constraint
      where conrelid = 'public.offer_codes'::regclass and conname = 'offer_codes_seven_digits'
   ) then
-    if exists (select 1 from public.offer_codes where code !~ '^[0-9]{7}$') then
+    if exists (select 1 from public.offer_codes where code !~ pattern) then
       raise warning 'offer_codes holds codes that are not seven digits — format constraint NOT added, fix those rows first';
     else
-      alter table public.offer_codes
-        add constraint offer_codes_seven_digits check (code ~ '^[0-9]{7}$');
+      execute format(
+        'alter table public.offer_codes add constraint offer_codes_seven_digits check (code ~ %L)',
+        pattern);
     end if;
   end if;
 end $$;
@@ -1487,7 +1554,22 @@ begin
 
   code := nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), '');
 
-  if code is null or code !~ '^[0-9]{7}$' then
+  -- PRESENCE only. What a code looks like is decided in exactly one place —
+  -- the `offer_codes_seven_digits` constraint above — and repeating the pattern
+  -- here would be the same rule written twice: change the codes to eight digits
+  -- one day and this copy would go on refusing every valid one, from inside a
+  -- trigger, with an error that says the code is missing when it is not.
+  --
+  -- It does not need repeating. A string that is not a valid code cannot be
+  -- stored as one, so it cannot match a row, so consume_offer_code below
+  -- returns false and the sign-up is refused anyway — for the true reason
+  -- rather than a guessed one.
+  --
+  -- The empty case stays, because it is a different fact and deserves its own
+  -- answer: nothing was sent at all. That is not somebody mistyping their
+  -- invitation, it is a client that did not ask for one — an old cached copy of
+  -- the form, or a script posting straight at the endpoint.
+  if code is null then
     raise exception 'offer code required'
       using errcode = 'check_violation',
             hint    = 'Sign-up needs a valid seven-digit offer code.';

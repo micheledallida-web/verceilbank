@@ -903,6 +903,15 @@ That is why the code is consumed from a trigger rather than called from the
 client before sign-up: the client-side order burns a code every time a sign-up
 fails after the check, and leaves the decision with the browser.
 
+**What a code looks like is defined once**, by the `offer_codes_seven_digits`
+constraint. The trigger checks only that a code was *sent* — it does not repeat
+the pattern, because a string that is not a valid code cannot be stored as one,
+so it cannot match a row, so it is refused anyway and for the true reason. If
+you ever move to eight digits, change the constraint and nothing else. (The
+form's `OFFER_CODE_LENGTH` is a separate copy by necessity — the browser cannot
+read a check constraint — but it is one constant, and the field's `maxlength`
+and placeholder are written from it.)
+
 ### Issue a code
 
 `setup.sql` creates no codes, on purpose — a code committed to a source file is
@@ -962,6 +971,33 @@ step instead of at the end. It is a courtesy, not the rule — and a failure to
 reach it is **not** treated as a bad code: the applicant goes through and the
 trigger decides, because refusing somebody because their train went into a
 tunnel would be the form inventing a rejection the bank never made.
+
+### If you already had an `offer_codes` table
+
+Section 12 adapts one in place rather than expecting a clean slate. It keeps
+your surrogate key and any extra columns (a `campaign`, say), and fixes the two
+things a hand-rolled version usually has:
+
+- **`code` stored as a number.** It is the obvious choice and it is wrong: a
+  seven-digit code is not a quantity, it is a string made of digits. As an
+  integer, `0123456` **is** `123456` — the leading zero is not hidden, it is
+  gone, and roughly one code in ten becomes a six-digit code that will never
+  match what its owner types. The column is converted to `text` with a plain
+  cast, which changes no value. Anything left shorter than seven digits is a
+  code that already lost its zeros before you ran this, so the format constraint
+  refuses to be added and says so — only whoever issued those codes knows what
+  they were.
+- **`code` not unique.** Everything here keys on it, and a campaign-plus-code
+  model lets the same seven digits exist twice, in which case spending one
+  spends both.
+
+Both run as `NOTICE`/`WARNING`, so read the output.
+
+One thing the script will **not** touch: a `consume_offer_code` of your own with
+a different signature — `(campaign text, code integer)`, say. Postgres keeps
+both as overloads, so nothing breaks, but only
+`consume_offer_code(text, uuid)` is the one the trigger calls. Drop yours once
+you have moved off it.
 
 ### Turning it off
 
