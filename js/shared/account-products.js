@@ -16,34 +16,32 @@
 //
 //   'signup' — the application form. An applicant picks the account they are
 //              opening.
+//   'invest' — the same screen, opened from Invest and asking only about the
+//              two accounts that live there: the investment account and
+//              savings. A member can take either, or both.
 //   'app'    — Open an Account, used by somebody who already banks here and
 //              wants another one: a second checking account, interest checking
 //              alongside it, an investment account.
 //
-// Both checking products are on both surfaces. That is the whole point of Open
-// an Account — a member who already holds a checking account and the savings
-// that came with it, coming back for more.
+// Both checking products are on 'signup' and 'app'. That is the whole point of
+// Open an Account — a member who already holds a checking account and the
+// savings that came with it, coming back for more.
 //
-// The investment account is 'app' only. It was on the sign-up form, which meant
-// offering a product that can lose money to somebody the bank had not yet
-// identified; it now follows the rule the credit card and the IRA already
-// follow, and is opened from Open an Account behind a session.
+// The investment account is 'invest' ONLY. It came off the sign-up form because
+// that offered a product which can lose money to somebody the bank had not yet
+// identified, and it is off the main Open an Account list because that list
+// answers "which everyday account?" and this is not one. It follows the rule
+// the credit card and the IRA already follow.
+//
+// Savings is on both in-app surfaces. It is not chosen at sign-up because it is
+// not optional there — provision_user opens it alongside whatever the applicant
+// picked, so a brand-new customer always has one without being asked. After
+// that it is an ordinary product, offered to anybody who somehow does not hold
+// one, and never added to anything automatically.
 //
 // Nothing reads the 'signup' surface yet — signup.html carries its cards in
 // markup — so this list and that page have to be kept in step by hand until it
 // does. They are in step: there is no investment card on the sign-up form.
-//
-// Savings is 'app' only, and the reason is the interesting one. It is not
-// chosen at sign-up because it is not optional there: provision_user opens it
-// alongside whatever the applicant picked, so a brand-new customer always has
-// one without ever being asked.
-//
-// That rule applies to becoming a customer, and to nothing after it. A member
-// opening a second checking account already has their savings, and bundling
-// another one onto it is the bank deciding something on their behalf it has no
-// reason to decide twice. So from Open an Account, savings is an ordinary
-// product: offered to a customer who somehow does not hold one, shown as
-// already held to everybody else, and never added to anything automatically.
 export const ACCOUNT_PRODUCTS = [
   {
     key: 'checking',
@@ -79,20 +77,16 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Set money aside and earn on every dollar',
     note: '4.00% APY',
     accent: '#059669',
-    // Automatic at sign-up, and no longer offered on Open an Account either —
-    // it sits with the investment account under Invest instead. provision_user
-    // still opens it alongside whatever a new applicant picks, so nobody is
-    // left without one; this only stops it being a tick box on that screen.
-    openWith: [],
-    // Offered ALONGSIDE another account rather than instead of one. Every other
-    // product on this list answers "which account are you opening?"; savings
-    // answers "and do you want one of these with it?", which is a different
-    // question and needs a different control — a checkbox, not a radio. Open an
-    // Account reads this flag and draws it accordingly.
-    addOn: true,
-    // Nothing here about WHEN it was opened. That differs by reader — it came
-    // with a member's first account, and it is a thing a member without one is
-    // choosing right now — so the card says it in its footer instead.
+    // Automatic at sign-up, an ordinary choice afterwards, and on BOTH in-app
+    // surfaces — it belongs next to the checking accounts and next to the
+    // investment account, because it is the one product either kind of visitor
+    // might be after.
+    //
+    // A card like any other now, not the tick box it used to be beneath them:
+    // the picker takes more than one answer, so "savings as well as checking"
+    // is said the same way as "savings instead of checking", and savings no
+    // longer needs a control of its own to say it.
+    openWith: ['app', 'invest'],
     features: [
       '4.00% APY on the whole balance',
       'No minimum balance to earn interest',
@@ -106,15 +100,12 @@ export const ACCOUNT_PRODUCTS = [
     tagline: 'Buy and hold stocks, ETFs and mutual funds',
     note: 'Not FDIC insured · May lose value',
     accent: '#8B5CF6',
-    // Neither surface. It came off sign-up because it offers a product that can
-    // lose money to somebody the bank has not identified, and it is now off
-    // Open an Account as well: the investment account and savings are their own
-    // pair, reached from Invest, rather than two more answers to "which
-    // checking account are you opening?".
-    //
-    // Nothing else reads this list for the investment account, so it is the one
-    // switch — but see the note at the top of this file about what that leaves.
-    openWith: [],
+    // 'invest' only. Off the sign-up form, because it offers a product that can
+    // lose money to somebody the bank has not identified yet; and off the main
+    // Open an Account list, which answers "which everyday account?" — this is
+    // not one. It is opened from Invest, where the same screen is shown with
+    // this and savings on it.
+    openWith: ['invest'],
     // The one product on this list that can lose money, and the screens that
     // offer it say so where it is offered rather than in a footnote.
     risk: 'Investment products are not deposits, are not FDIC insured, are not guaranteed by the bank and may lose value.',
