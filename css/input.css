@@ -1437,6 +1437,21 @@ html.dark body {
 .home-ic-p { background: #8B5CF6; }
 .home-ic-r { background: #F4523B; }
 
+/* The account row.
+   It was two columns — name beside balance — which gave the name whatever the
+   balance left over. Measured on a 390px phone that was 114 pixels, and no
+   account name fits in 114 pixels at 16px: every card broke its name across
+   two lines, so "Verceil Checking", "High-Yield Savings" and "Vercel Interest
+   Checking" each wrapped at a different word and no two cards lined up.
+   Shrinking the type does not fix it — "Vercel Interest Checking" needs about
+   160px at 14px — so the name gets the whole width instead, on a line of its
+   own, and the figures sit beneath it right-aligned:
+       Verceil Checking
+       •0277                          $1,200.50
+                              Available Balance
+   Every name is one line at every width, whatever it is called, which is what
+   makes this hold for accounts that arrive from the database later as much as
+   for the ones in the markup today. */
 .home-grid {
   flex: 1;
   min-width: 0;
@@ -1453,7 +1468,21 @@ html.dark body {
   font-weight: 700;
   letter-spacing: -0.01em;
   text-align: left;
+  /* The full width, and one line. The ellipsis is a backstop for a name longer
+     than any product carries today — it truncates rather than reflowing the
+     card and pushing every figure below it out of line. */
+  grid-column: 1 / -1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 1px;
 }
+
+/* Explicit placement, so the order of these four in the markup cannot change
+   where they land. */
+.home-num { grid-column: 1; grid-row: 2; }
+.home-b   { grid-column: 2; grid-row: 2; }
+.home-sl  { grid-column: 2; grid-row: 3; }
 
 .dark .home-n { color: #FFFFFF; }
 
@@ -1473,6 +1502,14 @@ html.dark body {
   color: #6B7280;
   font-size: 13px;
   text-align: left;
+  /* One line, like the name above it. On a 320px phone this cell held
+     "Up to 4.00% APY", wrapped it, and pushed that card's "Available Balance"
+     seventeen pixels below every other card's — the rows only look level while
+     nothing in them is allowed to reflow. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .home-sl {
