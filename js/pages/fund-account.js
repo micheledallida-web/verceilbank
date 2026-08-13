@@ -24,14 +24,14 @@ import { watchRealtime } from '../shared/activity.js';
 // draws changes with it; there is no picture to keep in step.
 // ---------------------------------------------------------------------------
 const DEPOSIT = {
-  // Live receiving address. Mainnet P2WPKH (BIP-173 bech32, witness v0,
-  // 20-byte program) — checksum verified before it went in, because the one
-  // this replaced had an invalid checksum and every wallet refused it.
+  // Live receiving address. Mainnet P2PKH (base58check, version byte 0x00) —
+  // checksum verified before it went in, the same as the bech32 address it
+  // replaced.
   //
   // Whoever changes this: check the checksum before you deploy it. An address
   // that is merely well-formed but not yours sends customers' deposits to
   // somebody else, and bitcoin does not have a chargeback.
-  address: 'bc1quql2mf5pa323qxaa9903939z480tcf30s5ccvg',
+  address: '1FWzCzC4vQsnXJmTb3wfxWinyDKX6rh4t2',
   // A bitcoin price hardcoded in a bundle is wrong the day after it ships, and
   // more wrong every day after that — and it is the number somebody's deposit
   // is converted at. It is a starting value now, not the answer: loadRate()
