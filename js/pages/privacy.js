@@ -85,7 +85,12 @@ export async function init(root, ctx) {
     }
   });
 
-  on(root.querySelector('#privacyPolicyBtn'), 'click', () => showModal('Privacy Policy', 'The full Verceil Bank Privacy Policy will be linked here.'));
+  // The published Customer Banking Policy carries the privacy and data
+  // protection clauses, so this opens the document at that section rather than
+  // restating the terms in a modal where they would drift out of sync.
+  on(root.querySelector('#privacyPolicyBtn'), 'click', () => {
+    window.open('banking-policy.html#privacy', '_blank', 'noopener');
+  });
 }
 
 export function cleanup() {
