@@ -1,0 +1,25 @@
+# Verceil Bank — crawler policy
+#
+# The marketing site and the legal/policy documents are public and should be
+# indexed. Everything behind authentication is not: the dashboard shell, the
+# screens it fetches into itself, and the auth flows carry no public content
+# and must never surface in search results.
+
+User-agent: *
+Allow: /$
+Allow: /index.html
+Allow: /banking-policy.html
+
+# Authenticated application — no public content, never index
+Disallow: /dashboard.html
+Disallow: /pages/
+Disallow: /js/
+Disallow: /supabase/
+
+# Auth flows — indexing these competes with the homepage and exposes
+# password-reset endpoints to crawlers
+Disallow: /signin.html
+Disallow: /signup.html
+Disallow: /reset-password.html
+
+Sitemap: https://verceilbank.com/sitemap.xml
