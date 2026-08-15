@@ -4,10 +4,13 @@
 // Accounts section and Account Summary via the shared `accounts` table
 // (account_type: 'interest_checking'), same as every other account card.
 
+import { depositInsuranceFeature } from '../shared/deposit-insurance.js';
+import { APY_LABEL, APY_DISCLOSURE } from '../shared/rates.js';
+
 const benefits = [
-  'Up to 4.00% APY',
+  APY_LABEL,
   'No monthly maintenance fees',
-  'FDIC insured',
+  ...depositInsuranceFeature(),
   'Mobile check deposit',
   'Zelle® transfers',
   'Early direct deposit',
@@ -34,6 +37,10 @@ export function init(root, ctx) {
   const confirmStep = root.querySelector('#icConfirmStep');
   const benefitsList = root.querySelector('#icBenefitsList');
   const openAccountBtn = root.querySelector('#icOpenAccountBtn');
+
+  // Reg DD: the rate may not be advertised without the terms that qualify it.
+  const apyDisclosure = root.querySelector('#icApyDisclosure');
+  if (apyDisclosure) apyDisclosure.textContent = APY_DISCLOSURE;
 
   benefitsList.innerHTML = benefits.map((label, idx) => `
     <div class="flex items-center gap-[12px] px-[10px] py-[12px]${idx > 0 ? ' border-t border-gray-100 dark:border-white/[0.06]' : ''}">

@@ -1,3 +1,6 @@
+import { depositInsuranceFeature } from './deposit-insurance.js';
+import { APY_LABEL } from './rates.js';
+
 // ==================== PRODUCTS, AND HOW THEY ARE OWNED ====================
 // The bank's product catalogue and its joint-ownership rule, in one module,
 // because both are quoted on more than one screen and a rule stated in two
@@ -54,28 +57,28 @@ export const ACCOUNT_PRODUCTS = [
       'No monthly maintenance fee',
       'Direct deposit up to two days early',
       'Zelle® transfers and mobile check deposit',
-      'FDIC insured to the applicable limits',
+      ...depositInsuranceFeature(),
     ],
   },
   {
     key: 'interest_checking',
     name: 'Verceil Interest Checking',
     tagline: 'A checking account that earns interest on your balance',
-    note: 'Up to 4.00% APY · No monthly fees',
+    note: `${APY_LABEL} · No monthly fees`,
     accent: '#1D4ED8',
     openWith: ['signup', 'app'],
     features: [
-      'Earn up to 4.00% APY on your balance',
+      `Earn ${APY_LABEL} on your balance`,
       'No monthly maintenance fee',
       'Everything Verceil Checking does',
-      'FDIC insured to the applicable limits',
+      ...depositInsuranceFeature(),
     ],
   },
   {
     key: 'savings',
     name: 'High-Yield Savings',
     tagline: 'Set money aside and earn on every dollar',
-    note: '4.00% APY',
+    note: APY_LABEL,
     accent: '#059669',
     // Automatic at sign-up, an ordinary choice afterwards, and on BOTH in-app
     // surfaces — it belongs next to the checking accounts and next to the
@@ -88,10 +91,10 @@ export const ACCOUNT_PRODUCTS = [
     // longer needs a control of its own to say it.
     openWith: ['app', 'invest'],
     features: [
-      '4.00% APY on the whole balance',
+      `${APY_LABEL} on the whole balance`,
       'No minimum balance to earn interest',
       'No monthly maintenance fee',
-      'FDIC insured to the applicable limits',
+      ...depositInsuranceFeature(),
     ],
   },
   {

@@ -3,7 +3,7 @@
 // payment history derived from the `transactions` table (credited entries
 // tagged as interest).
 
-const APY = 0.04;
+import { APY, APY_DISCLOSURE } from '../shared/rates.js';
 
 const accountMeta = {
   savings: { name: 'High-Yield Savings', balanceId: 'savingsBalance' },
@@ -28,7 +28,11 @@ export async function init(root, ctx, type = 'savings') {
   root.querySelector('#idApyLabel').textContent = `${meta.name.toUpperCase()} · ANNUAL PERCENTAGE YIELD`;
 
   const balance = parseBalanceText(document.getElementById(meta.balanceId)?.textContent || '0');
-  root.querySelector('#idApyValue').textContent = `Up to ${(APY * 100).toFixed(2)}% APY`;
+  root.querySelector('#idApyValue').textContent = `${(APY * 100).toFixed(2)}% APY`;
+  // Reg DD: this screen quotes the rate and projects earnings from it, so it
+  // is exactly the screen the qualifying terms have to appear on.
+  const apyDisclosure = root.querySelector('#idApyDisclosure');
+  if (apyDisclosure) apyDisclosure.textContent = APY_DISCLOSURE;
   root.querySelector('#idCurrentBalance').textContent = formatCurrency(balance);
   root.querySelector('#idMonthlyEarnings').textContent = formatCurrency((balance * APY) / 12);
   root.querySelector('#idAnnualEarnings').textContent = formatCurrency(balance * APY);
