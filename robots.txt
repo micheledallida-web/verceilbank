@@ -22,4 +22,4 @@ Disallow: /signin.html
 Disallow: /signup.html
 Disallow: /reset-password.html
 
-Sitemap: https://verceilbank.com/sitemap.xml
+Sitemap: https://www.verceilbank.com/sitemap.xml
