@@ -3128,3 +3128,51 @@ html.dark body .amount-pending {
 @media (prefers-reduced-motion: reduce) {
   .amount-pending { animation: none; }
 }
+
+/* === SCROLL POLISH — APPENDED === */
+
+[data-scroll="polish"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+[data-scroll="polish"] [data-row] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+
+/* Selector list narrowed to the elements that actually carry a backdrop
+   filter in this project — #navMenuOverlay and #actionModal (Tailwind
+   `backdrop-blur-sm`) and .vb-idle-backdrop. There is no `.glass`,
+   `header` or `.floating-header` here, so those were dropped rather than
+   left as dead selectors. */
+html.is-scrolling [data-glass],
+html.is-scrolling #navMenuOverlay,
+html.is-scrolling #actionModal,
+html.is-scrolling .vb-idle-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.is-scrolling [data-chart],
+html.is-scrolling [data-row] {
+  box-shadow: none !important;
+}
+
+html.is-scrolling * {
+  transition-duration: 0s !important;
+  animation-play-state: paused !important;
+}
+
+/* Chase-standard address block: no hairline between lines */
+[data-profile-address],
+[data-profile-address] > * {
+  border-bottom: 0 !important;
+  border-top: 0 !important;
+}
+[data-profile-address] + hr {
+  display: none !important;
+}

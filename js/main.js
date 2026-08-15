@@ -2299,3 +2299,18 @@ createLiveSparkline({
   dot: document.getElementById('investSparkDot'),
   container: document.getElementById('investSparkWrap'),
 });
+
+/* === SCROLL POLISH — APPENDED === */
+(function () {
+  var root = document.documentElement;
+  var t;
+  function onScroll() {
+    root.classList.add('is-scrolling');
+    clearTimeout(t);
+    t = setTimeout(function () {
+      root.classList.remove('is-scrolling');
+    }, 140);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+})();
