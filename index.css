@@ -1162,3 +1162,12 @@ a { text-decoration: none; color: inherit; }
     flex: 0 0 calc((100% - 3.75rem) / 6);
   }
 }
+
+/* The heading sits in a 720px block that is itself centred (`margin: 0 auto`),
+   but the text inside it was left-aligned — so the block was centred and the
+   words were not, landing them well left of the middle. Centring the text
+   inside the block it already has is the whole fix; the block keeps its width
+   and its own centring. */
+.quick-links-title {
+  text-align: center;
+}
