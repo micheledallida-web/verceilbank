@@ -1407,3 +1407,104 @@ a { text-decoration: none; color: inherit; }
 @media (min-width: 1600px) {
   .home-page .card-promo-container { max-width: 1600px !important; }
 }
+
+/* ==========================================================================
+   THE IRA CARD — APPENDED
+
+   Brought to the reference: a blue eyebrow over a heavier headline, roomier
+   copy, and the two choices as tiles with an icon beside the words and a blue
+   bar down the left edge. The "Open an IRA" button is untouched — same colour,
+   same pill, same markup as the other calls to action on the page.
+   ========================================================================== */
+
+.ira-card .ira-eyebrow {
+  font-size: 0.78rem;
+  letter-spacing: 0.13em;
+  margin-bottom: 0.6rem;
+}
+
+.ira-card .promo-headline {
+  font-size: clamp(1.3rem, 2.1vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.18;
+  letter-spacing: -0.015em;
+  color: var(--vb-ink);
+  margin-bottom: 0.75rem;
+}
+
+.ira-card .ira-paragraph {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--vb-body);
+  margin-bottom: 1.5rem;
+}
+
+.ira-options { gap: 0.85rem; }
+
+/* The blue edge is drawn rather than bordered so it can carry the tile's own
+   corner radius — a 3px border-left squares off against a rounded tile. */
+.ira-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  background: #F5F7FA;
+  border: 1px solid var(--vb-line);
+  border-left: 1px solid var(--vb-line);
+  border-radius: 9px;
+  padding: 0.9rem 0.95rem 0.95rem 1.1rem;
+  overflow: hidden;
+}
+
+.ira-option::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--vb-blue);
+}
+
+.ira-option-icon {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  color: var(--vb-blue);
+  margin-top: 0.1rem;
+}
+
+.ira-option-text { min-width: 0; }
+
+.ira-option-name {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--vb-ink);
+  margin-bottom: 0.25rem;
+}
+
+.ira-option-line {
+  display: block;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--vb-body);
+}
+
+/* The reference draws this card about 1200px wide, where the two tiles sit
+   comfortably side by side. Here it is one of three in a row and about 435px,
+   which left each tile 187px — the heading wrapping onto two lines and the
+   description onto four. So the tiles answer to the card's own width rather
+   than the window's: stacked while the card is narrow, side by side the moment
+   it has the room. A container query, because the viewport width says nothing
+   useful about a card in a three-column row. */
+.ira-card { container-type: inline-size; }
+
+.ira-options { grid-template-columns: 1fr; }
+
+/* 560px, not 460: at 460 the pair went side by side again on a very wide
+   screen and each tile came out 214px — the cramped layout this was meant to
+   avoid. Below this they stack, which reads better than two squeezed columns. */
+@container (min-width: 560px) {
+  .ira-options { grid-template-columns: repeat(2, 1fr); }
+}
