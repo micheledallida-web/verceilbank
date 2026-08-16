@@ -1,3 +1,7 @@
+// Statements are the one artefact that leaves the app and gets filed, so the
+// footer stamped on them has to be as true as anything shown on screen.
+import { documentFooterLine } from './deposit-insurance.js';
+
 // ==================== DOWNLOADING A DOCUMENT ====================
 // One place for what "Download PDF" means, because three screens offer it —
 // Investment Statements, the Account Documents hub and Tax Documents — and
@@ -211,7 +215,7 @@ export function buildStatementPdf(doc) {
 
   content += textOp(MARGIN, y, 17, 'F2', 'Verceil Bank');
   y -= 15;
-  content += greyTextOp(MARGIN, y, 9.5, 'F1', 'Member FDIC - Equal Housing Lender');
+  content += greyTextOp(MARGIN, y, 9.5, 'F1', documentFooterLine());
 
   y -= 34;
   content += textOp(MARGIN, y, 15, 'F2', doc.title || 'Account Document');
