@@ -183,8 +183,8 @@ export const EXTERNAL_ACCOUNT_ACTIVE = 'active';
 
 // Customer care. The same number the Support and Help Center screens print, so
 // the bank has one phone number rather than one per screen.
-export const SUPPORT_PHONE = '+18005550123';
-export const SUPPORT_PHONE_DISPLAY = '(800) 555-0123';
+export const SUPPORT_PHONE = '+18572087394';
+export const SUPPORT_PHONE_DISPLAY = '(857) 208-7394';
 export const SUPPORT_HOURS = 'Monday to Friday, 8am–9pm ET · Saturday, 9am–5pm ET';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
