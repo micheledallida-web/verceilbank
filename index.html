@@ -371,7 +371,10 @@
     <section class="quick-links-section" id="services">
       <div class="container">
         <h2 class="quick-links-title">Choose what's right for you</h2>
-        <div class="quick-links-grid">
+        <!-- The nine links are a swipeable track: a scroll-snap container, so
+             the drag is the browser's own. The control under it is for a mouse,
+             and app.js hides it if every link already fits. -->
+        <div class="quick-links-grid" id="qlTrack" tabindex="0" role="group" aria-label="Products and services">
           <a href="#" class="quick-link-item">
             <svg class="quick-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
             <span class="quick-link-text">Business</span>
@@ -408,6 +411,16 @@
             <svg class="quick-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path><path d="M19 8h-2M19 11h-2"></path></svg>
             <span class="quick-link-text">Schedule a meeting</span>
           </a>
+        </div>
+
+        <div class="ql-nav" id="qlNav" hidden>
+          <button type="button" class="ql-nav-btn" id="qlPrev" aria-label="Previous">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="ql-dots" id="qlDots" role="tablist" aria-label="Pages"></div>
+          <button type="button" class="ql-nav-btn" id="qlNext" aria-label="Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
         </div>
       </div>
     </section>

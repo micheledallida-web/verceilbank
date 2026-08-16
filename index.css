@@ -1062,3 +1062,103 @@ a { text-decoration: none; color: inherit; }
   .promo-row .promo-section:last-of-type { padding-bottom: 1.25rem; }
   #blog.promo-section { padding-top: 0; }
 }
+
+/* ==========================================================================
+   "CHOOSE WHAT'S RIGHT FOR YOU" — A SWIPEABLE TRACK, APPENDED
+
+   Nine links, shown three-to-a-line on a phone and nine across on a laptop.
+   Both are one long list you cannot move through. This makes the row a track
+   you swipe, with the arrows-and-dots control under it.
+
+   The swipe is native — overflow-x plus scroll snapping — so a touch drag
+   works with no script and keeps its momentum. The control is for a mouse,
+   which has no swipe.
+   ========================================================================== */
+
+.quick-links-grid {
+  /* Overrides the `display: grid !important` above; the track is a flex row
+     because the number of items per page changes with the screen and columns
+     would have to be recounted at every breakpoint. */
+  display: flex !important;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 0.75rem;
+}
+
+.quick-links-grid::-webkit-scrollbar { display: none; }
+
+.quick-links-grid:focus-visible {
+  outline: 2px solid var(--vb-blue);
+  outline-offset: 6px;
+}
+
+/* Three to a view on a phone. `flex-shrink: 0` is what makes the row scroll
+   rather than squeezing nine links into one screen. */
+.quick-links-grid > .quick-link-item {
+  flex: 0 0 calc((100% - 1.5rem) / 3);
+  scroll-snap-align: start;
+  min-width: 0;
+}
+
+/* ---- the control ---- */
+.ql-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding-top: 1.4rem;
+}
+
+.ql-nav[hidden] { display: none; }
+
+.ql-nav-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: var(--vb-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ql-nav-btn svg { width: 19px; height: 19px; }
+.ql-nav-btn:hover:not(:disabled) { background: var(--vb-tint); }
+.ql-nav-btn:disabled { color: var(--vb-muted); opacity: 0.45; cursor: default; }
+
+.ql-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ql-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--vb-blue);
+  background: transparent;
+  cursor: pointer;
+}
+
+.ql-dot[aria-selected="true"] { background: var(--vb-blue); }
+
+@media (min-width: 640px) {
+  .quick-links-grid > .quick-link-item { flex: 0 0 calc((100% - 2.25rem) / 4); }
+}
+
+@media (min-width: 1024px) {
+  /* Six to a view. Nine links over six leaves two pages, and because the
+     track cannot scroll past its end the second page shows links four to
+     nine — a full row either way, never a stub. */
+  .home-page .quick-links-grid > .quick-link-item {
+    flex: 0 0 calc((100% - 3.75rem) / 6);
+  }
+}
