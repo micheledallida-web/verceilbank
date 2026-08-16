@@ -3195,3 +3195,19 @@ html.is-scrolling * {
     text-align: left;
   }
 }
+
+/* The top bar's inner element is centred on the page — `max-width: --app-col`
+   with auto margins — but its items were left-aligned inside it, so the five
+   tabs sat against the left edge of the content column rather than in the
+   middle of the bar: 246px left of centre on a 1440px screen, 328px on a
+   1920px one. Centring them within the element they already sit in puts them
+   on the page's centre line, because that element is itself centred.
+
+   Scoped to the desktop bar only. Below 1024px this is the pill fixed to the
+   bottom of a phone, which is laid out for a thumb and is not what this is
+   about. */
+@media (min-width: 1024px) {
+  .home-nav > div {
+    justify-content: center;
+  }
+}
