@@ -371,7 +371,10 @@
     <section class="quick-links-section" id="services">
       <div class="container">
         <h2 class="quick-links-title">Choose what's right for you</h2>
-        <div class="quick-links-grid">
+        <!-- The nine links are a swipeable track: a scroll-snap container, so
+             the drag is the browser's own. The control under it is for a mouse,
+             and app.js hides it if every link already fits. -->
+        <div class="quick-links-grid" id="qlTrack" tabindex="0" role="group" aria-label="Products and services">
           <a href="#" class="quick-link-item">
             <svg class="quick-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
             <span class="quick-link-text">Business</span>
@@ -409,6 +412,16 @@
             <span class="quick-link-text">Schedule a meeting</span>
           </a>
         </div>
+
+        <div class="ql-nav" id="qlNav" hidden>
+          <button type="button" class="ql-nav-btn" id="qlPrev" aria-label="Previous">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="ql-dots" id="qlDots" role="tablist" aria-label="Pages"></div>
+          <button type="button" class="ql-nav-btn" id="qlNext" aria-label="Next">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
       </div>
     </section>
 
@@ -416,23 +429,7 @@
     <!-- The three product cards. On a phone this wrapper is `display: contents`,
          so the sections stack exactly as they always have; from 1024px up it
          becomes the three-across row. -->
-    <!-- The offers, as a carousel. Swiping is native: the track is a
-         scroll-snap container, so a touch drag works without any script. The
-         arrows and dots are for a mouse, and app.js hides them whenever every
-         card already fits on screen. -->
-    <div class="promo-carousel">
-
-    <div class="promo-carousel-nav" id="promoNav" hidden>
-      <button type="button" class="promo-nav-btn" id="promoPrev" aria-label="Previous offers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <div class="promo-dots" id="promoDots" role="tablist" aria-label="Offer pages"></div>
-      <button type="button" class="promo-nav-btn" id="promoNext" aria-label="More offers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-      </button>
-    </div>
-
-    <div class="promo-row" id="promoTrack" tabindex="0" role="group" aria-label="Products and offers">
+    <div class="promo-row">
 
     <section class="promo-section" id="home-equity">
       <div class="container promo-container">
@@ -507,6 +504,8 @@
       </div>
     </section>
 
+    </div><!-- /.promo-row -->
+
     <!-- BLOG / COFFEE PHOTO SECTION -->
     <section class="promo-section" id="blog">
       <div class="container promo-container">
@@ -525,9 +524,6 @@
         </div>
       </div>
     </section>
-    </div><!-- /.promo-row -->
-    </div><!-- /.promo-carousel -->
-
   </main>
 
   <!-- CITI-STYLE ACCORDION FOOTER -->

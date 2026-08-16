@@ -63,56 +63,48 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* === OFFER CAROUSEL — APPENDED ===
-   The swipe is the browser's: the track is an overflow-x scroll-snap
-   container, so dragging works on touch with no JavaScript involved. What is
-   left for script is the part a mouse has no gesture for — arrows and dots —
-   plus deciding whether to show them at all, since on a wide screen every card
-   can already be visible and a control that pages nothing is worse than none. */
+/* === "CHOOSE WHAT'S RIGHT FOR YOU" CAROUSEL — APPENDED ===
+   The swipe belongs to the browser: the track is a scroll-snap container, so
+   dragging works on touch without script. What is left is the arrows and dots,
+   which exist because a mouse has no swipe — and the decision not to show them
+   at all when every link already fits. */
 (function () {
-  var track = document.getElementById('promoTrack');
-  var nav = document.getElementById('promoNav');
-  var dotsEl = document.getElementById('promoDots');
-  var prev = document.getElementById('promoPrev');
-  var next = document.getElementById('promoNext');
+  var track = document.getElementById('qlTrack');
+  var nav = document.getElementById('qlNav');
+  var dotsEl = document.getElementById('qlDots');
+  var prev = document.getElementById('qlPrev');
+  var next = document.getElementById('qlNext');
   if (!track || !nav || !dotsEl || !prev || !next) return;
 
   var pages = 1;
-  var perView = 1;
 
-  function slides() {
-    return track.querySelectorAll('.promo-section');
+  function items() {
+    return track.querySelectorAll('.quick-link-item');
   }
 
-  /* Measured off the slides rather than off scrollWidth/clientWidth: the track
-     carries horizontal padding, which inflates scrollWidth and had the ratio
-     reporting a single page on a laptop while a fourth card sat off-screen. */
+  /* Measured off the items and how many fit, not off scrollWidth / clientWidth:
+     the track carries padding, which inflates scrollWidth and would report a
+     page that does not exist. */
   function measure() {
-    var s = slides();
-    if (!s.length) { perView = 1; pages = 1; return; }
-    var a = s[0].getBoundingClientRect();
-    var step = s.length > 1
-      ? s[1].getBoundingClientRect().left - a.left
-      : a.width;
-    perView = Math.max(1, Math.round(track.clientWidth / step));
-    pages = Math.max(1, Math.ceil(s.length / perView));
+    var it = items();
+    if (!it.length) { pages = 1; return; }
+    var a = it[0].getBoundingClientRect();
+    var step = it.length > 1 ? it[1].getBoundingClientRect().left - a.left : a.width;
+    var perView = Math.max(1, Math.round(track.clientWidth / step));
+    pages = Math.max(1, Math.ceil(it.length / perView));
   }
 
   function maxScroll() {
     return Math.max(0, track.scrollWidth - track.clientWidth);
   }
 
-  /* Page position is read as a fraction of the scrollable distance rather than
-     as "slide index / perView". With four cards three to a view the last page
-     is a partial one: scrolling to the fourth card clamps at the end of the
-     track, so the slide-index reading stayed on page one and the dot never
-     moved off the first. A fraction cannot disagree with where the track has
-     actually come to rest. */
+  /* Read as a fraction of the distance actually scrollable. The last page is
+     usually a partial one — the track clamps before the final item reaches the
+     left edge — and an index-based reading would sit on the wrong dot there. */
   function currentPage() {
     var m = maxScroll();
     if (m <= 0 || pages < 2) return 0;
-    return Math.min(pages - 1, Math.max(0,
-      Math.round((track.scrollLeft / m) * (pages - 1))));
+    return Math.min(pages - 1, Math.max(0, Math.round((track.scrollLeft / m) * (pages - 1))));
   }
 
   function goTo(i) {
@@ -141,9 +133,9 @@ document.addEventListener('DOMContentLoaded', () => {
       for (var i = 0; i < pages; i++) {
         var b = document.createElement('button');
         b.type = 'button';
-        b.className = 'promo-dot';
+        b.className = 'ql-dot';
         b.setAttribute('role', 'tab');
-        b.setAttribute('aria-label', 'Offers, page ' + (i + 1) + ' of ' + pages);
+        b.setAttribute('aria-label', 'Page ' + (i + 1) + ' of ' + pages);
         b.addEventListener('click', (function (n) {
           return function () { goTo(n); };
         })(i));
@@ -156,7 +148,6 @@ document.addEventListener('DOMContentLoaded', () => {
   prev.addEventListener('click', function () { goTo(currentPage() - 1); });
   next.addEventListener('click', function () { goTo(currentPage() + 1); });
 
-  // Keyboard, for the track itself — it is focusable, so it has to answer.
   track.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage() + 1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentPage() - 1); }
@@ -175,7 +166,4 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   build();
-  // The card heights settle once the article's photo has loaded, and the page
-  // count is measured off them.
-  window.addEventListener('load', build);
 })();
