@@ -916,17 +916,13 @@ a { text-decoration: none; color: inherit; }
 
   /* ---- The three product cards, side by side ---- */
   .home-page .promo-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.75rem;
+    align-items: stretch;
     max-width: 1440px;
     margin: 0 auto;
-    padding: 0 2.5rem 1rem;
-    scroll-padding-left: 2.5rem;
-  }
-
-  /* Three to a page on a laptop, so four cards make two pages — which is what
-     the arrows and the dots are counting. */
-  .home-page .promo-row > .promo-section {
-    flex: 0 0 calc((100% - 2 * 1.75rem) / 3);
+    padding: 2.5rem 2.5rem 1rem;
   }
 
   /* Each section is now a grid cell rather than a full-width band. */
@@ -967,24 +963,29 @@ a { text-decoration: none; color: inherit; }
     min-height: 132px;
   }
 
-  /* ---- The article, now the fourth card ---- */
-  /* It used to run full width with the photo beside the copy. In a third of a
-     row that would be two cramped columns, so inside the track it stacks like
-     any other card: image on top, copy under it. */
+  /* ---- The article, full width beneath the row ---- */
+  .home-page #blog .promo-container {
+    max-width: 1440px !important;
+  }
+
   .home-page .blog-promo-card {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+  }
+
+  .home-page .blog-image-wrapper {
+    height: 100%;
   }
 
   .home-page .blog-featured-image {
+    height: 100%;
     width: 100%;
-    height: 190px;
     object-fit: cover;
-    display: block;
   }
 
   .home-page .blog-body-content {
-    padding: 1.5rem;
+    padding: 2.5rem;
   }
 
   /* ---- Footer: the link groups as columns, all open ---- */
@@ -1046,6 +1047,7 @@ a { text-decoration: none; color: inherit; }
 @media (min-width: 1600px) {
   .home-page .container,
   .home-page .promo-row,
+  .home-page #blog .promo-container,
   .home-page .footer-content-wrapper {
     max-width: 1600px;
   }
@@ -1056,141 +1058,7 @@ a { text-decoration: none; color: inherit; }
    nudged the phone spacing: Retirement picking up the 2rem tail meant for the
    last section, and the article gaining a 1.25rem top it never had. Restored
    here so the phone layout is unchanged to the pixel. */
-
-
-/* ==========================================================================
-   THE OFFER CAROUSEL — APPENDED
-
-   The cards used to be a stack on a phone and a fixed row on a laptop: one
-   long list either way, with no way to move through them. This makes the row a
-   track you can swipe.
-
-   The swipe itself is native — an overflow-x container with scroll snapping —
-   so a touch drag works with no script at all, and keeps its momentum and its
-   rubber-band. The arrows and dots exist for a mouse, which has no swipe, and
-   app.js hides them whenever every card already fits.
-   ========================================================================== */
-
-.promo-carousel {
-  background-color: var(--vb-canvas);
-  padding-bottom: 2rem;
-}
-
-.promo-row {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
-  padding: 0 1.25rem 0.5rem;
-  /* Snapping has to account for the track's own padding, or every page lands
-     a gutter's width short of where it should. */
-  scroll-padding-left: 1.25rem;
-  /* The scrollbar is the desktop artefact of a touch gesture; the dots say
-     the same thing more clearly. */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.promo-row::-webkit-scrollbar { display: none; }
-
-.promo-row:focus-visible {
-  outline: 2px solid var(--vb-blue);
-  outline-offset: 4px;
-}
-
-/* One card per swipe on a phone. `flex-shrink: 0` is what stops flex from
-   quietly squeezing four cards into one screen instead of scrolling them. */
-.promo-row > .promo-section {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  padding: 0 !important;
-  background: transparent;
-  display: flex;
-  min-width: 0;
-}
-
-.promo-row > .promo-section > .promo-container {
-  max-width: none !important;
-  width: 100%;
-  padding: 0;
-}
-
-/* Equal heights across the track, with the call to action on a common
-   baseline — cards of ragged height are the giveaway of a carousel that was
-   a stack yesterday. */
-.promo-row .promo-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-}
-
-.promo-row .promo-body-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-}
-
-.promo-row .promo-cta-btn {
-  margin-top: auto;
-  align-self: flex-start;
-}
-
-/* ---- the control ---- */
-.promo-carousel-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1.5rem 1.25rem 1.25rem;
-}
-
-.promo-carousel-nav[hidden] { display: none; }
-
-.promo-nav-btn {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  border-radius: 999px;
-  color: var(--vb-blue);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.promo-nav-btn svg { width: 20px; height: 20px; }
-
-.promo-nav-btn:hover:not(:disabled) { background: var(--vb-tint); }
-
-.promo-nav-btn:disabled {
-  color: var(--vb-muted);
-  opacity: 0.45;
-  cursor: default;
-}
-
-.promo-dots {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.promo-dot {
-  width: 11px;
-  height: 11px;
-  padding: 0;
-  border-radius: 999px;
-  border: 1.5px solid var(--vb-blue);
-  background: transparent;
-  cursor: pointer;
-}
-
-.promo-dot[aria-selected="true"] { background: var(--vb-blue); }
-
-@media (min-width: 768px) {
-  /* Two to a page on a tablet. */
-  .promo-row > .promo-section { flex: 0 0 calc((100% - 1rem) / 2); }
+@media (max-width: 1023px) {
+  .promo-row .promo-section:last-of-type { padding-bottom: 1.25rem; }
+  #blog.promo-section { padding-top: 0; }
 }
