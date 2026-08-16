@@ -232,7 +232,7 @@
     }
   </style>
 </head>
-<body>
+<body class="home-page">
 
   <!-- MOBILE MENU BACKDROP OVERLAY -->
   <div class="menu-backdrop" id="menuBackdrop"></div>
@@ -400,6 +400,11 @@
     </section>
 
     <!-- PRODUCT PROMO SECTION (COMPACT HELOC CARD) -->
+    <!-- The three product cards. On a phone this wrapper is `display: contents`,
+         so the sections stack exactly as they always have; from 1024px up it
+         becomes the three-across row. -->
+    <div class="promo-row">
+
     <section class="promo-section" id="home-equity">
       <div class="container promo-container">
         <div class="promo-card">
@@ -473,6 +478,8 @@
       </div>
     </section>
 
+    </div><!-- /.promo-row -->
+
     <!-- BLOG / COFFEE PHOTO SECTION -->
     <section class="promo-section" id="blog">
       <div class="container promo-container">
@@ -497,6 +504,10 @@
   <footer class="main-footer">
     <div class="footer-content-wrapper">
       
+      <!-- Accordions on a phone; a multi-column link grid from 1024px up, where
+           there is room to show every group at once. -->
+      <div class="footer-link-grid">
+
       <!-- Accordion Section 1 -->
       <div class="footer-section-item">
         <button class="footer-section-header">
@@ -562,6 +573,8 @@
           <a href="#">FAQs</a>
         </div>
       </div>
+
+      </div><!-- /.footer-link-grid -->
 
       <!-- Badges, Equal Housing & Socials Area -->
       <div class="footer-badges-area">

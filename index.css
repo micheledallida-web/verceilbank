@@ -856,3 +856,203 @@ a { text-decoration: none; color: inherit; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   THE DESKTOP LAYER — APPENDED
+
+   Everything above this point is mobile-first and stops there: the only
+   breakpoints in this file are `max-width`, so a 1440px monitor got the phone
+   layout stretched down the middle of the screen. `.promo-container` is capped
+   at 640px and `.quick-links-grid` at 720px, which is why the page read as one
+   narrow column with the cards stacked in a straight line and half the display
+   empty on either side.
+
+   This block is additive and only takes effect from 1024px up. Below that
+   nothing here applies and the phone layout is untouched, which is the point:
+   the app is used on phones, and that layout was not the thing that was wrong.
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+
+  /* Reach the edges. Scoped to the landing page via the body class, because
+     `.container` is shared with signin, signup and the policy document, and a
+     1440px measure would be wrong for a page of legal text. */
+  .home-page .container {
+    max-width: 1440px;
+    padding: 0 2.5rem;
+  }
+
+  /* ---- Hero ---- */
+  .home-page .hero {
+    min-height: 520px;
+  }
+
+  .home-page .hero-content {
+    max-width: 640px;
+  }
+
+  /* ---- Quick links: one row across, not three per line ---- */
+  .home-page .quick-links-section {
+    padding: 3.5rem 0 3.75rem;
+  }
+
+  .home-page .quick-links-title {
+    font-size: 2rem;
+    margin-bottom: 2.25rem;
+  }
+
+  .home-page .quick-links-grid {
+    /* Beats the 720px/3-column cap above, which carries !important. */
+    grid-template-columns: repeat(9, 1fr) !important;
+    max-width: none !important;
+    gap: 1.5rem 1rem;
+  }
+
+  /* ---- The three product cards, side by side ---- */
+  .home-page .promo-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.75rem;
+    align-items: stretch;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 2.5rem 2.5rem 1rem;
+  }
+
+  /* Each section is now a grid cell rather than a full-width band. */
+  .home-page .promo-row .promo-section {
+    padding: 0 !important;
+    background: transparent;
+    display: flex;
+  }
+
+  .home-page .promo-row .promo-container {
+    max-width: none !important;
+    padding: 0;
+    width: 100%;
+  }
+
+  /* Equal-height cards with the call to action on a common baseline, which is
+     what makes a row of cards read as a row rather than three loose boxes. */
+  .home-page .promo-row .promo-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .home-page .promo-row .promo-body-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  .home-page .promo-row .promo-cta-btn {
+    margin-top: auto;
+    align-self: flex-start;
+  }
+
+  /* The banner heads sit at a common height so the three cards line up. */
+  .home-page .promo-row .promo-header-banner,
+  .home-page .promo-row .investing-top-banner {
+    min-height: 132px;
+  }
+
+  /* ---- The article, full width beneath the row ---- */
+  .home-page #blog .promo-container {
+    max-width: 1440px !important;
+  }
+
+  .home-page .blog-promo-card {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+  }
+
+  .home-page .blog-image-wrapper {
+    height: 100%;
+  }
+
+  .home-page .blog-featured-image {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .home-page .blog-body-content {
+    padding: 2.5rem;
+  }
+
+  /* ---- Footer: the link groups as columns, all open ---- */
+  .home-page .main-footer {
+    padding: 3rem 2.5rem 2.5rem;
+  }
+
+  .home-page .footer-content-wrapper {
+    max-width: 1440px;
+  }
+
+  .home-page .footer-link-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0 2rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /* No longer a row you open — a column heading. */
+  .home-page .footer-link-grid .footer-section-item {
+    border-bottom: none;
+  }
+
+  .home-page .footer-link-grid .footer-section-header {
+    padding: 0 0 0.9rem;
+    font-size: 0.95rem;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .home-page .footer-link-grid .footer-section-header svg {
+    display: none;
+  }
+
+  /* `!important` because the accordion script writes `display` inline, and an
+     inline style set on a phone would otherwise survive a resize. */
+  .home-page .footer-link-grid .footer-section-links {
+    display: flex !important;
+    padding-bottom: 1.75rem;
+  }
+
+  /* ---- Footer base: side by side rather than stacked ---- */
+  .home-page .footer-badges-area {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .home-page .footer-legal-links-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.75rem;
+  }
+}
+
+/* A wide monitor gets more room again, but the measure stops growing — text
+   the full width of a 2560px display is not readable. */
+@media (min-width: 1600px) {
+  .home-page .container,
+  .home-page .promo-row,
+  .home-page #blog .promo-container,
+  .home-page .footer-content-wrapper {
+    max-width: 1600px;
+  }
+}
+
+/* Wrapping the three cards in `.promo-row` moved which sections match
+   `.promo-section + .promo-section` and `:last-of-type`, which would have
+   nudged the phone spacing: Retirement picking up the 2rem tail meant for the
+   last section, and the article gaining a 1.25rem top it never had. Restored
+   here so the phone layout is unchanged to the pixel. */
+@media (max-width: 1023px) {
+  .promo-row .promo-section:last-of-type { padding-bottom: 1.25rem; }
+  #blog.promo-section { padding-top: 0; }
+}
