@@ -904,7 +904,13 @@ a { text-decoration: none; color: inherit; }
   .home-page .quick-links-grid {
     /* Beats the 720px/3-column cap above, which carries !important. */
     grid-template-columns: repeat(9, 1fr) !important;
-    max-width: none !important;
+    /* One row, but held together in the middle under the heading rather than
+       stretched to the page edges. Spread across a 1440px band the nine links
+       stop reading as one group and start reading as nine separate things
+       adrift on a line. The centred block is what the heading is centred over. */
+    max-width: 1040px !important;
+    margin-left: auto;
+    margin-right: auto;
     gap: 1.5rem 1rem;
   }
 
