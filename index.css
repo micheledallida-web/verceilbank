@@ -1181,15 +1181,29 @@ a { text-decoration: none; color: inherit; }
    costs a few hundred bytes instead of a photograph.
    ========================================================================== */
 
-.card-promo-container { max-width: 1040px !important; }
+/* Full content width, the same measure as everything else on the page — it
+   was held to 1040px and so stopped short of where the rest reaches. */
+.card-promo-container { max-width: 1440px !important; }
 
+/* No card. The green panel carries the artwork and the offer sits on the page
+   itself, divided from what comes before it by a single rule — which is what
+   the reference does, and why wrapping the pair in a white panel with a border
+   and a shadow read as a different component. */
 .card-promo-card {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--vb-line);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  padding-top: 2.5rem;
+  gap: 1.75rem;
 }
 
-/* The green panel the card sits on. */
+/* The green panel the card sits on. Square, because it is a block of colour
+   behind the artwork rather than a card in its own right. */
 .card-promo-art {
   background: linear-gradient(160deg, #14532D 0%, #2F7A3E 38%, #86C440 100%);
   padding: 2rem 1.5rem;
@@ -1323,7 +1337,25 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* ---- the offer beside it ---- */
-.card-promo-body { padding: 1.5rem 1.25rem 1.75rem; }
+/* On the page background, not on a surface of its own. */
+.card-promo-body { padding: 0 0.25rem; }
+
+.card-promo-card .promo-headline {
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+/* Square-ish, and sized to its label — the pill is the shape the offer cards
+   use, and this block is not one of them. */
+.card-promo-body .promo-cta-btn {
+  border-radius: 4px;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
 
 .card-promo-terms {
   margin-top: 1rem;
@@ -1337,34 +1369,41 @@ a { text-decoration: none; color: inherit; }
   .card-promo-card {
     flex-direction: row;
     align-items: stretch;
+    gap: 3.5rem;
+    padding-top: 3rem;
+    padding-bottom: 1rem;
   }
 
   .card-promo-art {
-    flex: 0 0 46%;
-    padding: 2.75rem 2rem;
+    flex: 0 0 41%;
+    padding: 3rem 2.5rem;
   }
 
-  .credit-card { max-width: 360px; font-size: 12px; }
+  .credit-card { max-width: 380px; font-size: 12px; }
 
   .card-promo-body {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 2.75rem;
+    padding: 0;
+    max-width: 46ch;
   }
 }
 
-/* The body is a flex column, so the pill was stretching to the full column
+/* The body is a flex column, so the button was stretching to the full column
    width instead of sizing to its label. */
-.card-promo-body .promo-cta-btn {
-  align-self: flex-start;
-  padding-left: 2rem;
-  padding-right: 2rem;
-}
+.card-promo-body .promo-cta-btn { align-self: flex-start; }
 
 /* A little more weight in the ribbon, closer to the printed card. */
 .cc-ribbon {
   font-size: 0.9em;
   padding: 0.6em 0;
+}
+
+/* The card block carries `!important` on its width (it has to beat the 640px
+   cap on .promo-container), which also beat the wide-screen rule that takes
+   every other section to 1600px — so past 1600 it alone stayed at 1440. */
+@media (min-width: 1600px) {
+  .home-page .card-promo-container { max-width: 1600px !important; }
 }
