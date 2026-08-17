@@ -944,6 +944,48 @@ select public.mark_offer_code_sent('4820917');   -- returns the deadline now in 
 It is service-key only, and the returned timestamp is what to put in the email —
 computing the date separately just gives you something to disagree with.
 
+`revoke ... from public` takes the privilege from `service_role` too — it is
+neither the owner nor a superuser, so it only ever had it by inheritance. The
+script grants it straight back, because without that the function works in the
+SQL editor (where you are the owner) and nowhere else, and every RPC gets
+`permission denied for function mark_offer_code_sent`. `consume_offer_code`
+gets no such grant on purpose: only the sign-up trigger may spend a code.
+
+### Sending them
+
+`supabase/functions/send-offer-code` does the whole thing: mints a code, emails
+it through Resend, and marks it sent — in that order, and only marking it once
+Resend has accepted the message. Marking first would mean a bounced send still
+costs the recipient their window.
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/send-offer-code" \
+  -H "x-admin-secret: $OFFER_CODE_ADMIN_SECRET" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"someone@example.com","label":"launch-2026"}'
+# -> {"ok":true,"code":"4820917","expires_at":"...","minted":true}
+```
+
+| Field | | |
+| --- | --- | --- |
+| `email` | required | who it goes to |
+| `label` | optional | campaign name, stored on the code |
+| `max_uses` | optional | defaults to 1 — an invitation is for one person |
+| `code` | optional | resend an existing code instead of minting. Does **not** extend its deadline |
+
+It needs `RESEND_API_KEY`, `OFFER_CODE_ADMIN_SECRET`, and a from-address in
+`OFFER_CODE_FROM` (or it reuses `SUPPORT_FROM`). It is guarded by that shared
+secret rather than a customer session, because no signed-in user should be able
+to mint themselves an invitation — and with the secret unset it refuses every
+request rather than falling open.
+
+If a send fails, the code is left behind unsent. That is inert — nobody has
+been told it, and with `sent_at` null it cannot age — but it is litter:
+
+```sql
+select code, label, created_at from public.offer_codes where sent_at is null;
+```
+
 | `expires_at` | `sent_at` | Dies |
 | --- | --- | --- |
 | set | either | at `expires_at`, whenever it was sent |

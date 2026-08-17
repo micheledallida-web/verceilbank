@@ -1898,6 +1898,25 @@ revoke all     on function public.offer_codes_usable()           from public, an
 -- start — or refuse to start — anybody's window.
 revoke all     on function public.mark_offer_code_sent(text, timestamptz) from public, anon, authenticated;
 
+-- ...and then handed back to the one role that is supposed to call it.
+--
+-- Revoking from PUBLIC takes the privilege from every role that had it only by
+-- inheritance, and service_role is one of them — it is not the owner and it is
+-- not a superuser. Without this grant the function is callable from the SQL
+-- editor, where you are the owner, and from nowhere else: every RPC and Edge
+-- Function attempting it gets "permission denied for function
+-- mark_offer_code_sent". That failure looks like a broken sender rather than a
+-- missing grant, which is a bad afternoon.
+--
+-- Guarded because service_role is a Supabase role. On a plain Postgres there is
+-- nothing to grant to, and an unguarded GRANT would abort the whole file.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.mark_offer_code_sent(text, timestamptz) to service_role;
+  end if;
+end $$;
+
 
 -- ---------------------------------------------------------------------------
 -- The gate.

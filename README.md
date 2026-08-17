@@ -78,7 +78,8 @@ pages/
   ...
 supabase/
   setup.sql             # Everything the database needs, in the order it needs it
-  functions/            # Edge functions: the deposit webhook, support mail
+  functions/            # Edge functions: the deposit webhook, support mail,
+                        # and the offer-code invitation sender
 docs/
   supabase-setup.md     # What setup.sql does, section by section
 ```
