@@ -185,6 +185,14 @@ body {
   overscroll-behavior-y: contain;
 }
 
+/* The dashboard ends on the site footer (css/footer.css), and the footer takes
+   the runway over the fixed navigation bar into its own padding. Reserved here
+   as well it would show as a strip of page background below the footer —
+   bright blue in the light theme — between the disclosures and the bar. */
+body.has-app-footer {
+  padding-bottom: 0;
+}
+
 /* Anchored jumps land clear of the bar rather than under it. */
 html {
   scroll-padding-bottom: var(--scroll-end);
