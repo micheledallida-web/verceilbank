@@ -132,7 +132,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <style>
+  <!-- data-page-style: this block belongs to this page alone, and the soft
+       navigation in app.js swaps it out with the page. -->
+  <style data-page-style>
     /* ==========================================================================
        HERO & ACCORDION / STACKED FOOTER STYLING
        ========================================================================== */
@@ -267,6 +269,12 @@
        simply an older path that had been left reachable. Removing them also
        takes the Supabase SDK off the landing page, which no longer needs it.
        ========================================================================== -->
+
+  <!-- SWAP ROOT
+       Everything a soft navigation replaces: the page's content and the page's
+       footer, with the header left standing above it. A plain wrapper, so the
+       <main> and <footer> landmarks inside it are exactly what they were. -->
+  <div id="swap-root">
 
   <main>
     <!-- HERO SECTION -->
@@ -616,6 +624,8 @@
 
     </div>
   </footer>
+
+  </div><!-- /#swap-root -->
 
   <script src="js/footer-accordion.js"></script>
   <script src="app.js"></script>

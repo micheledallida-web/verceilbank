@@ -10,30 +10,25 @@
 (function () {
   'use strict';
 
-  function wire() {
-    var headers = document.querySelectorAll('.footer-section-header');
+  // One listener on the document rather than one per heading, and it is not
+  // only about the count. The marketing site swaps its content in place (see
+  // the soft navigation in app.js), so the footer a customer clicks may be a
+  // set of nodes that did not exist when this script ran. Delegation does not
+  // care: it matches the heading at the moment of the click, whenever the
+  // heading arrived, and there is no re-wiring step to remember.
+  document.addEventListener('click', function (event) {
+    var header = event.target.closest && event.target.closest('.footer-section-header');
+    if (!header) return;
 
-    Array.prototype.forEach.call(headers, function (header) {
-      header.addEventListener('click', function () {
-        header.classList.toggle('active');
+    header.classList.toggle('active');
 
-        var panel = header.nextElementSibling;
-        if (!panel) return;
+    var panel = header.nextElementSibling;
+    if (!panel) return;
 
-        // Read the inline value this script wrote last time rather than the
-        // computed one: from 1024px up the stylesheet forces every panel open,
-        // so a computed check would report "open" for a panel nobody has
-        // touched and the first tap after narrowing the window would close it.
-        panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-      });
-    });
-  }
-
-  // Runs whether the tag is deferred, at the end of the body, or dropped in
-  // the head by a page that does it differently later.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
+    // Read the inline value this script wrote last time rather than the
+    // computed one: from 1024px up the stylesheet forces every panel open, so a
+    // computed check would report "open" for a panel nobody has touched and the
+    // first tap after narrowing the window would close it.
+    panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+  });
 })();

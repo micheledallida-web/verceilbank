@@ -31,44 +31,66 @@ document.addEventListener('DOMContentLoaded', () => {
     link.addEventListener('click', closeMenu);
   });
 
-  // --------------------------------------------------------------------------
-  // VERCEL-STYLE HIGHLIGHT WORD ROTATOR ANIMATION
-  // --------------------------------------------------------------------------
-  const words = ["simple.", "secure.", "seamless.", "effortless."];
-  let currentIndex = 0;
-  const wordElement = document.getElementById("rotatingWord");
-
-  if (wordElement) {
-    setInterval(() => {
-      // 1. Animate current highlight word up and out
-      wordElement.classList.add("swap-out");
-
-      setTimeout(() => {
-        // 2. Advance index and change text
-        currentIndex = (currentIndex + 1) % words.length;
-        wordElement.textContent = words[currentIndex];
-
-        // 3. Move instantly to bottom start position
-        wordElement.classList.remove("swap-out");
-        wordElement.classList.add("swap-prepare");
-
-        // 4. Smoothly animate up into center position
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            wordElement.classList.remove("swap-prepare");
-          });
-        });
-      }, 450); // Matches CSS transition duration
-    }, 2800); // Rotates every 2.8 seconds
-  }
+  initHeroRotator();
 });
+
+// --------------------------------------------------------------------------
+// VERCEL-STYLE HIGHLIGHT WORD ROTATOR ANIMATION
+// --------------------------------------------------------------------------
+// A function rather than inline setup, and it clears its own timer first,
+// because the word it rotates lives inside the swapped container: navigating
+// away and back builds a new one, and the interval left running against the
+// old node would still be there, ticking at a element no longer on the page.
+var heroRotatorTimer = null;
+
+function initHeroRotator() {
+  clearInterval(heroRotatorTimer);
+  heroRotatorTimer = null;
+
+  var words = ["simple.", "secure.", "seamless.", "effortless."];
+  var currentIndex = 0;
+  var wordElement = document.getElementById("rotatingWord");
+  if (!wordElement) return;
+
+  heroRotatorTimer = setInterval(function () {
+    // 1. Animate current highlight word up and out
+    wordElement.classList.add("swap-out");
+
+    setTimeout(function () {
+      // 2. Advance index and change text
+      currentIndex = (currentIndex + 1) % words.length;
+      wordElement.textContent = words[currentIndex];
+
+      // 3. Move instantly to bottom start position
+      wordElement.classList.remove("swap-out");
+      wordElement.classList.add("swap-prepare");
+
+      // 4. Smoothly animate up into center position
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          wordElement.classList.remove("swap-prepare");
+        });
+      });
+    }, 450); // Matches CSS transition duration
+  }, 2800); // Rotates every 2.8 seconds
+}
 
 /* === "CHOOSE WHAT'S RIGHT FOR YOU" CAROUSEL — APPENDED ===
    The swipe belongs to the browser: the track is a scroll-snap container, so
    dragging works on touch without script. What is left is the arrows and dots,
    which exist because a mouse has no swipe — and the decision not to show them
-   at all when every link already fits. */
-(function () {
+   at all when every link already fits.
+
+   Everything it binds hangs off one AbortController, and the strip lives inside
+   the swapped container: a soft navigation away and back builds a new strip, so
+   the run before it has to be taken down whole — its timer stopped, its
+   observer disconnected, every listener dropped — or each visit would leave
+   another set behind, all of them still firing at nodes off the page. */
+var stripTeardown = null;
+
+function initCategoryStrip() {
+  if (stripTeardown) { stripTeardown(); stripTeardown = null; }
+
   var track = document.getElementById('qlTrack');
   var nav = document.getElementById('qlNav');
   var dotsEl = document.getElementById('qlDots');
@@ -76,6 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
   var next = document.getElementById('qlNext');
   if (!track || !nav || !dotsEl || !prev || !next) return;
 
+  var abort = new AbortController();
+  var signal = abort.signal;
   var pages = 1;
 
   function items() {
@@ -149,25 +173,25 @@ document.addEventListener('DOMContentLoaded', () => {
     syncState();
   }
 
-  prev.addEventListener('click', function () { goTo(currentPage() - 1); });
-  next.addEventListener('click', function () { goTo(currentPage() + 1); });
+  prev.addEventListener('click', function () { goTo(currentPage() - 1); }, { signal: signal });
+  next.addEventListener('click', function () { goTo(currentPage() + 1); }, { signal: signal });
 
   track.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentPage() + 1); }
     if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentPage() - 1); }
-  });
+  }, { signal: signal });
 
   var tick;
   track.addEventListener('scroll', function () {
     clearTimeout(tick);
     tick = setTimeout(syncState, 60);
-  }, { passive: true });
+  }, { passive: true, signal: signal });
 
   var rz;
   window.addEventListener('resize', function () {
     clearTimeout(rz);
     rz = setTimeout(build, 150);
-  });
+  }, { signal: signal });
 
   /* ---- the carousel moves on its own ----
      Out to the last page and back to the first, over and over, the way a bank's
@@ -222,79 +246,219 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   ['pointerenter', 'focusin'].forEach(function (evt) {
-    track.addEventListener(evt, hold);
-    nav.addEventListener(evt, hold);
+    track.addEventListener(evt, hold, { signal: signal });
+    nav.addEventListener(evt, hold, { signal: signal });
   });
   ['pointerleave', 'focusout'].forEach(function (evt) {
-    track.addEventListener(evt, function () { release(RESUME_MS); });
-    nav.addEventListener(evt, function () { release(RESUME_MS); });
+    track.addEventListener(evt, function () { release(RESUME_MS); }, { signal: signal });
+    nav.addEventListener(evt, function () { release(RESUME_MS); }, { signal: signal });
   });
 
   // A drag is the one interaction that never fires pointerleave on the way out.
-  track.addEventListener('touchstart', hold, { passive: true });
-  track.addEventListener('touchend', function () { release(RESUME_MS); }, { passive: true });
+  track.addEventListener('touchstart', hold, { passive: true, signal: signal });
+  track.addEventListener('touchend', function () { release(RESUME_MS); }, { passive: true, signal: signal });
 
   // Pressing an arrow or a dot is a destination, not a pause: honour it, then
   // carry on from there.
-  nav.addEventListener('click', function () { release(RESUME_MS); });
+  nav.addEventListener('click', function () { release(RESUME_MS); }, { signal: signal });
 
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) stop();
     else schedule();
-  });
+  }, { signal: signal });
 
+  var watcher = null;
   if (typeof IntersectionObserver === 'function') {
-    new IntersectionObserver(function (entries) {
+    watcher = new IntersectionObserver(function (entries) {
       onScreen = entries[0].isIntersecting;
       if (onScreen) schedule();
       else stop();
-    }, { threshold: 0.25 }).observe(track);
+    }, { threshold: 0.25 });
+    watcher.observe(track);
   }
 
   // Safari before 14 has addListener only.
   if (stillMotion.addEventListener) {
-    stillMotion.addEventListener('change', function () { schedule(); });
+    stillMotion.addEventListener('change', function () { schedule(); }, { signal: signal });
   }
+
+  stripTeardown = function () {
+    stop();
+    abort.abort();
+    if (watcher) watcher.disconnect();
+  };
 
   build();
   schedule();
-})();
+}
 
-/* === CURSOR GLOW ON THE CARDS — APPENDED ===
-   Hands the pointer's position to the stylesheet, which does the rest. Two
-   custom properties on the card under the cursor, --glow-x and --glow-y, and
-   no other work: index.css owns the colour, the size, the shape and the fade,
-   so the look can be retuned without touching this.
+/* === HOVER SPOTLIGHT — APPENDED ===
+   Hands the cursor's position to the stylesheet and does nothing else. Two
+   custom properties on the card under the pointer — --mouse-x and --mouse-y,
+   its offset within that card — and index.css owns the colour, the size, the
+   shape and the fade.
 
-   One delegated listener rather than a pair on every card, and one write per
-   animation frame rather than one per event — a pointer reports far more often
-   than the screen redraws, and the frames in between are thrown away anyway. */
+   One delegated listener on the document rather than a pair on every card:
+   cards come and go with a soft navigation, and a delegated listener does not
+   care. One write per animation frame rather than one per event, because a
+   mouse reports far more often than the screen redraws and the frames in
+   between are discarded anyway. */
 (function () {
   if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
 
   var CARDS = '.promo-card, .quick-link-item';
   var frame = null;
-  var pendingCard = null;
-  var pendingX = 0;
-  var pendingY = 0;
+  var card = null;
+  var pageX = 0;
+  var pageY = 0;
 
   function paint() {
     frame = null;
-    var rect = pendingCard.getBoundingClientRect();
-    pendingCard.style.setProperty('--glow-x', (pendingX - rect.left) + 'px');
-    pendingCard.style.setProperty('--glow-y', (pendingY - rect.top) + 'px');
+    var rect = card.getBoundingClientRect();
+    card.style.setProperty('--mouse-x', (pageX - rect.left) + 'px');
+    card.style.setProperty('--mouse-y', (pageY - rect.top) + 'px');
   }
 
-  document.addEventListener('pointermove', function (e) {
-    // A synthesised move from a tap has no business lighting anything up.
-    if (e.pointerType && e.pointerType !== 'mouse') return;
+  document.addEventListener('mousemove', function (e) {
+    var hit = e.target && e.target.closest ? e.target.closest(CARDS) : null;
+    if (!hit) return;
 
-    var card = e.target && e.target.closest ? e.target.closest(CARDS) : null;
-    if (!card) return;
-
-    pendingCard = card;
-    pendingX = e.clientX;
-    pendingY = e.clientY;
+    card = hit;
+    pageX = e.clientX;
+    pageY = e.clientY;
     if (!frame) frame = requestAnimationFrame(paint);
   }, { passive: true });
 })();
+
+/* === CLIENT-SIDE NAVIGATION — APPENDED ===
+   Following a link fetches the next page and swaps it into #swap-root instead
+   of reloading the browser: the header, the stylesheets and the fonts stay
+   where they are, so a move between two pages of the same site costs one
+   document rather than a fresh start.
+
+   What gets swapped is the container, the page's title and its own <style>
+   block — the marketing pages each carry one, and leaving the last page's
+   behind would style the new page with the old page's rules.
+
+   It fails open, always. A cross-origin link, a download, a new tab, a
+   modified click, an anchor on the page, anything the app owns rather than the
+   marketing site, a request that does not come back, a reply that is not HTML,
+   a page with no container of its own — every one of them falls through to an
+   ordinary navigation. Nothing here is load-bearing: with the script removed
+   the links are still links. */
+(function () {
+  var ROOT_ID = 'swap-root';
+  var root = document.getElementById(ROOT_ID);
+  if (!root || !window.history || !window.history.pushState || !window.fetch) return;
+
+  // Screens belonging to the signed-in app: a different shell, a different
+  // stylesheet and a session to establish. They are entered, not swapped into.
+  var APP_PATHS = /(^|\/)(signin|signup|reset-password|dashboard)\.html$|(^|\/)pages\//;
+
+  var cache = Object.create(null);
+  var current = location.href;
+
+  history.scrollRestoration = 'manual';
+  history.replaceState({ soft: true, y: 0 }, '', location.href);
+
+  function samePage(a, b) {
+    return a.split('#')[0] === b.split('#')[0];
+  }
+
+  function swappable(link, e) {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
+    if (!link || !link.href || link.target || link.hasAttribute('download')) return false;
+    if (link.origin !== location.origin) return false;
+    if (link.protocol !== 'http:' && link.protocol !== 'https:') return false;
+    if (APP_PATHS.test(link.pathname)) return false;
+    // An anchor on the page we are already on is the browser's job.
+    if (samePage(link.href, location.href)) return false;
+    return true;
+  }
+
+  function apply(doc, url) {
+    var next = doc.getElementById(ROOT_ID);
+    if (!next) return false;
+
+    root.innerHTML = next.innerHTML;
+    document.title = doc.title;
+
+    // The page's own <style>, swapped with it. Marked in the markup rather
+    // than guessed at, so a shared block could be added later without this
+    // carrying it off.
+    var mine = document.head.querySelectorAll('style[data-page-style]');
+    for (var i = 0; i < mine.length; i++) mine[i].remove();
+    var theirs = doc.head.querySelectorAll('style[data-page-style]');
+    for (var j = 0; j < theirs.length; j++) {
+      document.head.appendChild(document.importNode(theirs[j], true));
+    }
+
+    var canonical = document.querySelector('link[rel="canonical"]');
+    var next_canonical = doc.querySelector('link[rel="canonical"]');
+    if (canonical && next_canonical) canonical.href = next_canonical.href;
+
+    current = url;
+    // Everything inside the container is new, so anything that had wired
+    // itself to the old nodes wires itself again.
+    document.dispatchEvent(new CustomEvent('vb:navigated', { detail: { url: url } }));
+    return true;
+  }
+
+  function load(url) {
+    if (cache[url]) return Promise.resolve(cache[url]);
+    return fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'soft-nav' } })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.status);
+        var type = res.headers.get('content-type') || '';
+        if (type.indexOf('text/html') === -1) throw new Error('not html');
+        return res.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        cache[url] = doc;
+        return doc;
+      });
+  }
+
+  function go(url, push, restoreY) {
+    load(url).then(function (doc) {
+      if (!apply(doc, url)) { location.href = url; return; }
+      if (push) history.pushState({ soft: true, y: 0 }, '', url);
+      var hash = url.indexOf('#') > -1 ? url.slice(url.indexOf('#') + 1) : '';
+      var target = hash ? document.getElementById(hash) : null;
+      if (target) target.scrollIntoView();
+      else window.scrollTo(0, restoreY || 0);
+    })
+    .catch(function () { location.href = url; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var link = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!swappable(link, e)) return;
+
+    e.preventDefault();
+    // Where the reader was on this page, so the back button can put them back.
+    history.replaceState({ soft: true, y: window.scrollY }, '', current);
+    go(link.href, true, 0);
+  });
+
+  window.addEventListener('popstate', function (e) {
+    if (!e.state || !e.state.soft) return;   // not a page this script pushed
+    go(location.href, false, e.state.y || 0);
+  });
+})();
+
+/* First run, now that the carousel is a function rather than an IIFE. */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initCategoryStrip);
+} else {
+  initCategoryStrip();
+}
+
+/* The pieces that live inside the swapped container, wired again to the nodes
+   that replaced theirs. The mobile menu is not among them: it belongs to the
+   header, which never moves. */
+document.addEventListener('vb:navigated', function () {
+  initHeroRotator();
+  initCategoryStrip();
+});
