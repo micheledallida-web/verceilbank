@@ -185,14 +185,6 @@ body {
   overscroll-behavior-y: contain;
 }
 
-/* The dashboard ends on the site footer (css/footer.css), and the footer takes
-   the runway over the fixed navigation bar into its own padding. Reserved here
-   as well it would show as a strip of page background below the footer —
-   bright blue in the light theme — between the disclosures and the bar. */
-body.has-app-footer {
-  padding-bottom: 0;
-}
-
 /* Anchored jumps land clear of the bar rather than under it. */
 html {
   scroll-padding-bottom: var(--scroll-end);
@@ -2191,17 +2183,11 @@ html.dark body .home-sell {
 .dark .home-promo-card .home-promo-go { background: #2563EB; }
 
 /* ---- bottom nav ---- */
-/* Sticky, not fixed. Fixed, the bar owned the bottom of the screen for the
-   whole life of the page, which left the footer permanently behind it: the last
-   of the disclosures could never be read without the bar sitting on top of
-   them. Sticky, it rides the bottom of the screen for as long as the board is
-   under the thumb and then parks at the end of it, and the footer scrolls up
-   underneath — the bar is the end of the dashboard, not the end of the page.
-   It sticks within .app-scroll, which is what stops it holding on over the
-   footer as well. */
 .home-nav {
-  position: sticky;
+  position: fixed;
   bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
   background: #FFFFFF;
   /* The bottom padding has to clear the home indicator, not sit under it.
@@ -2493,23 +2479,6 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
 }
 
-/* An opened screen is fixed over the whole viewport and the page behind it
-   stops scrolling, so a bar that parks with the board would be wherever the
-   customer happened to have scrolled to — off the bottom of the screen, if they
-   were reading the footer when they tapped. Pinned for as long as a screen is
-   open, which is how it behaved everywhere before. Horizontally it stays where
-   its margins put it, so the centred bar above stays centred. */
-body.screen-open .home-nav {
-  position: fixed;
-  bottom: 0;
-  /* Both insets, because a fixed box with `width: auto` and no insets shrinks
-     to fit its contents — five icons huddled in a 272px stub rather than a bar.
-     With an explicit width (the centred column below 1024px) these two plus
-     the auto margins centre it instead. */
-  left: 0;
-  right: 0;
-}
-
 /* ---- screens wider than the app itself ----
    Two pieces of chrome are fixed to the viewport rather than to the column —
    the bottom navigation and the support reply composer — so on anything wider
@@ -2524,25 +2493,12 @@ body.screen-open .home-nav {
    to edge, which is exactly where it belongs. The upper bound is there because
    at 1024px the navigation stops being a bottom bar altogether. */
 @media (min-width: 431px) and (max-width: 1023.98px) {
+  .home-nav,
   #supComposer {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: var(--page-col);
-  }
-
-  /* The bar is in the flow now (see .home-nav), so it is centred the way a
-     block is centred. `left` and a translate would have moved a fixed box;
-     they do nothing for a sticky one, which sits where its own margins put
-     it. */
-  .home-nav {
-    width: var(--page-col);
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .home-nav,
-  #supComposer {
     border-top-left-radius: 20px;
     border-top-right-radius: 20px;
   }
@@ -2600,14 +2556,9 @@ body.screen-open .home-nav {
   }
 
   /* ---- navigation moves to the top ---- */
-  /* Fixed again here, and back to full width. This is a top bar on a desktop:
-     it belongs to the window rather than to the end of the board, and there is
-     no footer for it to sit on top of at this end of the page. */
   .home-nav {
-    position: fixed;
     top: 0;
     bottom: auto;
-    margin: 0;
     left: 0;
     right: 0;
     width: auto;
