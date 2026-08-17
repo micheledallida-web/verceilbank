@@ -2228,6 +2228,13 @@ async function initSupabaseData() {
     const anyVisible = Array.from(offers.children).some(el => !el.classList.contains('hidden'));
     label.classList.toggle('hidden', !anyVisible);
     offers.classList.toggle('hidden', !anyVisible);
+    // The column they sit in goes with them. On a wide screen the board is a
+    // two-track grid, and a track holding an element with nothing visible in it
+    // is still a track — the accounts would keep half the board and leave the
+    // other half empty. Hidden, the track collapses and the accounts take the
+    // full width.
+    const column = document.getElementById('homeOffersCol');
+    if (column) column.classList.toggle('hidden', !anyVisible);
   }
 
   // An account is a row in the accounts table and nothing else. There used to

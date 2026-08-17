@@ -2647,21 +2647,31 @@ body.screen-open .home-nav {
     margin-bottom: 0;
   }
 
-  /* ---- accounts and offers in two columns ---- */
+  /* ---- accounts and offers in two columns ----
+     A grid of two real elements, and it used to be `column-count: 2` — one flow
+     of cards handed to the browser to cut into columns. That is the only thing
+     on this board that changes at this width, and it is the reason the board
+     came up empty on a desktop while the same page was fine on a phone, where
+     no columns are asked for.
+
+     Multi-column layout has to fragment content, and fragmentation is the least
+     consistently implemented part of CSS. The offers stack was a single child
+     with `break-inside: avoid` on it — an unbreakable box taller than the
+     column it had to fit in, which is precisely the case engines disagree
+     about: Blink balances around it, others can drop or clip what will not fit.
+     A board that sometimes renders nothing is not worth a browser's opinion.
+
+     A grid never fragments anything. Each stack is placed, not flowed, so what
+     comes out is the same on every engine.
+
+     `auto-fit` is what keeps the accounts full-width when there are no offers
+     left to show: an empty track collapses, so the customer who holds every
+     product does not get a half-empty board. */
   .home-columns {
-    column-count: 2;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
     column-gap: 28px;
-  }
-
-  /* A card split down the middle of a column break is unreadable, and a
-     section label orphaned at the foot of one column with its card at the head
-     of the next is worse. */
-  .home-columns > * {
-    break-inside: avoid;
-  }
-
-  .home-lab {
-    break-after: avoid;
+    align-items: start;
   }
 
   /* ---- the screens that open over the dashboard ---- */
@@ -2695,7 +2705,6 @@ body.screen-open .home-nav {
    inherited from the desktop block above. */
 @media (min-width: 1600px) {
   .home-columns {
-    column-count: 3;
     column-gap: 32px;
   }
 
