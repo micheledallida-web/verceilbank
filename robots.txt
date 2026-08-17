@@ -8,6 +8,13 @@
 User-agent: *
 Allow: /$
 Allow: /index.html
+Allow: /checking.html
+Allow: /savings.html
+Allow: /credit-cards.html
+Allow: /home-loans.html
+Allow: /investing.html
+Allow: /business.html
+Allow: /customer-service.html
 Allow: /banking-policy.html
 
 # Authenticated application — no public content, never index

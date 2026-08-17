@@ -1423,3 +1423,274 @@ a { text-decoration: none; color: inherit; }
 }
 
 .ira-option-text { display: block; }
+
+/* ==========================================================================
+   PRODUCT PAGES — APPENDED
+
+   The shared layout behind checking, savings, credit cards, home loans,
+   investing, business and customer service. One stylesheet rather than seven
+   inline blocks, because these pages differ only in their words.
+
+   The footer and header they use are the ones the policy page established, so
+   those styles are not repeated here.
+   ========================================================================== */
+
+.prod-shell {
+  background: var(--vb-canvas);
+  padding-bottom: 3.5rem;
+}
+
+/* Breadcrumb — the trail a search engine reads for the crumb line under a
+   result, and the way back for anyone who arrived from one. */
+.prod-crumb {
+  background: #ffffff;
+  border-bottom: 1px solid var(--vb-line);
+  padding: 0.85rem 0;
+  font-size: 0.82rem;
+  color: var(--vb-muted);
+}
+
+.prod-crumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.prod-crumb a { color: var(--vb-blue); font-weight: 600; }
+.prod-crumb a:hover { text-decoration: underline; }
+.prod-crumb li[aria-current="page"] { color: var(--vb-body); }
+
+/* Masthead */
+.prod-masthead {
+  background: var(--vb-navy-deep);
+  color: #ffffff;
+  padding: 2.75rem 0 2.5rem;
+}
+
+.prod-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8FC4EC;
+  margin-bottom: 0.75rem;
+}
+
+.prod-masthead h1 {
+  font-size: clamp(1.75rem, 4.5vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 0.9rem;
+}
+
+.prod-standfirst {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 62ch;
+}
+
+.prod-masthead .btn { margin-top: 1.6rem; }
+
+/* Body */
+.prod-body { padding-top: 2.5rem; }
+
+.prod-section + .prod-section { margin-top: 2.5rem; }
+
+.prod-section h2 {
+  font-size: clamp(1.2rem, 2.4vw, 1.5rem);
+  font-weight: 800;
+  color: var(--vb-ink);
+  margin-bottom: 1rem;
+}
+
+.prod-section > p {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--vb-body);
+  max-width: 68ch;
+}
+
+.prod-section > p + p { margin-top: 0.9rem; }
+
+/* A product, as a card. */
+.prod-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 860px) {
+  .prod-grid { grid-template-columns: repeat(2, 1fr); }
+  .prod-grid.is-single { grid-template-columns: 1fr; max-width: 620px; }
+}
+
+.prod-card {
+  background: var(--vb-surface);
+  border: 1px solid var(--vb-line);
+  border-radius: var(--vb-card-radius);
+  box-shadow: var(--vb-shadow);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.prod-card h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--vb-ink);
+  margin-bottom: 0.35rem;
+}
+
+.prod-card .prod-tagline {
+  font-size: 0.92rem;
+  color: var(--vb-body);
+  line-height: 1.6;
+  margin-bottom: 0.9rem;
+}
+
+.prod-rate {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--vb-navy);
+  line-height: 1.1;
+  margin-bottom: 0.15rem;
+}
+
+.prod-rate-note {
+  font-size: 0.8rem;
+  color: var(--vb-muted);
+  margin-bottom: 0.9rem;
+}
+
+.prod-list { list-style: none; margin: 0 0 1.25rem; }
+
+.prod-list li {
+  position: relative;
+  padding-left: 1.4rem;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--vb-body);
+}
+
+.prod-list li + li { margin-top: 0.4rem; }
+
+.prod-list li::before {
+  content: "";
+  position: absolute;
+  left: 0.2rem;
+  top: 0.62rem;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--vb-blue);
+}
+
+.prod-card .btn { margin-top: auto; align-self: flex-start; }
+
+/* Rates, fees and the words that must travel with them. */
+.prod-disclosure {
+  margin-top: 1.25rem;
+  background: var(--vb-tint);
+  border-left: 3px solid var(--vb-blue);
+  border-radius: 0 var(--vb-radius) var(--vb-radius) 0;
+  padding: 0.95rem 1.15rem;
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: #1F3A52;
+  max-width: 68ch;
+}
+
+.prod-warning {
+  margin-top: 1.25rem;
+  background: #FDF7EE;
+  border: 1px solid #E4C79B;
+  border-left: 3px solid #B57415;
+  border-radius: 0 var(--vb-radius) var(--vb-radius) 0;
+  padding: 1rem 1.2rem;
+  font-size: 0.87rem;
+  line-height: 1.7;
+  color: #5C4415;
+  max-width: 68ch;
+}
+
+.prod-warning strong {
+  display: block;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8A560F;
+  margin-bottom: 0.4rem;
+}
+
+/* The links that make the site a site rather than a page — and what a search
+   engine follows to find everything else. */
+.prod-related {
+  margin-top: 3rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--vb-line);
+}
+
+.prod-related h2 {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vb-muted);
+  margin-bottom: 1rem;
+}
+
+.prod-related-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem 1.5rem;
+}
+
+.prod-related-links a {
+  color: var(--vb-blue);
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 0.35rem 0;
+}
+
+.prod-related-links a:hover { text-decoration: underline; }
+
+.prod-contact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1.25rem;
+}
+
+@media (min-width: 700px) {
+  .prod-contact { grid-template-columns: repeat(2, 1fr); }
+}
+
+.prod-contact a {
+  display: block;
+  background: var(--vb-surface);
+  border: 1px solid var(--vb-line);
+  border-radius: var(--vb-card-radius);
+  box-shadow: var(--vb-shadow);
+  padding: 1.25rem 1.35rem;
+}
+
+.prod-contact .k {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vb-muted);
+  margin-bottom: 0.3rem;
+}
+
+.prod-contact .v {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--vb-blue);
+}
