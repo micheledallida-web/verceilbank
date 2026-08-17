@@ -3223,3 +3223,29 @@ html.is-scrolling * {
     max-width: calc((min(100vw, var(--app-col)) - 2 * var(--app-pad) - 64px) / 3 - 4px);
   }
 }
+
+/* ---- the clock, up beside the balance ----
+   Lifted out of the stats line to sit opposite the total balance, still on the
+   right edge the line already establishes — which is the edge of the account
+   cards below.
+
+   Taken out of flow rather than moved in the markup, and positioned against
+   the row: `right: 0` is the row's right edge, so it inherits the alignment
+   worked out above instead of repeating the arithmetic. The 13px is the row's
+   own top margin, which lands the time's baseline on the balance's rather than
+   somewhere between it and the labels underneath.
+
+   Desktop only. On a phone the clock belongs at the end of the line of
+   balances, which is where it stays. */
+@media (min-width: 1024px) {
+  .home-hero-row {
+    position: relative;
+  }
+
+  .home-clock {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 13px);
+    margin-left: 0;
+  }
+}
