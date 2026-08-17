@@ -98,7 +98,20 @@
     // on this project: the only trigger on auth.users that can raise is the
     // offer-code gate, and the other one, handle_new_user, swallows everything
     // it hits by design so that provisioning can never fail a sign-up. The copy
-    // below is written to be true either way.
+    // is written to be true either way.
+    //
+    // Where the database's own words DO come through, they say which of three
+    // things went wrong, so there are three kinds here. Most specific first:
+    // all three messages contain "offer code", so the general match has to come
+    // last or it would swallow the other two.
+    //
+    // Note what is NOT here: the pre-check the form runs while you type
+    // (`offer_code_status`) still answers only ok/invalid. It is callable by
+    // anyone holding the anon key, so it must not confirm which strings are
+    // real codes. These three arrive only from a sign-up that was actually
+    // attempted, which is expensive and logged — see consume_offer_code.
+    if (/offer code expired/.test(m)) return 'offer_code_expired';
+    if (/offer code already used/.test(m)) return 'offer_code_used';
     if (/offer code/.test(m)) return 'offer_code';
     if (/database error saving new user|error saving new user/.test(m)) return 'offer_code';
 
@@ -141,12 +154,29 @@
       signup: 'An account already exists for that email address. Sign in instead, or use "Forgot password" if you cannot get in.',
       any: 'That email address is already in use.',
     },
+    // The three the gate can distinguish. Each one names a different next move,
+    // which is the whole reason for telling them apart: an expired code needs a
+    // new invitation, a spent one needs a word with whoever issued it, and an
+    // unrecognised one is usually a digit typed wrong.
+    //
+    // None of them states how long a code lasts. That number lives in exactly
+    // one place — offer_code_expiry in setup.sql — and a copy of it here would
+    // go on confidently quoting seven days the week somebody changes it to ten.
+    offer_code_expired: {
+      signup: 'That offer code has expired. Offer codes run out a set time after we email them. Ask whoever invited you to send a new one.',
+      any: 'That offer code has expired.',
+    },
+    offer_code_used: {
+      signup: 'That offer code has already been used. If you have not opened an account with it yourself, contact whoever invited you.',
+      any: 'That offer code has already been used.',
+    },
     offer_code: {
-      // Says what to do about it without asserting which of the several
-      // possible reasons it was — the server deliberately does not tell us, and
-      // a code that was fine three screens ago is most often one somebody else
+      // The general case: no such code, one the bank has switched off, or a
+      // project where GoTrue flattens the trigger's message and we are
+      // inferring. Says what to do about it without asserting which — and a
+      // code that was fine three screens ago is most often one somebody else
       // has just taken the last use of.
-      signup: 'We could not open an account with that offer code. It may have expired or been fully used since you started. Check the seven digits on your invitation, or contact whoever invited you.',
+      signup: 'We could not open an account with that offer code. Check the seven digits on your invitation, or contact whoever invited you.',
       any: 'That offer code could not be used.',
     },
     unconfirmed: {
@@ -258,6 +288,20 @@
     isOurFault: function (kind) {
       return kind === 'timeout' || kind === 'network' || kind === 'config' ||
              kind === 'signups_disabled' || kind === 'unknown';
+    },
+    // Every kind that means the gate refused the code, whatever the reason —
+    // so the sign-up page can put the applicant back on the step that can fix
+    // it instead of leaving them on the password screen.
+    //
+    // A predicate here rather than a list of kinds in the page, because this
+    // file is what decides which kinds exist. When the gate learned to say
+    // 'expired' and 'used' separately, a page testing `kind === 'offer_code'`
+    // silently stopped recognising the two most specific offer-code failures
+    // there are. Adding a kind must not be able to do that again.
+    isOfferCode: function (kind) {
+      return kind === 'offer_code' ||
+             kind === 'offer_code_expired' ||
+             kind === 'offer_code_used';
     },
   };
 })();

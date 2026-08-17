@@ -1350,7 +1350,11 @@
         // it rather than leaving them on the password screen reading about a
         // field they cannot see, and forget the verdict we cached so the code
         // is asked about again rather than waved through from memory.
-        if (kind === 'offer_code') {
+        //
+        // Asked through the predicate rather than compared to one kind: the
+        // gate reports expired and already-used separately from the general
+        // refusal, and all three belong on this step.
+        if (VerceilAuth.isOfferCode(kind)) {
           delete offerCodeVerdicts[offerCode];
           showStep('offer');
           setStepError('offer', message);

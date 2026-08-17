@@ -918,17 +918,51 @@ and placeholder are written from it.)
 a code everybody has. Issue your own:
 
 ```sql
--- 500 accounts, no expiry
+-- 500 accounts, seven days each from the day the invitation is emailed
 insert into public.offer_codes (code, label, max_uses)
 values ('4820917', 'launch-2026', 500);
 
--- one-shot, expires at the end of the month
+-- one-shot, dead at the end of the month whenever it was sent
 insert into public.offer_codes (code, label, max_uses, expires_at)
 values ('3051764', 'branch-referral', 1, '2026-09-01T00:00:00Z');
 ```
 
 `max_uses` null means unlimited. `active = false` switches a code off without
 deleting it, which keeps the redemption history attached to something.
+
+### When a code runs out
+
+The clock starts when the invitation is **emailed**, not when the row is
+written — codes get minted in batches and sent later, and a batch cut in
+January and posted in February should not arrive already dead. So whatever
+sends the invitation has to say so, immediately after the send succeeds:
+
+```sql
+select public.mark_offer_code_sent('4820917');   -- returns the deadline now in force
+```
+
+It is service-key only, and the returned timestamp is what to put in the email —
+computing the date separately just gives you something to disagree with.
+
+| `expires_at` | `sent_at` | Dies |
+| --- | --- | --- |
+| set | either | at `expires_at`, whenever it was sent |
+| null | set | seven days after `sent_at` |
+| null | null | never — **the clock has not started** |
+
+That last row is the point of having two timestamps, and it is worth being
+deliberate about: a code nothing ever marks as sent never expires. That is safe
+only while an unsent code is one nobody has been given. **If nothing in your
+stack calls `mark_offer_code_sent`, no code ever expires** — the column stays
+null and every window stays open.
+
+A resend does not extend the deadline (`sent_at` is only ever set once), or
+"resend my code" would be an unlimited extension. To genuinely restart one,
+clear `sent_at` and mark it sent again.
+
+The seven days is stated in exactly one place, `public.offer_code_expiry`, and
+every check goes through it. Change it there and the pre-check, the gate and
+the "how many are usable" count all move together.
 
 If the requirement is on and there are no usable codes, **nobody can sign up** —
 so the script says so loudly when you run it:
@@ -940,9 +974,14 @@ WARNING: OFFER CODES: the requirement is ON and there are no usable codes — NO
 ### Watching them
 
 ```sql
--- how much of each code is left
-select code, label, used_count, max_uses, active, expires_at
+-- how much of each code is left, and when it dies
+select code, label, used_count, max_uses, active,
+       sent_at, expires_at,
+       public.offer_code_expiry(expires_at, sent_at) as dies_at
   from public.offer_codes order by created_at desc;
+
+-- issued but never emailed: not on the clock, and nobody can use them
+select code, label from public.offer_codes where sent_at is null;
 
 -- who came in on what, most recent first
 select r.code, r.redeemed_at, u.email
@@ -1025,6 +1064,19 @@ different signature — `(campaign text, code integer)`, say. Postgres keeps bot
 as overloads, so nothing breaks, but only `consume_offer_code(text, uuid)` is
 the one the trigger calls. Drop yours once you have moved off it. If your column
 was converted to `text`, yours will error when called — loudly, not silently.
+
+One it **will**: `consume_offer_code(text, uuid)` itself now returns `text`
+rather than `boolean` — `'ok'`, `'expired'`, `'used'` or `'invalid'` — so the
+gate can say which. A return type cannot be changed by `create or replace`, so
+the script drops that exact signature first. Anything of your own calling it and
+expecting a boolean needs updating; `= 'ok'` is the replacement for a bare truth
+test, and note that in SQL a non-empty string is not true.
+
+The split stops at the gate. `offer_code_status`, the one the anon key can
+reach, still answers only `ok` / `invalid` / `throttled` — telling a stranger
+that a code is real but expired is the enumeration oracle the throttle exists to
+prevent. Reaching the four-way answer costs an actual sign-up attempt, which
+GoTrue rate limits and which leaves a record.
 
 ### The pre-check is rate limited
 
