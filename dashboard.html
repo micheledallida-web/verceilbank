@@ -48,13 +48,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Open Sans is the marketing site's face, and it is here for the footer
+       alone: the footer states that stack rather than inheriting the page's,
+       so that the same component does not arrive in Inter here and Open Sans
+       on the way in. Same URL as index.html, so anyone who arrived from the
+       front page already has it cached. -->
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/output.css">
+  <!-- Shared with index.html — see the note at the top of the file. -->
+  <link rel="stylesheet" href="css/footer.css?v=1">
   <!-- Include Supabase JS SDK CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- QR code library — renders the Bitcoin deposit address on Fund Account -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
-<body class="antialiased relative selection:bg-[#2563EB] selection:text-white">
+<body class="antialiased relative selection:bg-[#2563EB] selection:text-white has-app-footer">
 
   <!-- APP SHELL CONTAINER (Max width 430px, 16px left/right padding, centered) -->
   <div class="app-shell w-full max-w-[430px] mx-auto px-[16px]">
@@ -585,6 +593,135 @@
 
   </div>
 
+  <!-- ================= SITE FOOTER =================
+       The same footer the marketing site ends on, markup for markup, so a
+       customer who scrolls past the last card lands somewhere the bank looks
+       like itself rather than at a hard stop. Styles come from
+       css/footer.css and the accordion from js/footer-accordion.js — both
+       shared with index.html, so the two can only ever match.
+
+       Outside .app-shell deliberately: the board is a 430px column and the
+       footer is the full width of the page underneath it.
+
+       `app-footer` is the app's one addition — the runway that keeps the
+       disclosures clear of the fixed navigation bar. -->
+  <footer class="main-footer app-footer">
+    <div class="footer-content-wrapper">
+      
+      <!-- Accordions on a phone; a multi-column link grid from 1024px up, where
+           there is room to show every group at once. -->
+      <div class="footer-link-grid">
+
+      <!-- Accordion Section 1 -->
+      <div class="footer-section-item">
+        <button class="footer-section-header">
+          <span>Why Verceil</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="footer-section-links">
+          <a href="#">Our Story</a>
+          <a href="#">Security & Trust</a>
+          <a href="#">Verceil Community</a>
+        </div>
+      </div>
+
+      <!-- Accordion Section 2 -->
+      <div class="footer-section-item">
+        <button class="footer-section-header">
+          <span>Wealth Management</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="footer-section-links">
+          <a href="#">Investing Accounts</a>
+          <a href="#">Retirement Planning</a>
+          <a href="#">Advisory Services</a>
+        </div>
+      </div>
+
+      <!-- Accordion Section 3 -->
+      <div class="footer-section-item">
+        <button class="footer-section-header">
+          <span>Business Banking</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="footer-section-links">
+          <a href="#">Business Checking</a>
+          <a href="#">Commercial Loans</a>
+          <a href="#">Merchant Services</a>
+        </div>
+      </div>
+
+      <!-- Accordion Section 4 -->
+      <div class="footer-section-item">
+        <button class="footer-section-header">
+          <span>Rates</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="footer-section-links">
+          <a href="#">Savings Rates</a>
+          <a href="#">Mortgage & HELOC Rates</a>
+          <a href="#">Credit Card APRs</a>
+        </div>
+      </div>
+
+      <!-- Accordion Section 5 -->
+      <div class="footer-section-item">
+        <button class="footer-section-header">
+          <span>Help & Support</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div class="footer-section-links">
+          <a href="mailto:support@verceilbank.com">Email Support</a>
+          <a href="#">Customer Service</a>
+          <a href="#">Schedule a Meeting</a>
+          <a href="#">FAQs</a>
+        </div>
+      </div>
+
+      </div><!-- /.footer-link-grid -->
+
+      <!-- Badges, Equal Housing & Socials Area -->
+      <div class="footer-badges-area">
+        <div class="housing-icon-container">
+          <!-- Equal Housing Opportunity Icon -->
+          <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h14v-8h3L12 3zm0 2.84L18 11.2v6.8H6v-6.8l6-5.36z"/><rect x="9" y="13" width="6" height="5"/></svg>
+        </div>
+        <div class="app-store-badges">
+          <a href="#"><img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" class="app-badge-img"></a>
+          <a href="#"><img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg" alt="Download on the App Store" class="app-badge-img"></a>
+        </div>
+        <div class="footer-social-icons">
+          <!-- Facebook -->
+          <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+          <!-- X / Twitter -->
+          <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <!-- YouTube -->
+          <svg viewBox="0 0 24 24"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46a2.78 2.78 0 0 0-1.95 1.96A29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.8zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/></svg>
+        </div>
+      </div>
+
+      <!-- Copyright & Legal Links -->
+      <div class="footer-legal-section">
+        <div class="footer-copyright">© 2026 Verceil Bank, N.A.</div>
+        <div class="footer-legal-links-list">
+          <a href="banking-policy.html">Customer Banking Policy</a>
+          <a href="#">Terms & Conditions</a>
+          <a href="#">Privacy</a>
+          <a href="#">Notice at Collection</a>
+          <a href="#">Do Not Sell or Share My Personal Information</a>
+          <a href="#">Accessibility</a>
+        </div>
+      </div>
+
+      <!-- Important Legal Disclosures -->
+      <div class="footer-disclosures">
+        <h5>Important Legal Disclosures & Information</h5>
+        <p>Verceil.com provides information about and access to accounts and financial services provided by Verceil Bank, N.A. and its affiliates in the United States and its territories. `This is not, and should not be construed as, an offer, invitation, or solicitation to buy or sell any of the banking or financial products mentioned herein to individuals outside of the United States.</p>
+      </div>
+
+    </div>
+  </footer>
+
   <!-- FIXED BOTTOM NAVIGATION BAR -->
   <nav class="home-nav">
     <div class="w-full max-w-[430px] mx-auto grid grid-cols-5">
@@ -681,5 +818,8 @@
   <script src="js/config.js"></script>
   <!-- Core app module: Supabase client, shared helpers, theme, modal, loadPage() -->
   <script type="module" src="js/main.js"></script>
+  <!-- Footer accordions. Shared with index.html, and independent of the module
+       above: the footer works whether or not the session does. -->
+  <script src="js/footer-accordion.js" defer></script>
 </body>
 </html>

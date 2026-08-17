@@ -126,6 +126,9 @@
   </script>
 
   <link rel="stylesheet" href="index.css?v=18">
+  <!-- The footer is shared with the signed-in dashboard, so it lives in its
+       own file rather than in either page's stylesheet. -->
+  <link rel="stylesheet" href="css/footer.css?v=1">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -166,157 +169,6 @@
       box-sizing: border-box !important;
     }
 
-    .main-footer {
-      background-color: #0B1F33 !important;
-      color: #ffffff !important;
-      padding: 2.5rem 1.2rem 2rem !important;
-      font-family: inherit;
-    }
-
-    .footer-content-wrapper {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    /* Accordion / Link Sections */
-    .footer-section-item {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-    }
-
-    .footer-section-header {
-      width: 100%;
-      background: none;
-      border: none;
-      color: #ffffff;
-      font-size: 1.05rem;
-      font-weight: 700;
-      padding: 1.15rem 0;
-      text-align: left;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      cursor: pointer;
-      font-family: inherit;
-    }
-
-    .footer-section-header svg {
-      width: 19px;
-      height: 19px;
-      stroke: #8FA3B8;
-      transition: transform 0.3s ease;
-    }
-
-    .footer-section-header.active svg {
-      transform: rotate(180deg);
-    }
-
-    .footer-section-links {
-      display: none;
-      padding-bottom: 1.25rem;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .footer-section-links a {
-      color: #B4C2D0;
-      text-decoration: none;
-      font-size: 0.92rem;
-      transition: color 0.2s ease;
-    }
-
-    .footer-section-links a:hover {
-      color: #ffffff;
-      text-decoration: underline;
-    }
-
-    /* Badges & Icons Area */
-    .footer-badges-area {
-      display: flex;
-      flex-direction: column;
-      gap: 1.1rem;
-      padding: 1.7rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-    }
-
-    .housing-icon-container svg {
-      width: 34px;
-      height: 34px;
-      fill: #ffffff;
-    }
-
-    .app-store-badges {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .app-badge-img {
-      height: 42px;
-      width: auto;
-      object-fit: contain;
-    }
-
-    .footer-social-icons {
-      display: flex;
-      gap: 1.5rem;
-      align-items: center;
-    }
-
-    .footer-social-icons svg {
-      width: 24px;
-      height: 24px;
-      fill: #ffffff;
-      transition: opacity 0.2s;
-    }
-
-    .footer-social-icons svg:hover {
-      opacity: 0.75;
-    }
-
-    /* Copyright & Legal Links */
-    .footer-legal-section {
-      padding: 1.6rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 0.85rem;
-      color: #B4C2D0;
-    }
-
-    .footer-copyright {
-      color: #ffffff;
-      font-weight: 700;
-      margin-bottom: 0.7rem;
-    }
-
-    .footer-legal-links-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .footer-legal-links-list a {
-      color: #B4C2D0;
-      text-decoration: none;
-    }
-
-    .footer-legal-links-list a:hover {
-      color: #ffffff;
-      text-decoration: underline;
-    }
-
-    /* Disclosures */
-    .footer-disclosures {
-      padding-top: 1.6rem;
-      font-size: 0.75rem;
-      color: #7E8FA1;
-      line-height: 1.55;
-    }
-
-    .footer-disclosures h5 {
-      color: #ffffff;
-      font-size: 0.88rem;
-      font-weight: 700;
-      margin-bottom: 0.7rem;
-    }
   </style>
 </head>
 <body class="home-page">
@@ -765,21 +617,7 @@
     </div>
   </footer>
 
-  <script>
-    // Accordion functionality for Citi-style footer
-    const accordions = document.querySelectorAll('.footer-section-header');
-    accordions.forEach(acc => {
-      acc.addEventListener('click', () => {
-        acc.classList.toggle('active');
-        const linksPanel = acc.nextElementSibling;
-        if (linksPanel.style.display === 'flex') {
-          linksPanel.style.display = 'none';
-        } else {
-          linksPanel.style.display = 'flex';
-        }
-      });
-    });
-  </script>
+  <script src="js/footer-accordion.js"></script>
   <script src="app.js"></script>
 
 </body>

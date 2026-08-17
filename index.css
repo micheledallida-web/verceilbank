@@ -988,58 +988,9 @@ a { text-decoration: none; color: inherit; }
     padding: 2.5rem;
   }
 
-  /* ---- Footer: the link groups as columns, all open ---- */
-  .home-page .main-footer {
-    padding: 3rem 2.5rem 2.5rem;
-  }
-
-  .home-page .footer-content-wrapper {
-    max-width: 1440px;
-  }
-
-  .home-page .footer-link-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 0 2rem;
-    padding-bottom: 0.5rem;
-  }
-
-  /* No longer a row you open — a column heading. */
-  .home-page .footer-link-grid .footer-section-item {
-    border-bottom: none;
-  }
-
-  .home-page .footer-link-grid .footer-section-header {
-    padding: 0 0 0.9rem;
-    font-size: 0.95rem;
-    cursor: default;
-    pointer-events: none;
-  }
-
-  .home-page .footer-link-grid .footer-section-header svg {
-    display: none;
-  }
-
-  /* `!important` because the accordion script writes `display` inline, and an
-     inline style set on a phone would otherwise survive a resize. */
-  .home-page .footer-link-grid .footer-section-links {
-    display: flex !important;
-    padding-bottom: 1.75rem;
-  }
-
-  /* ---- Footer base: side by side rather than stacked ---- */
-  .home-page .footer-badges-area {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-  }
-
-  .home-page .footer-legal-links-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.6rem 1.75rem;
-  }
+  /* The footer's own desktop layout moved to css/footer.css with the rest of
+     it, so that the dashboard — which links that file and not this one — gets
+     the same columns rather than a second copy of these rules. */
 }
 
 /* A wide monitor gets more room again, but the measure stops growing — text
@@ -1047,8 +998,7 @@ a { text-decoration: none; color: inherit; }
 @media (min-width: 1600px) {
   .home-page .container,
   .home-page .promo-row,
-  .home-page #blog .promo-container,
-  .home-page .footer-content-wrapper {
+  .home-page #blog .promo-container {
     max-width: 1600px;
   }
 }
