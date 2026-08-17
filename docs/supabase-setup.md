@@ -1394,9 +1394,33 @@ supabase secrets set \
 | `SUPPORT_FROM` | required | the sender. Must be an address on a domain verified with Resend, or the mail is refused |
 
 With any of the three unset the function answers "Email is not configured" and
-logs which one is missing. The customer still sees their message saved and the
-thread open, because the app never waits on the mail — a mail outage must not
-look to somebody like a failed send.
+names the missing ones in the response. The customer still sees their message
+saved and the thread open, because the app never waits on the mail — a mail
+outage must not look to somebody like a failed send.
+
+Ask it about itself rather than sending a message to find out:
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify" -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+# {"function":"support-notify","deployed":true,"configured":true,"missing":[],"inbound_replies_enabled":false}
+```
+
+`404` means the function was never deployed — do step 2 above. A reply with
+`"configured": false` lists the secrets still to set. It reports only whether
+each one is present, never its value.
+
+When the secrets are all set and mail still does not arrive, the send itself
+answers with what Resend said:
+
+```json
+{ "error": "Could not send the notification email",
+  "resend_status": 403,
+  "resend_message": "The verceilbank.com domain is not verified..." }
+```
+
+That one is the usual culprit: `SUPPORT_FROM` has to be an address on a domain
+verified in Resend. Owning `verceilbank.com` is not enough — the domain has to
+be added in Resend and its DNS records published, or every send is refused.
 
 ### 3. Replying by email (optional)
 

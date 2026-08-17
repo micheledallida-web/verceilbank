@@ -55,7 +55,7 @@ function replyToAddress(inbound: string, threadId: string) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  if (req.method !== 'POST' && req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -70,9 +70,33 @@ Deno.serve(async (req) => {
   const SUPPORT_INBOUND_ADDRESS = Deno.env.get('SUPPORT_INBOUND_ADDRESS');
   const inboundReady = !!SUPPORT_INBOUND_ADDRESS;
 
-  if (!RESEND_API_KEY || !SUPPORT_INBOX || !SUPPORT_FROM) {
-    console.error('support-notify is missing RESEND_API_KEY, SUPPORT_INBOX or SUPPORT_FROM');
-    return json({ error: 'Email is not configured' }, 500);
+  // Which secrets are absent, by name. A missing secret is the most common
+  // reason no mail arrives, and until now the only place that said so was the
+  // function log — the caller got a flat "Email is not configured" and had to
+  // go digging. The names of the settings are not sensitive; their values are,
+  // and none of those are ever put in a response.
+  const missing = [
+    ['RESEND_API_KEY', RESEND_API_KEY],
+    ['SUPPORT_INBOX', SUPPORT_INBOX],
+    ['SUPPORT_FROM', SUPPORT_FROM],
+  ].filter(([, value]) => !value).map(([name]) => name);
+
+  // GET is a config check, so "is this deployed, and is it configured?" can be
+  // answered by opening the URL — without sending a message to find out. It
+  // reports only whether each setting is present, never what it is set to.
+  if (req.method === 'GET') {
+    return json({
+      function: 'support-notify',
+      deployed: true,
+      configured: missing.length === 0,
+      missing,
+      inbound_replies_enabled: inboundReady,
+    });
+  }
+
+  if (missing.length > 0) {
+    console.error('support-notify is missing:', missing.join(', '));
+    return json({ error: 'Email is not configured', missing }, 500);
   }
 
   try {
@@ -171,7 +195,20 @@ Deno.serve(async (req) => {
     if (!sent.ok) {
       const detail = await sent.text();
       console.error('Resend send failed:', sent.status, detail);
-      return json({ error: 'Could not send the notification email' }, 502);
+      // Resend says why it refused — an unverified sending domain, a rejected
+      // key — and that sentence is the whole answer to "why is no mail
+      // arriving". It describes the account's own mail setup, not the customer
+      // or their message, so it is passed back rather than flattened into a
+      // generic failure that leaves the reader guessing.
+      let reason = '';
+      try {
+        reason = String(JSON.parse(detail)?.message ?? '');
+      } catch { /* not JSON — the status alone has to carry it */ }
+      return json({
+        error: 'Could not send the notification email',
+        resend_status: sent.status,
+        ...(reason ? { resend_message: reason } : {}),
+      }, 502);
     }
 
     return json({ ok: true });
