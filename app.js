@@ -292,44 +292,6 @@ function initCategoryStrip() {
   schedule();
 }
 
-/* === HOVER SPOTLIGHT — APPENDED ===
-   Hands the cursor's position to the stylesheet and does nothing else. Two
-   custom properties on the card under the pointer — --mouse-x and --mouse-y,
-   its offset within that card — and index.css owns the colour, the size, the
-   shape and the fade.
-
-   One delegated listener on the document rather than a pair on every card:
-   cards come and go with a soft navigation, and a delegated listener does not
-   care. One write per animation frame rather than one per event, because a
-   mouse reports far more often than the screen redraws and the frames in
-   between are discarded anyway. */
-(function () {
-  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-
-  var CARDS = '.promo-card, .quick-link-item';
-  var frame = null;
-  var card = null;
-  var pageX = 0;
-  var pageY = 0;
-
-  function paint() {
-    frame = null;
-    var rect = card.getBoundingClientRect();
-    card.style.setProperty('--mouse-x', (pageX - rect.left) + 'px');
-    card.style.setProperty('--mouse-y', (pageY - rect.top) + 'px');
-  }
-
-  document.addEventListener('mousemove', function (e) {
-    var hit = e.target && e.target.closest ? e.target.closest(CARDS) : null;
-    if (!hit) return;
-
-    card = hit;
-    pageX = e.clientX;
-    pageY = e.clientY;
-    if (!frame) frame = requestAnimationFrame(paint);
-  }, { passive: true });
-})();
-
 /* === CLIENT-SIDE NAVIGATION — APPENDED ===
    Following a link fetches the next page and swaps it into #swap-root instead
    of reloading the browser: the header, the stylesheets and the fonts stay
