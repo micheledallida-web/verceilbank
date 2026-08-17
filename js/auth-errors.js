@@ -289,5 +289,19 @@
       return kind === 'timeout' || kind === 'network' || kind === 'config' ||
              kind === 'signups_disabled' || kind === 'unknown';
     },
+    // Every kind that means the gate refused the code, whatever the reason —
+    // so the sign-up page can put the applicant back on the step that can fix
+    // it instead of leaving them on the password screen.
+    //
+    // A predicate here rather than a list of kinds in the page, because this
+    // file is what decides which kinds exist. When the gate learned to say
+    // 'expired' and 'used' separately, a page testing `kind === 'offer_code'`
+    // silently stopped recognising the two most specific offer-code failures
+    // there are. Adding a kind must not be able to do that again.
+    isOfferCode: function (kind) {
+      return kind === 'offer_code' ||
+             kind === 'offer_code_expired' ||
+             kind === 'offer_code_used';
+    },
   };
 })();
