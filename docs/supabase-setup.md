@@ -1377,26 +1377,36 @@ select relname, relrowsecurity from pg_class
 Without RLS on, the anon key in every visitor's browser can read every
 customer's messages to their bank. Do not skip the second query.
 
-### 2. Point the mail at your business address
+### 2. Point the mail at your inbox
+
+Messages go to **support@verceilbank.com**, from
+`Verceil Bank <support@verceilbank.com>`. Both are the function's defaults, so
+there is one thing to set:
 
 ```bash
 supabase functions deploy support-notify
-supabase secrets set \
-  RESEND_API_KEY=re_xxx \
-  SUPPORT_INBOX=you@yourbusiness.com \
-  SUPPORT_FROM='Verceil Bank <support@verceilbank.com>'
+supabase secrets set RESEND_API_KEY=re_xxx
 ```
 
 | Secret | | |
 | --- | --- | --- |
 | `RESEND_API_KEY` | required | from resend.com. Server-side only — it must never reach the browser, which is the entire reason this runs as a function |
-| `SUPPORT_INBOX` | required | **where the message lands: your business email** |
-| `SUPPORT_FROM` | required | the sender. Must be an address on a domain verified with Resend, or the mail is refused |
+| `SUPPORT_INBOX` | optional | overrides where the message lands. Defaults to `support@verceilbank.com` |
+| `SUPPORT_FROM` | optional | overrides the sender. Defaults to `Verceil Bank <support@verceilbank.com>` |
 
-With any of the three unset the function answers "Email is not configured" and
-logs which one is missing. The customer still sees their message saved and the
-thread open, because the app never waits on the mail — a mail outage must not
-look to somebody like a failed send.
+The from-address has to be on a domain verified with Resend — add
+`verceilbank.com` there and complete its DNS records, or every send is refused
+with a domain error in the function logs.
+
+Where the mail goes is not a secret: it is in the site footer, in the page's
+structured data and on the Support screen. It is a default rather than a
+variable because three required settings meant the path could be deployed,
+correct, and silently mailing nowhere for want of one of them.
+
+Without the key the function answers "Email is not configured" and says so in
+the logs. The customer still sees their message saved and the thread open,
+because the app never waits on the mail — a mail outage must not look to
+somebody like a failed send.
 
 ### 3. Replying by email (optional)
 
@@ -1409,7 +1419,7 @@ from the Supabase dashboard instead.
 ```bash
 supabase functions deploy support-inbound
 supabase secrets set \
-  SUPPORT_INBOUND_ADDRESS=support@yourbusiness.com \
+  SUPPORT_INBOUND_ADDRESS=support@verceilbank.com \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
@@ -1506,7 +1516,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed with `SUPPORT_INBOX` set to your business email (section 5i)
+- [ ] `support-notify` deployed and `RESEND_API_KEY` set, `verceilbank.com` verified with Resend (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
