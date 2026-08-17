@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <!-- iOS Safari finds anything that looks like a phone number and turns it
        into a link of its own — its own blue, its own underline, over the top of
-       whatever the page had decided. It is why the customer care number on the
-       offer-code step came out underlined and split across two lines. The page
-       says where its links are; the browser does not need to guess. -->
+       whatever the page had decided. Nothing on this form quotes a number today,
+       but a step that adds one should not have to rediscover this. The page says
+       where its links are; the browser does not need to guess. -->
   <meta name="format-detection" content="telephone=no">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign up - Verceil Bank</title>
@@ -185,112 +185,6 @@
       cursor: pointer;
     }
 
-    /* The offer code is seven digits and nothing else, so it is set as digits
-       rather than as prose: tabular figures at an even width, spaced apart far
-       enough to be counted and checked against a letter without losing your
-       place. The placeholder shows the length before anything is typed. */
-    .input-group input.offer-code-input {
-      font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
-      font-size: 1.4rem;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.42em;
-      text-indent: 0.42em;
-    }
-
-    .input-group input.offer-code-input::placeholder {
-      color: #d1d5db;
-      letter-spacing: 0.42em;
-    }
-
-    /* ---- a code the bank would not take ----
-       Deliberately NOT the pink bordered box the other steps use. That box is
-       right when a step has five fields and the complaint could be about any of
-       them; here there is one field, the customer is looking straight at it,
-       and a panel underneath announcing a problem is louder than the problem.
-
-       So the field itself answers: the digits and the rule under them turn red,
-       and one line of text sits beneath in the same colour. Nothing is added to
-       the page and nothing moves — the message occupies its line whether or not
-       it has anything to say, so the Continue button does not jump down the
-       screen at the moment somebody is reaching for it. */
-    .input-group input.offer-code-input.is-invalid {
-      color: #dc2626;
-      border-bottom-color: #dc2626;
-    }
-
-    .input-group input.offer-code-input.is-invalid:focus {
-      border-bottom-color: #b91c1c;
-    }
-
-    .code-error {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.4rem;
-      /* Reserved, not conjured. One line's worth of height is always here. */
-      min-height: 1.15rem;
-      margin-top: 0.55rem;
-      font-size: 0.85rem;
-      line-height: 1.35;
-      color: #dc2626;
-      /* Fades in rather than appearing, which reads as an answer rather than as
-         something having gone wrong with the page. */
-      opacity: 0;
-      transition: opacity 140ms ease-out;
-    }
-
-    .code-error.visible { opacity: 1; }
-
-    /* A filled disc with a white exclamation in it, drawn rather than fetched —
-       no image request, no icon font, nothing to fail to load on the one screen
-       that is telling somebody their invitation did not work.
-
-       It is a character in a circle rather than anything cleverer. The first
-       attempt cut the glyph out of the disc with a CSS mask, which needs
-       `mask-composite` spelled two different ways for two engines and renders
-       as a bare red tick-mark on the ones that disagree. This cannot render
-       wrong anywhere.
-
-       Decoration: the sentence beside it carries the message, and the parent is
-       the live region a screen reader reads. */
-    .code-error.visible::before {
-      content: "!";
-      flex-shrink: 0;
-      width: 16px;
-      height: 16px;
-      margin-top: 0.06rem;
-      border-radius: 50%;
-      background: #dc2626;
-      color: #ffffff;
-      font-family: 'Inter', system-ui, sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 16px;
-      text-align: center;
-    }
-
-    /* A short, tight shake — the physical answer to "no". Two cycles, six
-       pixels, done in a fifth of a second: enough to read as a refusal, not
-       enough to feel like a toy. Fired by adding the class, and the class is
-       removed when it ends so the next rejection can fire it again. */
-    @keyframes code-refused {
-      0%, 100% { transform: translateX(0); }
-      20%      { transform: translateX(-6px); }
-      40%      { transform: translateX(5px); }
-      60%      { transform: translateX(-3px); }
-      80%      { transform: translateX(2px); }
-    }
-
-    .input-group.shake input.offer-code-input {
-      animation: code-refused 220ms ease-in-out;
-    }
-
-    /* Somebody who has asked the system for less motion gets the colour and the
-       sentence, which carry the whole message on their own. */
-    @media (prefers-reduced-motion: reduce) {
-      .input-group.shake input.offer-code-input { animation: none; }
-      .code-error { transition: none; }
-    }
-
     .input-group input:focus, .input-group select:focus {
       border-bottom-color: var(--vb-blue-dark);
     }
@@ -426,13 +320,6 @@
       padding: 0.15rem 0.5rem;
       border-radius: 999px;
       margin-bottom: 0.45rem;
-    }
-
-    /* Keeps a phone number, a code or a reference whole. A number broken over
-       two lines is one somebody has to reassemble before they can use it. */
-    .nowrap {
-      white-space: nowrap;
-      text-decoration: none;
     }
 
     .step-note {
@@ -573,59 +460,10 @@
              render blocks the customer with no explanation at all. -->
         <div class="step-error" data-step-error="product"></div>
 
-        <button type="button" class="btn-next-full" data-next="offer">Continue</button>
-      </div>
-
-      <!-- ================= STEP 2 — OFFER CODE =================
-           Verceil is invite-only. The code is asked for here, before any
-           personal detail, because it is the one answer that can end the
-           application — and asking somebody for their name, their date of
-           birth, four digits of their Social Security Number and their home
-           address before telling them they cannot open an account is
-           collecting a stranger's identity for nothing.
-
-           The field is checked against the bank as the step is cleared, not at
-           the end. The real gate is the trigger on auth.users; this is what
-           stops an applicant reaching the last screen before finding out. -->
-      <div id="stepOffer" style="display:none;">
-        <h1>What is your offer code?</h1>
-        <p class="subtitle">Verceil Bank is invite-only. Enter the seven-digit code from your invitation to continue.</p>
-
-        <div class="input-group">
-          <label for="offerCode">Offer code</label>
-          <!-- No `maxlength` and no `placeholder` here on purpose: both are the
-               code's length, and the length is stated once, in the script
-               below, which sets them. Three copies of a 7 in two languages is
-               how a field ends up accepting a different number of digits than
-               the thing checking it. -->
-          <input type="text" id="offerCode" class="offer-code-input" inputmode="numeric" autocomplete="one-time-code"
-                 required aria-describedby="offerCodeNote">
-
-          <!-- The complaint belongs to the field, so it lives under the field.
-               It was down beneath the help text with the other steps' errors,
-               which on this step reads as a note about the page rather than as
-               an answer about the seven digits somebody just typed.
-
-               `aria-live` because it appears without the page moving or the
-               focus shifting: a screen reader that is not told will simply
-               never mention it. `role="status"` rather than `alert` — this is
-               an answer to something the customer did, not an interruption. -->
-          <div class="code-error" data-step-error="offer" role="status" aria-live="polite"></div>
-        </div>
-
-        <!-- `telephone=no` on the page keeps iOS from turning the number into
-             a link of its own, which is where the underline came from, and
-             `.nowrap` keeps it on one line: a phone number broken across two
-             lines is one somebody has to reassemble before they can dial it. -->
-        <div class="step-note" id="offerCodeNote">
-          Your offer code is in the invitation we sent you. If it will not work, please contact the person who referred you, or call Verceil Bank customer care on <span class="nowrap">(800) 555-0123</span>.
-        </div>
-
         <button type="button" class="btn-next-full" data-next="identity">Continue</button>
-        <button type="button" class="btn-back-link" data-back="product">Back</button>
       </div>
 
-      <!-- ================= STEP 3 — NAME AND DATE OF BIRTH ================= -->
+      <!-- ================= STEP 2 — NAME AND DATE OF BIRTH ================= -->
       <div id="stepIdentity" style="display:none;">
         <h1>Let's get to know you</h1>
         <p class="subtitle">Your name and date of birth as they appear on your government ID. These are checked against your ID during verification, so they cannot be changed afterwards.</p>
@@ -663,7 +501,7 @@
 
         <div class="step-error" data-step-error="identity"></div>
         <button type="button" class="btn-next-full" data-next="ssn">Next</button>
-        <button type="button" class="btn-back-link" data-back="offer">Back</button>
+        <button type="button" class="btn-back-link" data-back="product">Back</button>
       </div>
 
       <!-- ================= STEP 3 — SOCIAL SECURITY NUMBER ================= -->
@@ -839,10 +677,6 @@
     // hand by then.
     const STEPS = [
       { key: 'product', id: 'stepProduct', label: 'Choose your account' },
-      // Second, and ahead of every personal detail on purpose. It is the only
-      // step that can end the application, so it is asked before the applicant
-      // has handed over a name, a date of birth or an address.
-      { key: 'offer', id: 'stepOffer', label: 'Your offer code' },
       { key: 'identity', id: 'stepIdentity', label: 'Your name and date of birth' },
       { key: 'ssn', id: 'stepSsn', label: 'Last four of your SSN' },
       { key: 'address', id: 'stepAddress', label: 'Home address' },
@@ -892,35 +726,6 @@
       if (!el) return;
       el.textContent = message || '';
       el.classList.toggle('visible', !!message);
-      if (key === 'offer') markOfferCode(!!message);
-    }
-
-    // The offer step's refusal, on the field rather than in a panel: the digits
-    // and the rule under them go red, the field shakes once, and the message
-    // fades in beneath. Called through setStepError so every path that can
-    // reject a code — the format check, the bank's answer at the step, and the
-    // sign-up itself failing at the very end — produces the same thing.
-    //
-    // Declared as a function rather than a const arrow because setStepError is
-    // called during set-up, before this line is reached; a hoisted declaration
-    // is what makes that safe.
-    function markOfferCode(invalid) {
-      const field = document.getElementById('offerCode');
-      if (!field) return;
-      const group = field.closest('.input-group');
-      field.classList.toggle('is-invalid', invalid);
-      // Announces the state to a screen reader, and is what a browser's own
-      // validation styling keys off.
-      field.setAttribute('aria-invalid', invalid ? 'true' : 'false');
-      if (!group) return;
-      // Restarted rather than toggled: adding a class that is already there
-      // does not replay an animation, and the second wrong code in a row has to
-      // shake as convincingly as the first.
-      group.classList.remove('shake');
-      if (invalid) {
-        void group.offsetWidth;
-        group.classList.add('shake');
-      }
     }
 
     function value(id) {
@@ -947,88 +752,6 @@
       ssnInput.value = ssnInput.value.replace(/\D/g, '').slice(0, 4);
     });
 
-    // ---------- Offer code ----------
-    // Seven digits. The field refuses anything else as it is typed, so a code
-    // pasted out of an email with a space or a dash in it still lands correctly
-    // rather than being rejected for a character the applicant did not put
-    // there.
-    // The length, once. The field's own attributes are written from it rather
-    // than repeated in the markup, so this is the only 7 on the page.
-    const OFFER_CODE_LENGTH = 7;
-    const offerCodeInput = document.getElementById('offerCode');
-    offerCodeInput.setAttribute('maxlength', String(OFFER_CODE_LENGTH));
-    offerCodeInput.setAttribute('placeholder', '0'.repeat(OFFER_CODE_LENGTH));
-
-    offerCodeInput.addEventListener('input', () => {
-      offerCodeInput.value = offerCodeInput.value.replace(/\D/g, '').slice(0, OFFER_CODE_LENGTH);
-      // A complaint about the previous attempt should not still be on screen
-      // while a new one is being typed.
-      setStepError('offer', '');
-    });
-
-    // What the bank last told us about a code, so tabbing back and forth over a
-    // cleared step does not re-ask about a code it has already answered for.
-    // Keyed by the code itself; a different code is a different question.
-    const offerCodeVerdicts = Object.create(null);
-
-    // Asks the project whether this code can still be spent.
-    //
-    // `offer_code_status` is a security-definer function granted to the anon
-    // key — the offer_codes table itself is readable by nobody, so this is the
-    // only thing a stranger can ask, and all it will answer is 'ok' or
-    // 'invalid'. It deliberately will not say WHICH kind of invalid: a code is
-    // seven digits, so an answer that separated "no such code" from "that one
-    // is used up" would confirm which of ten million strings are real.
-    //
-    // A failure to reach the bank is NOT treated as a bad code. The applicant
-    // is allowed through the step on a network error and the sign-up itself
-    // decides — the trigger on auth.users is the gate, and refusing somebody
-    // here because their train went into a tunnel would be this screen
-    // inventing a rejection the bank never made.
-    //
-    // The same goes for 'throttled', which is what the bank answers a caller
-    // that has asked about too many codes too quickly. It is a defence against
-    // somebody working through the seven-digit space one guess at a time, and
-    // the thing it takes away is the cheap yes/no — not the ability to open an
-    // account. See the note above offer_code_status in setup.sql.
-    async function checkOfferCode(code) {
-      if (Object.prototype.hasOwnProperty.call(offerCodeVerdicts, code)) {
-        return offerCodeVerdicts[code];
-      }
-      if (!supabaseClient) return 'unreachable';
-
-      try {
-        const { data, error } = await VerceilAuth.withTimeout(
-          supabaseClient.rpc('offer_code_status', { p_code: code }),
-          'Checking your offer code',
-        );
-        if (error) throw error;
-
-        // 'throttled' is not an answer about the code — it is the bank
-        // declining to answer, because this caller has asked too many times too
-        // quickly. It means the same thing to this screen as not being able to
-        // reach the bank at all: we do not know, so we do not claim to. The
-        // applicant goes through and the sign-up itself decides.
-        //
-        // Not cached either, for the same reason: there is nothing here worth
-        // remembering about this code.
-        if (data === 'throttled') {
-          console.warn('[signup] offer code checks are rate limited for this caller; letting the sign-up decide');
-          return 'unreachable';
-        }
-
-        const verdict = data === 'ok' ? 'ok' : 'invalid';
-        offerCodeVerdicts[code] = verdict;
-        return verdict;
-      } catch (err) {
-        // Logged rather than shown. Whoever opens the console needs to know the
-        // function is missing or the grant was never made; the applicant does
-        // not, and must not be blocked by it.
-        console.error('[signup] offer code check could not be made:', err);
-        return 'unreachable';
-      }
-    }
-
     // ---------- Per-step validation ----------
     // Each returns an error string, or '' when the step is complete. Nothing
     // moves forward until its own step is right, so an error can only ever be
@@ -1040,14 +763,6 @@
       product: () => (SIGNUP_PRODUCTS.includes(selectedProduct)
         ? ''
         : 'Choose one of the accounts listed to continue.'),
-      // Shape only. Whether the code is real is the bank's answer, asked for
-      // separately below — this is what stops six digits being sent to find out.
-      offer: () => {
-        const digits = value('offerCode').replace(/\D/g, '');
-        if (!digits) return 'Enter your seven-digit offer code.';
-        if (digits.length !== OFFER_CODE_LENGTH) return `Seven digits — you entered ${digits.length}.`;
-        return '';
-      },
       identity: () => {
         if (!value('firstName')) return 'Enter your first name as it appears on your ID.';
         if (!value('lastName')) return 'Enter your last name as it appears on your ID.';
@@ -1091,51 +806,16 @@
       },
     };
 
-    // A step that has to ask the bank something before it will let go.
-    //
-    // Only the offer code does, and only because the alternative is letting
-    // somebody fill in five more screens before being told their invitation is
-    // no good. Each returns an error string, or '' to let the step pass.
-    const SERVER_CHECKS = {
-      offer: async () => {
-        const verdict = await checkOfferCode(value('offerCode').replace(/\D/g, ''));
-        if (verdict === 'invalid') {
-          return 'That code is not valid.';
-        }
-        // 'unreachable' passes. See checkOfferCode.
-        return '';
-      },
-    };
-
+    // No step asks the bank anything on the way past any more. The offer code
+    // was the only one that did, and every remaining step can be judged from
+    // what is on screen — so a step is cleared by its own validator alone.
     document.querySelectorAll('[data-next]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const current = STEPS.find((step) => document.getElementById(step.id).style.display !== 'none');
         const key = current ? current.key : 'product';
         const error = (VALIDATORS[key] || (() => ''))();
         setStepError(key, error);
         if (error) return;
-
-        const check = SERVER_CHECKS[key];
-        if (!check) {
-          showStep(btn.getAttribute('data-next'));
-          return;
-        }
-
-        // The button says what it is doing and cannot be pressed twice while it
-        // is doing it. A second request would be a second answer racing the
-        // first one onto the same step.
-        const label = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Checking...';
-        let serverError = '';
-        try {
-          serverError = await check();
-        } finally {
-          btn.disabled = false;
-          btn.textContent = label;
-        }
-        setStepError(key, serverError);
-        if (serverError) return;
         showStep(btn.getAttribute('data-next'));
       });
     });
@@ -1195,7 +875,6 @@
       const suffix = suffixRaw === 'None' ? '' : suffixRaw;
       const dob = value('dob');
       const ssn = value('ssn').replace(/\D/g, '');
-      const offerCode = value('offerCode').replace(/\D/g, '');
       const email = value('email');
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
@@ -1244,15 +923,6 @@
               city: value('city'),
               state: value('state'),
               postal_code: value('postalCode'),
-              // The invitation this account is being opened against.
-              //
-              // Sent as metadata, and spent by the BEFORE INSERT trigger on
-              // auth.users in the same transaction that creates the user — so a
-              // code that cannot be spent takes the sign-up down with it, and a
-              // sign-up that fails for any other reason leaves the code
-              // untouched. The step above already asked the bank about this
-              // code; that was for the applicant's benefit, not the rule's.
-              offer_code: offerCode,
               // The last four, which is now all this screen ever collects.
               // The full number is written to the verification record at
               // identity check, never onto the auth user, where it would sit
@@ -1331,21 +1001,11 @@
         queueEvent('signup.failed', { reason: kind });
         if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
 
-        // The gate refused this code between the step check and the submit —
-        // somebody else spent the last use of it, or it expired in the minutes
-        // the application took. Put the applicant back on the step that can fix
-        // it rather than leaving them on the password screen reading about a
-        // field they cannot see, and forget the verdict we cached so the code
-        // is asked about again rather than waved through from memory.
-        if (kind === 'offer_code') {
-          delete offerCodeVerdicts[offerCode];
-          showStep('offer');
-          setStepError('offer', message);
-          submitBtn.textContent = 'Open my account';
-          submitBtn.disabled = false;
-          return;
-        }
-
+        // 'offer_code' is no longer a step this can send anybody back to — the
+        // form does not ask for a code, so there is nothing an applicant could
+        // retype. It now means the gate on auth.users is still armed with the
+        // requirement switched on, which is ours to fix and not something to
+        // stage as a field error. It falls through to the banner with the rest.
         errorBanner.textContent = message;
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Open my account';

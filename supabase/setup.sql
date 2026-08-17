@@ -1786,6 +1786,18 @@ revoke all     on function public.offer_codes_usable()           from public, an
 -- without dropping the trigger, and so creating a user by hand in the Supabase
 -- dashboard is possible: flip it, add the user, flip it back. It defaults to
 -- ON, because a gate that defaults to open is not a gate.
+--
+-- READ THIS BEFORE DEPLOYING. The sign-up form no longer collects an offer
+-- code — the step was removed — so nothing in the browser sends `offer_code`
+-- any more, and with the requirement ON this trigger now refuses EVERY
+-- registration on the 'offer code required' branch below. The default is left
+-- ON deliberately rather than quietly flipped: a gate's default is not
+-- something a change to a form should decide. To open registration, run
+--
+--   update public.bank_settings set offer_code_required = false where id = 1;
+--
+-- Turning it back on means restoring the sign-up step as well; on its own it
+-- closes registration completely. See section 5g of docs/supabase-setup.md.
 -- ---------------------------------------------------------------------------
 alter table public.bank_settings
   add column if not exists offer_code_required boolean not null default true;

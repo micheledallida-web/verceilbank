@@ -142,12 +142,16 @@
       any: 'That email address is already in use.',
     },
     offer_code: {
-      // Says what to do about it without asserting which of the several
-      // possible reasons it was — the server deliberately does not tell us, and
-      // a code that was fine three screens ago is most often one somebody else
-      // has just taken the last use of.
-      signup: 'We could not open an account with that offer code. It may have expired or been fully used since you started. Check the seven digits on your invitation, or contact whoever invited you.',
-      any: 'That offer code could not be used.',
+      // Sign-up no longer asks for an offer code, so an applicant seeing this
+      // has not got one wrong — they cannot. It means the invite-only gate is
+      // still armed on the database while the form that fed it is gone, and
+      // that is ours to fix, not theirs. The copy says so rather than sending
+      // somebody to look for an invitation that was never asked for.
+      //
+      // The fix is `bank_settings.offer_code_required = false`; see the gate in
+      // supabase/setup.sql.
+      signup: 'We could not open your account just now. This is a problem on our side, not with the details you entered — please try again shortly.',
+      any: 'That action could not be completed.',
     },
     unconfirmed: {
       signin: 'Confirm your email address first — check your inbox for the link we sent when you applied.',
