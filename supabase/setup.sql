@@ -1922,14 +1922,17 @@ end $$;
 -- The gate.
 --
 -- BEFORE INSERT on auth.users. It reads the code off the metadata the sign-up
--- form sends and spends it, and if it cannot, it refuses the insert — which
--- GoTrue reports to the browser as a failed sign-up and which leaves no user
--- behind.
+-- form sends — or, for a user created with the service key, off the app
+-- metadata only that key can write — and spends it; if it cannot, it refuses the
+-- insert, which GoTrue reports to the browser as a failed sign-up and which
+-- leaves no user behind.
 --
 -- The switch is in bank_settings so an operator can turn the requirement off
--- without dropping the trigger, and so creating a user by hand in the Supabase
--- dashboard is possible: flip it, add the user, flip it back. It defaults to
--- ON, because a gate that defaults to open is not a gate.
+-- without dropping the trigger. It defaults to ON, because a gate that defaults
+-- to open is not a gate. Creating one user by hand no longer needs the switch:
+-- pass the code in app_metadata and the account is opened against a real code,
+-- with the redemption row to show for it, instead of through a hole held open
+-- for as long as it takes somebody to remember to close it.
 -- ---------------------------------------------------------------------------
 alter table public.bank_settings
   add column if not exists offer_code_required boolean not null default true;
@@ -1955,7 +1958,28 @@ begin
     return new;
   end if;
 
-  code := nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), '');
+  -- User metadata first, app metadata second. The two are not the same channel
+  -- and the order is the point.
+  --
+  -- `raw_user_meta_data` is whatever the browser put in `options.data`, so it is
+  -- the sign-up form's channel — and also the one a stranger with the anon key
+  -- controls. That costs nothing: a code still has to match a row in
+  -- `offer_codes` to be spent, so control of the field buys an attacker the
+  -- ability to submit a guess, which is what the form already does.
+  --
+  -- `raw_app_meta_data` cannot be set through `auth.signUp` at all — GoTrue
+  -- ignores it there. Only the service key writes it, through
+  -- `admin.createUser({ app_metadata: { offer_code: '1234567' } })`. That makes
+  -- it the channel for users created server-side: an operator adding an account
+  -- by hand, or an invite flow that already knows which code the account is
+  -- being opened against. Without it the only way in is to switch
+  -- `offer_code_required` off, add the user and switch it back — which opens the
+  -- gate for every sign-up in the gap, and leaves no redemption row behind to say
+  -- how that account was opened.
+  code := coalesce(
+    nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), ''),
+    nullif(trim(coalesce(new.raw_app_meta_data ->>'offer_code', '')), '')
+  );
 
   -- PRESENCE only. What a code looks like is decided in exactly one place —
   -- the `offer_codes_seven_digits` constraint above — and repeating the pattern

@@ -1165,20 +1165,66 @@ you like:
 delete from public.offer_code_attempts where last_seen < now() - interval '7 days';
 ```
 
+### Creating a user by hand
+
+Don't reach for the switch below. Pass the code the way only the service key
+can, in **app metadata**:
+
+```ts
+await admin.auth.admin.createUser({
+  email: 'someone@example.com',
+  password: '...',
+  app_metadata: { offer_code: '1234567' }
+})
+```
+
+The trigger reads `raw_user_meta_data->>'offer_code'` first and falls back to
+`raw_app_meta_data->>'offer_code'`. The fallback is safe **because
+`auth.signUp` cannot write app metadata** — GoTrue ignores it there, so this is a
+service-key-only channel. The account is opened against a real code, the tally
+moves, and there is a redemption row to say how it was opened.
+
 ### Turning it off
 
-For creating a user by hand in the Supabase dashboard, or to open sign-ups to
-everyone:
+To open sign-ups to everyone:
 
 ```sql
 update public.bank_settings set offer_code_required = false where id = 1;
--- ... add the user ...
+-- ...
 update public.bank_settings set offer_code_required = true  where id = 1;
 ```
 
 The switch lives in `bank_settings` so this never means dropping the trigger. It
 defaults to **on**, because a gate that defaults to open is not a gate — and a
 missing `bank_settings` row reads as on for the same reason.
+
+While it is off **no code is consumed and no redemption row is written**, for
+every account created in the window — not just the one you meant. That is the
+usual answer to "sign-ups work but `offer_code_redemptions` is empty":
+
+```sql
+-- is the gate actually on?
+select offer_code_required from public.bank_settings where id = 1;
+
+-- is the trigger actually there? (expect one row)
+select tgname, tgenabled from pg_trigger
+ where tgrelid = 'auth.users'::regclass and tgname = 'on_auth_user_offer_code';
+
+-- accounts opened with no redemption to show for them
+select u.id, u.email, u.created_at
+  from auth.users u
+  left join public.offer_code_redemptions r on r.user_id = u.id
+ where r.user_id is null order by u.created_at desc;
+```
+
+If the gate is on and the trigger is there, no user can have been created
+without spending a code — so anything the last query returns predates one or the
+other.
+
+One more thing that reads as "missing rows" and is not: `offer_code_redemptions`
+is keyed by `user_id`, one row per user, and a second redemption by the same user
+updates that row rather than adding one. It records how an account was opened,
+not a history of attempts.
 
 ### One thing to know about the error
 
