@@ -655,7 +655,7 @@ Keep it current from wherever you take a price feed. If the column is absent or
 the read fails, the app falls back to its built-in figure rather than leaving
 the screen unable to quote anything.
 
-The receiving address on that screen is live — a mainnet P2WPKH address in
+The receiving address on that screen is live — a mainnet P2PKH address in
 `js/pages/fund-account.js`, checksum verified. The QR is drawn from it at
 render time as a BIP-21 `bitcoin:` URI with the amount prefilled, so changing
 the address changes every QR the app draws; there is no image to keep in step.
