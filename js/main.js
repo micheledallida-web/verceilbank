@@ -1029,11 +1029,6 @@ export async function loadPage(name, ...args) {
   pageRoot.innerHTML = html;
   pageRoot.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
-  // The navigation bar is sticky to the board, so it parks at the end of it and
-  // lets the footer past. A screen opens over the whole viewport with the page
-  // behind it frozen, and the bar has to be on the screen for that — pinned for
-  // as long as one is open. See body.screen-open in css/input.css.
-  document.body.classList.add('screen-open');
 
   // Each page module gets shared helpers passed in, rather than importing
   // globals off `window` — keeps every page module self-contained and testable.
@@ -1042,7 +1037,6 @@ export async function loadPage(name, ...args) {
     pageRoot.classList.add('hidden');
     pageRoot.innerHTML = '';
     document.body.style.overflow = '';
-    document.body.classList.remove('screen-open');
   };
 
   mod.init(pageRoot, {
@@ -1573,19 +1567,6 @@ document.getElementById('homeQuickTransfer').addEventListener('click', () => loa
 document.getElementById('homeQuickSendMoney').addEventListener('click', () => loadPage('send-money'));
 document.getElementById('homeQuickDeposit').addEventListener('click', () => loadPage('fund-account'));
 document.getElementById('homeQuickStatements').addEventListener('click', () => loadPage('docs-hub'));
-
-// ---------- Footer links that have a screen in the app ----------
-// The footer at the end of the board is the marketing site's, shared markup and
-// all, and most of its links are the marketing site's too. The handful that
-// name something this app actually has — support, the advisor, the help centre,
-// privacy — carry a data-page instead of an href, and open it over the board
-// rather than navigating away from a signed-in session.
-document.querySelectorAll('.main-footer [data-page]').forEach((link) => {
-  link.addEventListener('click', (event) => {
-    event.preventDefault();
-    loadPage(link.dataset.page);
-  });
-});
 
 // ---------- Bottom nav dropdown menu sheet (Citi-style) ----------
 const navMenus = {

@@ -1,24 +1,20 @@
 /* ==========================================================================
    SITE FOOTER
-   The accordion footer that closes every full page: the marketing site
-   (index.html) and the signed-in dashboard, which reaches the same footer when
-   a customer scrolls past the end of the board.
+   The accordion footer that closes the marketing site (index.html), with
+   js/footer-accordion.js for the groups that open and close on a phone.
 
-   It lives in its own file because it is the one component both stylesheets
-   need. It began as a <style> block inside index.html; copying it into the
-   app's stylesheet would have left two footers that only matched until the
-   next edit to one of them. This is the only copy, and both pages link it.
-
-   Nothing here is themed. The footer is the same deep navy on the marketing
-   site, on the app in light mode and on the app in dark mode — a footer that
-   changed colour underneath the board would read as a different page.
+   It began as a <style> block and an inline <script> inside index.html, and it
+   was lifted out here when the dashboard grew the same footer. The dashboard
+   does not have one any more — the app ends on the board — so index.html is
+   the only page that links this today. It stays a file rather than going back
+   inline: it is the whole footer in one place, and it is where the app would
+   pick it up again if it ever wants it.
    ========================================================================== */
 
 /* No `!important` on any of this, though there was when it lived inside
    index.html: it was there to beat an older, unused `.main-footer` rule still
    sitting in index.css. This file is linked after index.css, so it wins on
-   order alone — and without the flags the app can add a rule of its own at the
-   bottom of this file without having to shout over itself. */
+   order alone. */
 .main-footer {
   background-color: #0B1F33;
   color: #ffffff;
@@ -243,15 +239,4 @@
   .footer-content-wrapper {
     max-width: 1600px;
   }
-}
-
-/* ==========================================================================
-   INSIDE THE APP
-   Nothing covers the footer in the app: the navigation bar parks at the end of
-   the board above it rather than floating over it. All it needs is the home
-   indicator's strip on a phone, since it is now the last thing on the page.
-   ========================================================================== */
-
-.app-footer {
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
 }
