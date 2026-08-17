@@ -1213,127 +1213,23 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* ---- the card face ---- */
+/* The product render, cropped to the card and carrying its rounded corners in
+   the alpha channel. The height comes from the file's own ratio rather than a
+   declared one, so the face can never be stretched.
+
+   The radius is repeated here because a box-shadow traces the border box, not
+   the alpha: without it the soft shadow would show square corners behind a
+   rounded card. It is given as a horizontal/vertical percentage pair so the
+   corner stays circular at any width — 3.41% of the width and 5.33% of the
+   height are the same number of pixels at this file's 1.5619 ratio, which a
+   single percentage (an ellipse on a non-square box) would not be. */
 .credit-card {
-  position: relative;
+  display: block;
   width: 100%;
   max-width: 340px;
-  /* The ISO/IEC 7810 ID-1 ratio every payment card uses. */
-  aspect-ratio: 1.586 / 1;
-  border-radius: 14px;
-  overflow: hidden;
-  background:
-    radial-gradient(120% 90% at 78% 18%, rgba(56, 189, 248, 0.20) 0%, rgba(56, 189, 248, 0) 55%),
-    linear-gradient(150deg, #0B1220 0%, #0E1A2B 45%, #060B14 100%);
+  height: auto;
+  border-radius: 3.41% / 5.33%;
   box-shadow: 0 12px 30px rgba(3, 10, 20, 0.45);
-  color: #ffffff;
-  font-size: clamp(9px, 2.6vw, 11px);
-}
-
-/* The lit arc across the face. */
-.credit-card::after {
-  content: "";
-  position: absolute;
-  left: -20%;
-  right: -20%;
-  bottom: 18%;
-  height: 60%;
-  border-radius: 50%;
-  border-top: 1.5px solid rgba(134, 196, 64, 0.55);
-  filter: blur(0.4px);
-  pointer-events: none;
-}
-
-.cc-ribbon {
-  position: absolute;
-  top: 13%;
-  right: -22%;
-  width: 72%;
-  transform: rotate(45deg);
-  background: linear-gradient(90deg, #9BD24F, #7FBF3F);
-  color: #10240A;
-  font-size: 0.82em;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  padding: 0.45em 0;
-  z-index: 2;
-}
-
-.cc-brand {
-  position: absolute;
-  top: 11%;
-  left: 7%;
-  display: flex;
-  align-items: center;
-  gap: 0.5em;
-}
-
-.cc-mark { height: 2.4em; width: auto; display: block; }
-
-.cc-wordmark { display: flex; flex-direction: column; line-height: 1.05; }
-.cc-wordmark b {
-  font-size: 1.55em;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-.cc-wordmark i {
-  font-style: normal;
-  font-size: 1em;
-  font-weight: 600;
-  letter-spacing: 0.42em;
-  color: #9BD24F;
-}
-
-/* The chip: contact plate with its contact lines, not a gold rectangle. */
-.cc-chip {
-  position: absolute;
-  top: 40%;
-  left: 8%;
-  width: 15%;
-  aspect-ratio: 4 / 3;
-  border-radius: 4px;
-  background: linear-gradient(145deg, #E8EAED 0%, #B9BEC6 45%, #8E949E 100%);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.6);
-}
-
-.cc-chip::before,
-.cc-chip::after {
-  content: "";
-  position: absolute;
-  inset: 22% 12%;
-  border: 0.5px solid rgba(90, 96, 104, 0.75);
-  border-left: none;
-  border-right: none;
-}
-.cc-chip::after { inset: 40% 26%; border: 0.5px solid rgba(90, 96, 104, 0.75); }
-
-.cc-wave {
-  position: absolute;
-  top: 41%;
-  right: 9%;
-  width: 8%;
-  color: rgba(255, 255, 255, 0.92);
-}
-.cc-wave svg { width: 100%; height: auto; display: block; }
-
-.cc-name {
-  position: absolute;
-  left: 8%;
-  bottom: 13%;
-  font-size: 1.15em;
-  letter-spacing: 0.22em;
-  color: rgba(255, 255, 255, 0.92);
-}
-
-.cc-network {
-  position: absolute;
-  right: 8%;
-  bottom: 13%;
-  font-size: 1.05em;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: #9BD24F;
 }
 
 /* ---- the offer beside it ---- */
@@ -1379,7 +1275,7 @@ a { text-decoration: none; color: inherit; }
     padding: 3rem 2.5rem;
   }
 
-  .credit-card { max-width: 380px; font-size: 12px; }
+  .credit-card { max-width: 380px; }
 
   .card-promo-body {
     flex: 1 1 auto;
@@ -1394,12 +1290,6 @@ a { text-decoration: none; color: inherit; }
 /* The body is a flex column, so the button was stretching to the full column
    width instead of sizing to its label. */
 .card-promo-body .promo-cta-btn { align-self: flex-start; }
-
-/* A little more weight in the ribbon, closer to the printed card. */
-.cc-ribbon {
-  font-size: 0.9em;
-  padding: 0.6em 0;
-}
 
 /* The card block carries `!important` on its width (it has to beat the 640px
    cap on .promo-container), which also beat the wide-screen rule that takes
