@@ -2497,17 +2497,31 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
    stops scrolling, so a bar that parks with the board would be wherever the
    customer happened to have scrolled to — off the bottom of the screen, if they
    were reading the footer when they tapped. Pinned for as long as a screen is
-   open, which is how it behaved everywhere before. Horizontally it stays where
-   its margins put it, so the centred bar above stays centred. */
-body.screen-open .home-nav {
-  position: fixed;
-  bottom: 0;
-  /* Both insets, because a fixed box with `width: auto` and no insets shrinks
-     to fit its contents — five icons huddled in a 272px stub rather than a bar.
-     With an explicit width (the centred column below 1024px) these two plus
-     the auto margins centre it instead. */
-  left: 0;
-  right: 0;
+   open, which is how it behaved everywhere before.
+
+   Only where the bar is at the bottom, and that bound is the whole point. From
+   1024px up the bar is at the TOP of the window and already fixed, with `top:
+   0` set on it. This rule outweighs that one — it names two classes to its one
+   — so unbounded it added `bottom: 0` to a box that still had `top: 0`, and a
+   fixed box pinned to both edges is as tall as the window. The bar became a
+   white sheet over the whole screen at z-index 50, with the screen the customer
+   had just opened rendered perfectly underneath it and invisible. That is the
+   blank desktop page: not an empty screen, a covered one.
+
+   `top: auto` as well as the bound, so that even inside these widths the rule
+   can only ever move the bar to the bottom, never stretch it. */
+@media (max-width: 1023.98px) {
+  body.screen-open .home-nav {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    /* Both insets, because a fixed box with `width: auto` and no insets shrinks
+       to fit its contents — five icons huddled in a 272px stub rather than a
+       bar. With an explicit width (the centred column above 431px) these two
+       plus the auto margins centre it instead. */
+    left: 0;
+    right: 0;
+  }
 }
 
 /* ---- screens wider than the app itself ----
