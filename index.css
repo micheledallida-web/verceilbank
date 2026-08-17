@@ -1220,15 +1220,15 @@ a { text-decoration: none; color: inherit; }
    The radius is repeated here because a box-shadow traces the border box, not
    the alpha: without it the soft shadow would show square corners behind a
    rounded card. It is given as a horizontal/vertical percentage pair so the
-   corner stays circular at any width — 3.41% of the width and 5.33% of the
-   height are the same number of pixels at this file's 1.5619 ratio, which a
+   corner stays circular at any width — 3.83% of the width and 6.15% of the
+   height are the same number of pixels at this file's 1.6066 ratio, which a
    single percentage (an ellipse on a non-square box) would not be. */
 .credit-card {
   display: block;
   width: 100%;
   max-width: 340px;
   height: auto;
-  border-radius: 3.41% / 5.33%;
+  border-radius: 3.83% / 6.15%;
   box-shadow: 0 12px 30px rgba(3, 10, 20, 0.45);
 }
 
