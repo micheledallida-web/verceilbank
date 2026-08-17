@@ -3193,59 +3193,38 @@ html.is-scrolling * {
   }
 }
 
-/* ---- the clock, back at the far end of the hero row ----
-   `.home-clock` keeps the `margin-left: auto` it was written with, so the time
-   sits opposite the balances at the end of the line.
+/* ---- the clock, up on the greeting line ----
+   Opposite the name, on the right edge the account cards establish.
 
-   What was wrong was not the clock, it was the line it sits on. `.home-top`
-   splits 1.35fr / 1fr while the cards below split into equal columns, so the
-   hero row ran 73px past the right edge of the Savings card at 1440 and the
-   time landed in the gutter between Verceil Checking and the investment block
-   rather than above the card's edge.
+   Anchored to the shell rather than to anything in the hero, because the shell
+   is the one box that knows both numbers this needs: it is the element the
+   cards' columns are measured from, so the card edge can be derived from its
+   own width instead of guessed. Everything absolutely positioned inside the
+   shell already has its own positioned parent — the promo artwork, the select
+   chevrons, the alerts badge — so giving it a containing block moves nothing
+   else.
 
-   The row is now held to the same width as the column of cards underneath it,
-   so the time lands exactly on the Savings card's right edge — the same
-   formula the shell uses for its own width, so the two cannot drift apart.
-   Only the stats line is constrained; the greeting, the balance and the
-   actions beside them are untouched. */
+   `right` is the shell's padding plus the distance from the content's right
+   edge back to the end of the first card column. `top` is the greeting name's
+   own offset, which is fixed: the header's padding and two lines of type do
+   not change with the width.
+
+   Desktop only — on a phone the clock stays at the end of the line of
+   balances, where it was written to be. */
 @media (min-width: 1024px) {
-  .home-hero-row {
-    /* less the 4px of horizontal padding `.home-hero` puts around the row,
-       which otherwise carries the right edge 4px past the card's. */
-    max-width: calc((min(100vw, var(--app-col)) - 2 * var(--app-pad) - 28px) / 2 - 4px);
-  }
-}
-
-/* Three columns of cards up here, and the gap widens to 32px with them, so the
-   first column is a third of the board less two of those gaps. */
-@media (min-width: 1600px) {
-  .home-hero-row {
-    max-width: calc((min(100vw, var(--app-col)) - 2 * var(--app-pad) - 64px) / 3 - 4px);
-  }
-}
-
-/* ---- the clock, up beside the balance ----
-   Lifted out of the stats line to sit opposite the total balance, still on the
-   right edge the line already establishes — which is the edge of the account
-   cards below.
-
-   Taken out of flow rather than moved in the markup, and positioned against
-   the row: `right: 0` is the row's right edge, so it inherits the alignment
-   worked out above instead of repeating the arithmetic. The 13px is the row's
-   own top margin, which lands the time's baseline on the balance's rather than
-   somewhere between it and the labels underneath.
-
-   Desktop only. On a phone the clock belongs at the end of the line of
-   balances, which is where it stays. */
-@media (min-width: 1024px) {
-  .home-hero-row {
-    position: relative;
-  }
+  .app-shell { position: relative; }
 
   .home-clock {
     position: absolute;
-    right: 0;
-    bottom: calc(100% + 13px);
+    top: 32px;
+    right: calc(var(--app-pad) + (100% - 2 * var(--app-pad) + 28px) / 2);
     margin-left: 0;
+  }
+}
+
+/* Three columns of cards up here, with a 32px gutter between them. */
+@media (min-width: 1600px) {
+  .home-clock {
+    right: calc(var(--app-pad) + ((100% - 2 * var(--app-pad)) * 2 + 64px) / 3);
   }
 }
