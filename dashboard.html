@@ -186,12 +186,18 @@
         <svg viewBox="0 0 24 24"><path d="M7 10l5-7 5 7M7 14l5 7 5-7"></path></svg>
         <span>Transfer</span>
       </button>
+      <!-- A paper plane, not the bare triangle that was here. The triangle read
+           as a play button or a cursor depending on who was looking at it, and
+           an arrowhead is not what anyone pictures when they think "send". -->
       <button id="homeQuickSendMoney" class="home-act">
-        <svg viewBox="0 0 24 24"><path d="M12 3l9 18-9-4-9 4 9-18z"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"></path></svg>
         <span>Send Money</span>
       </button>
+      <!-- An arrow coming down onto a line: money arriving in the account. It
+           was a plain +, which is the mark this app uses for opening a new
+           account — the one thing Deposit does not do. -->
       <button id="homeQuickDeposit" class="home-act">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M12 3v12M7 12l5 5 5-5M5 21h14"></path></svg>
         <span>Deposit</span>
       </button>
       <button id="homeQuickStatements" class="home-act">
@@ -670,11 +676,15 @@
           <span>Help & Support</span>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
+        <!-- Signed in, these are screens rather than pages: data-page opens
+             them over the board (wired in js/main.js). The groups above have no
+             equivalent inside the app, so they stay as the marketing site
+             writes them. -->
         <div class="footer-section-links">
           <a href="mailto:support@verceilbank.com">Email Support</a>
-          <a href="#">Customer Service</a>
-          <a href="#">Schedule a Meeting</a>
-          <a href="#">FAQs</a>
+          <a href="#" data-page="contact-support">Customer Service</a>
+          <a href="#" data-page="advisor">Schedule a Meeting</a>
+          <a href="#" data-page="help-center">FAQs</a>
         </div>
       </div>
 
@@ -706,7 +716,7 @@
         <div class="footer-legal-links-list">
           <a href="banking-policy.html">Customer Banking Policy</a>
           <a href="#">Terms & Conditions</a>
-          <a href="#">Privacy</a>
+          <a href="#" data-page="privacy">Privacy</a>
           <a href="#">Notice at Collection</a>
           <a href="#">Do Not Sell or Share My Personal Information</a>
           <a href="#">Accessibility</a>

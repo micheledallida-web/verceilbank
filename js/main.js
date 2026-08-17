@@ -1568,6 +1568,19 @@ document.getElementById('homeQuickSendMoney').addEventListener('click', () => lo
 document.getElementById('homeQuickDeposit').addEventListener('click', () => loadPage('fund-account'));
 document.getElementById('homeQuickStatements').addEventListener('click', () => loadPage('docs-hub'));
 
+// ---------- Footer links that have a screen in the app ----------
+// The footer at the end of the board is the marketing site's, shared markup and
+// all, and most of its links are the marketing site's too. The handful that
+// name something this app actually has — support, the advisor, the help centre,
+// privacy — carry a data-page instead of an href, and open it over the board
+// rather than navigating away from a signed-in session.
+document.querySelectorAll('.main-footer [data-page]').forEach((link) => {
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    loadPage(link.dataset.page);
+  });
+});
+
 // ---------- Bottom nav dropdown menu sheet (Citi-style) ----------
 const navMenus = {
   // Accounts lists accounts, and nothing else. Statements had a row here and a
