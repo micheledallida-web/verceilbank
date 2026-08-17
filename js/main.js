@@ -1029,6 +1029,11 @@ export async function loadPage(name, ...args) {
   pageRoot.innerHTML = html;
   pageRoot.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  // The navigation bar is sticky to the board, so it parks at the end of it and
+  // lets the footer past. A screen opens over the whole viewport with the page
+  // behind it frozen, and the bar has to be on the screen for that — pinned for
+  // as long as one is open. See body.screen-open in css/input.css.
+  document.body.classList.add('screen-open');
 
   // Each page module gets shared helpers passed in, rather than importing
   // globals off `window` — keeps every page module self-contained and testable.
@@ -1037,6 +1042,7 @@ export async function loadPage(name, ...args) {
     pageRoot.classList.add('hidden');
     pageRoot.innerHTML = '';
     document.body.style.overflow = '';
+    document.body.classList.remove('screen-open');
   };
 
   mod.init(pageRoot, {
