@@ -247,17 +247,11 @@
 
 /* ==========================================================================
    INSIDE THE APP
-   The dashboard's navigation bar is fixed over the foot of the page, and the
-   board reserves --scroll-end at the end of the document to clear it. With the
-   footer down there, that runway belongs inside the footer: left below it, it
-   shows as a band of page background between the disclosures and the bar —
-   deep navy on a slightly different navy in the dark theme, and bright blue in
-   the light one.
-
-   The variable is declared in the app's stylesheet only, so on the marketing
-   site the fallback leaves this rule doing nothing.
+   Nothing covers the footer in the app: the navigation bar parks at the end of
+   the board above it rather than floating over it. All it needs is the home
+   indicator's strip on a phone, since it is now the last thing on the page.
    ========================================================================== */
 
 .app-footer {
-  padding-bottom: calc(2rem + var(--scroll-end, 0px));
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
 }
