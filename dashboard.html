@@ -217,7 +217,14 @@
 
     </div>
 
+    <!-- The board's two stacks on a wide screen: the accounts on the left, what
+         the bank is offering on the right. Two real elements rather than one
+         flow split by the browser — see .home-columns in css/input.css for why
+         that had to change. On a phone they are plain blocks and the board
+         reads top to bottom exactly as it always has. -->
     <div class="home-columns">
+
+    <div class="home-col home-col-accounts">
 
     <!-- ================= CHECKING (hidden until opened) =================
          Every account card on this screen is hidden until a row in `accounts`
@@ -401,6 +408,9 @@
     </button>
 
     <!-- ================= AVAILABLE TO YOU ================= -->
+    </div><!-- /.home-col-accounts -->
+
+    <div class="home-col home-col-offers" id="homeOffersCol">
     <p class="home-lab" id="homeOffersLabel">Available to You</p>
     <div id="homeOffers">
 
@@ -603,6 +613,8 @@
       </div>
 
     </div>
+
+    </div><!-- /.home-col-offers -->
 
     </div>
 
