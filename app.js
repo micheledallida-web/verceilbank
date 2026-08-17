@@ -259,3 +259,42 @@ document.addEventListener('DOMContentLoaded', () => {
   build();
   schedule();
 })();
+
+/* === CURSOR GLOW ON THE CARDS — APPENDED ===
+   Hands the pointer's position to the stylesheet, which does the rest. Two
+   custom properties on the card under the cursor, --glow-x and --glow-y, and
+   no other work: index.css owns the colour, the size, the shape and the fade,
+   so the look can be retuned without touching this.
+
+   One delegated listener rather than a pair on every card, and one write per
+   animation frame rather than one per event — a pointer reports far more often
+   than the screen redraws, and the frames in between are thrown away anyway. */
+(function () {
+  if (!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+  var CARDS = '.promo-card, .quick-link-item';
+  var frame = null;
+  var pendingCard = null;
+  var pendingX = 0;
+  var pendingY = 0;
+
+  function paint() {
+    frame = null;
+    var rect = pendingCard.getBoundingClientRect();
+    pendingCard.style.setProperty('--glow-x', (pendingX - rect.left) + 'px');
+    pendingCard.style.setProperty('--glow-y', (pendingY - rect.top) + 'px');
+  }
+
+  document.addEventListener('pointermove', function (e) {
+    // A synthesised move from a tap has no business lighting anything up.
+    if (e.pointerType && e.pointerType !== 'mouse') return;
+
+    var card = e.target && e.target.closest ? e.target.closest(CARDS) : null;
+    if (!card) return;
+
+    pendingCard = card;
+    pendingX = e.clientX;
+    pendingY = e.clientY;
+    if (!frame) frame = requestAnimationFrame(paint);
+  }, { passive: true });
+})();
