@@ -412,6 +412,18 @@
 
     <div class="home-col home-col-offers" id="homeOffersCol">
     <p class="home-lab" id="homeOffersLabel">Available to You</p>
+    <!-- ONE ORDER, FOR EVERY CUSTOMER
+         Verceil Checking, then the Investment Account, then the Signature
+         Card, then Interest Checking. Nothing sorts this list at runtime: each
+         card is shown or hidden on its own (renderTotals in js/main.js), so
+         what anybody sees is this sequence with the ones they already hold
+         taken out of it. Somebody who holds checking sees the same three cards
+         in the same places as somebody who holds none, minus the first.
+
+         The order lives here, in the markup, and that is the whole mechanism —
+         so moving one of these blocks moves it for every customer at once.
+         Keep new offers in their intended position rather than appended, and
+         the promise holds without anything having to enforce it. -->
     <div id="homeOffers">
 
       <!-- ---- Verceil Checking ---- -->
