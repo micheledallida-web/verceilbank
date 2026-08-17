@@ -7,8 +7,8 @@
 //
 // THE ORDER IS THE POINT
 //
-// Mint -> send -> mark sent. The mark happens only after Resend has accepted
-// the message, never before. Marking first and sending second means a bounced
+// Mint -> send -> mark sent. The mark happens only after the mail server has
+// accepted the message, never before. Marking first and sending second means a bounced
 // or refused send still costs the recipient their window: they never get the
 // email, and the code quietly dies seven days later anyway.
 //
@@ -26,6 +26,7 @@
 // able to mint themselves an invitation.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { readSmtpSettings, sendMail } from '../_shared/mailer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,15 +86,16 @@ Deno.serve(async (req) => {
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
   const ADMIN_SECRET = Deno.env.get('OFFER_CODE_ADMIN_SECRET');
-  // The invitation can go out from the support address; there is nothing wrong
-  // with an applicant replying to it, and one fewer domain to verify.
-  const FROM = Deno.env.get('OFFER_CODE_FROM') ?? Deno.env.get('SUPPORT_FROM');
 
-  if (!RESEND_API_KEY || !FROM) {
-    console.error('send-offer-code is missing RESEND_API_KEY or OFFER_CODE_FROM/SUPPORT_FROM');
-    return json({ error: 'Email is not configured' }, 500);
+  // The invitation goes out from the support mailbox. It is the only mailbox
+  // there is a password for, and a mailbox will only send as itself — so there
+  // is no separate sender to configure here. An applicant replying to it lands
+  // in support@, which is where a reply should go anyway.
+  const { settings, missing } = readSmtpSettings();
+  if (!settings) {
+    console.error('send-offer-code is missing:', missing.join(', '));
+    return json({ error: 'Email is not configured', missing }, 500);
   }
 
   // No secret set means no way to tell the operator from a stranger. Refusing
@@ -115,7 +117,7 @@ Deno.serve(async (req) => {
     const requested = body.code ? String(body.code).replace(/\D/g, '') : '';
 
     // Deliberately shallow. This is not validating that an address exists, only
-    // that it is not obviously not one — Resend decides the rest, and a stricter
+    // that it is not obviously not one — the mail server decides the rest, and a stricter
     // regex here would reject valid addresses nobody would think to test.
     if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
       return json({ error: 'A valid email address is required' }, 400);
@@ -172,16 +174,15 @@ Deno.serve(async (req) => {
       'If you were not expecting this, you can ignore it.',
     ].join('\n');
 
-    const sent = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: [email], subject, html, text }),
-    });
+    const sent = await sendMail(settings, { to: email, subject, html, text });
 
     if (!sent.ok) {
-      const detail = await sent.text();
-      console.error('Resend send failed:', sent.status, detail, minted ? `(code ${code} left unsent)` : '');
-      return json({ error: 'Could not send the invitation' }, 502);
+      console.error('SMTP send failed:', sent.code, sent.message, minted ? `(code ${code} left unsent)` : '');
+      return json({
+        error: 'Could not send the invitation',
+        smtp_code: sent.code,
+        smtp_message: sent.message,
+      }, 502);
     }
 
     // Only now. The message is accepted, so the window may start.

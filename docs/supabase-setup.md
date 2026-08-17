@@ -963,9 +963,9 @@ gets no such grant on purpose: only the sign-up trigger may spend a code.
 ### Sending them
 
 `supabase/functions/send-offer-code` does the whole thing: mints a code, emails
-it through Resend, and marks it sent — in that order, and only marking it once
-Resend has accepted the message. Marking first would mean a bounced send still
-costs the recipient their window.
+it from the support mailbox, and marks it sent — in that order, and only
+marking it once the mail server has accepted the message. Marking first would
+mean a bounced send still costs the recipient their window.
 
 ```bash
 curl -X POST "$SUPABASE_URL/functions/v1/send-offer-code" \
@@ -982,11 +982,13 @@ curl -X POST "$SUPABASE_URL/functions/v1/send-offer-code" \
 | `max_uses` | optional | defaults to 1 — an invitation is for one person |
 | `code` | optional | resend an existing code instead of minting. Does **not** extend its deadline |
 
-It needs `RESEND_API_KEY`, `OFFER_CODE_ADMIN_SECRET`, and a from-address in
-`OFFER_CODE_FROM` (or it reuses `SUPPORT_FROM`). It is guarded by that shared
-secret rather than a customer session, because no signed-in user should be able
-to mint themselves an invitation — and with the secret unset it refuses every
-request rather than falling open.
+It needs `OFFER_CODE_ADMIN_SECRET` and the same SMTP settings as section 5i —
+it sends from the support mailbox, since that is the only mailbox there is a
+password for, and an applicant replying to an invitation should land in
+support@ anyway. It is guarded by that shared secret rather than a customer
+session, because no signed-in user should be able to mint themselves an
+invitation — and with the secret unset it refuses every request rather than
+falling open.
 
 If a send fails, the code is left behind unsent. That is inert — nobody has
 been told it, and with `sent_at` null it cannot age — but it is litter:
@@ -1379,56 +1381,91 @@ customer's messages to their bank. Do not skip the second query.
 
 ### 2. Point the mail at your business address
 
+The mail goes out through the `support@verceilbank.com` mailbox on **Namecheap
+Private Email**, over SMTP. There is no API key, because a mailbox provider has
+no send API — the function logs in as the mailbox and hands the message over
+the way a mail client would.
+
 ```bash
 supabase functions deploy support-notify
 supabase secrets set \
-  RESEND_API_KEY=re_xxx \
+  SMTP_USER=support@verceilbank.com \
+  SMTP_PASSWORD='your-mailbox-password' \
   SUPPORT_INBOX=you@yourbusiness.com \
   SUPPORT_FROM='Verceil Bank <support@verceilbank.com>'
 ```
 
 | Secret | | |
 | --- | --- | --- |
-| `RESEND_API_KEY` | required | from resend.com. Server-side only — it must never reach the browser, which is the entire reason this runs as a function |
+| `SMTP_USER` | required | the full mailbox address. Namecheap wants the whole address, not a username |
+| `SMTP_PASSWORD` | required | the mailbox password from the Private Email dashboard — there is no separate app password. Server-side only: this password can *read* support@ as well as send from it, which is the entire reason this runs as a function |
 | `SUPPORT_INBOX` | required | **where the message lands: your business email** |
-| `SUPPORT_FROM` | required | the sender. Must be an address on a domain verified with Resend, or the mail is refused |
+| `SUPPORT_FROM` | optional | adds a display name, as `Verceil Bank <support@verceilbank.com>`. Defaults to `SMTP_USER`. It cannot change *who* the mail is from — the provider refuses a From that is not the mailbox that logged in |
+| `SMTP_HOST` | optional | defaults to `mail.privateemail.com` |
+| `SMTP_PORT` | optional | defaults to `465`. **Leave it there** — see below |
 
-With any of the three unset the function answers "Email is not configured" and
-names the missing ones in the response. The customer still sees their message
-saved and the thread open, because the app never waits on the mail — a mail
-outage must not look to somebody like a failed send.
+**Port 465, not 587.** Namecheap documents both, but Supabase's edge runtime
+does not allow outbound connections on port 25 and is unreliable on 587, so 465
+with implicit TLS is the one that actually connects. A send that hangs and then
+times out with nothing in the logs is this.
+
+With a required setting unset the function answers "Email is not configured"
+and names the missing ones in the response. The customer still sees their
+message saved and the thread open, because the app never waits on the mail — a
+mail outage must not look to somebody like a failed send.
 
 Ask it about itself rather than sending a message to find out:
 
 ```bash
 curl "$SUPABASE_URL/functions/v1/support-notify" -H "Authorization: Bearer $SUPABASE_ANON_KEY"
-# {"function":"support-notify","deployed":true,"configured":true,"missing":[],"inbound_replies_enabled":false}
+# {"function":"support-notify","deployed":true,"configured":true,"missing":[],
+#  "transport":"smtp://mail.privateemail.com:465","inbound_replies_enabled":false}
 ```
 
-`404` means the function was never deployed — do step 2 above. A reply with
-`"configured": false` lists the secrets still to set. It reports only whether
+`404` means the function was never deployed — do the deploy above. A reply with
+`"configured": false` lists the settings still to set. It reports only whether
 each one is present, never its value.
 
-When the secrets are all set and mail still does not arrive, the send itself
-answers with what Resend said:
+Add `?verify=1` and it logs in to the mailbox without sending anything, which
+is the only way to tell a wrong password apart from a message that was accepted
+and then went missing:
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify?verify=1" -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+# {"smtp_login":"failed","smtp_code":535,"smtp_message":"535 Incorrect authentication data"}
+```
+
+When a send fails, the response carries what the mail server said:
 
 ```json
 { "error": "Could not send the notification email",
-  "resend_status": 403,
-  "resend_message": "The verceilbank.com domain is not verified..." }
+  "smtp_code": 535,
+  "smtp_message": "535 Incorrect authentication data" }
 ```
 
-That one is the usual culprit: `SUPPORT_FROM` has to be an address on a domain
-verified in Resend. Owning `verceilbank.com` is not enough — the domain has to
-be added in Resend and its DNS records published, or every send is refused.
+The usual ones:
 
-### 3. Replying by email (optional)
+| | |
+| --- | --- |
+| `535` | wrong mailbox password, or `SMTP_USER` is not the full address |
+| `550` / `553` | the From is not the mailbox that logged in — unset `SUPPORT_FROM`, or point it at the same address |
+| a timeout, no code | the port. See above: use 465 |
 
-Set `SUPPORT_INBOUND_ADDRESS` and the mail carries a `Reply-To` tagged with the
-thread id, so a plain reply from any mail client comes back into the
-customer's app through `support-inbound`. Leave it unset and the mail says so
-in its footer rather than promising a reply route that is not there — answer
-from the Supabase dashboard instead.
+### 3. Replying by email — not available on Namecheap
+
+Sending and receiving are separate capabilities, and Private Email only does
+the first. Turning a reply into a message in the customer's app needs a
+provider that **posts arriving mail to a webhook** (Resend, Mailgun, SendGrid
+and Postmark all do; a mailbox does not). Namecheap has no such hook, so there
+is nothing to point at `support-inbound` while it is the only mail account.
+
+**Leave `SUPPORT_INBOUND_ADDRESS` unset.** That is the correct state, not a
+missing step: the outbound mail then drops its `Reply-To` and its footer says
+to answer from the Supabase dashboard, instead of inviting a reply that would
+silently go nowhere. Answer threads from the dashboard, or from the app.
+
+If you later add a provider that does inbound parsing, `support-inbound` is
+already written for it:
 
 ```bash
 supabase functions deploy support-inbound
@@ -1437,9 +1474,9 @@ supabase secrets set \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
-Then point your mail provider's inbound webhook at the function URL and include
-that secret — it is what stops anyone who finds the URL from writing messages
-into a customer's conversation as the bank.
+Then point that provider's inbound webhook at the function URL and include the
+secret — it is what stops anyone who finds the URL from writing messages into a
+customer's conversation as the bank.
 
 ### 4. Check it end to end
 
@@ -1530,7 +1567,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed with `SUPPORT_INBOX` set to your business email (section 5i)
+- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox and `SUPPORT_INBOX` set to your business email — check with `?verify=1` (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**

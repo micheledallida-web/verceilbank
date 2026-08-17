@@ -1,12 +1,25 @@
 // Turns a reply to a support email back into a message in the customer's app.
 //
-// Resend posts every inbound email here. The thread is identified by the plus
-// tag on the address it was sent to — support+<thread-id>@domain — which is
-// what the outbound side put in Reply-To, so answering is just hitting reply.
+// A mail provider posts every inbound email here. The thread is identified by
+// the plus tag on the address it was sent to — support+<thread-id>@domain —
+// which is what the outbound side put in Reply-To, so answering is just
+// hitting reply.
 //
-// This endpoint is public by necessity: Resend has no Supabase session. It is
-// guarded by a shared secret in the URL, because anything that can post here
-// can write messages that the customer will read as coming from their bank.
+// THIS NEEDS A PROVIDER THAT POSTS INBOUND MAIL TO A WEBHOOK
+//
+// Sending and receiving are not the same capability. Namecheap Private Email —
+// which is what sends the outbound mail — is a mailbox, and a mailbox has no
+// way to hand an arriving message to a URL. Nothing will ever call this while
+// that is the only mail account, and leaving SUPPORT_INBOUND_ADDRESS unset is
+// the correct state then: the outbound mail drops its Reply-To and says in its
+// footer to answer from the dashboard, rather than promising a route that
+// silently goes nowhere. This function is here for a provider that does offer
+// inbound parsing.
+//
+// The endpoint is public by necessity: the provider has no Supabase session.
+// It is guarded by a shared secret in the URL, because anything that can post
+// here can write messages that the customer will read as coming from their
+// bank.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
@@ -26,7 +39,7 @@ function secretMatches(a: string, b: string) {
   return diff === 0;
 }
 
-// Resend's inbound payload has moved around between versions, so the fields are
+// Inbound payloads differ between providers and between versions, so fields are
 // read defensively rather than assuming one shape.
 function pick(payload: any) {
   const data = payload?.data ?? payload ?? {};

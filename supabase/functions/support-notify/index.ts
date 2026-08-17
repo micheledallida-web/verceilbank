@@ -1,14 +1,16 @@
 // Emails the support inbox whenever someone sends a message from the app.
 //
-// This runs server-side for one reason: the Resend API key must never reach the
-// browser. Everything under js/ is downloaded by the client, so a key placed
-// there would be readable by anyone who opens devtools.
+// This runs server-side for one reason: the mailbox password must never reach
+// the browser. Everything under js/ is downloaded by the client, so a password
+// placed there would be readable by anyone who opens devtools — and that
+// password can read support@ as well as send from it.
 //
 // The app calls this after the message row is already written, and never waits
 // on the result — the message is saved either way, so a mail outage must not
 // look to the user like a failed send.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { readSmtpSettings, sendMail, verifySmtp } from '../_shared/mailer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,9 +62,7 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
   const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX');
-  const SUPPORT_FROM = Deno.env.get('SUPPORT_FROM');
   // Deliberately no fallback. Until a domain is set up to receive mail there is
   // no address a reply could come back through, and quietly falling back to the
   // inbox itself would put a Reply-To on the mail that just loops to the reader.
@@ -70,31 +70,38 @@ Deno.serve(async (req) => {
   const SUPPORT_INBOUND_ADDRESS = Deno.env.get('SUPPORT_INBOUND_ADDRESS');
   const inboundReady = !!SUPPORT_INBOUND_ADDRESS;
 
-  // Which secrets are absent, by name. A missing secret is the most common
+  // Which settings are absent, by name. A missing one is the most common
   // reason no mail arrives, and until now the only place that said so was the
   // function log — the caller got a flat "Email is not configured" and had to
   // go digging. The names of the settings are not sensitive; their values are,
   // and none of those are ever put in a response.
-  const missing = [
-    ['RESEND_API_KEY', RESEND_API_KEY],
-    ['SUPPORT_INBOX', SUPPORT_INBOX],
-    ['SUPPORT_FROM', SUPPORT_FROM],
-  ].filter(([, value]) => !value).map(([name]) => name);
+  const { settings, missing } = readSmtpSettings();
+  if (!SUPPORT_INBOX) missing.push('SUPPORT_INBOX');
 
   // GET is a config check, so "is this deployed, and is it configured?" can be
   // answered by opening the URL — without sending a message to find out. It
   // reports only whether each setting is present, never what it is set to.
+  // ?verify=1 goes further and logs in to the mailbox, which is the only way to
+  // tell a wrong password apart from a message that was accepted and then lost.
   if (req.method === 'GET') {
+    const wantsVerify = new URL(req.url).searchParams.get('verify') === '1';
+    const check = wantsVerify && settings ? await verifySmtp(settings) : null;
     return json({
       function: 'support-notify',
       deployed: true,
       configured: missing.length === 0,
       missing,
+      transport: settings ? `smtp://${settings.host}:${settings.port}` : null,
       inbound_replies_enabled: inboundReady,
+      ...(check
+        ? check.ok
+          ? { smtp_login: 'ok' }
+          : { smtp_login: 'failed', smtp_code: check.code, smtp_message: check.message }
+        : {}),
     });
   }
 
-  if (missing.length > 0) {
+  if (!settings || missing.length > 0) {
     console.error('support-notify is missing:', missing.join(', '));
     return json({ error: 'Email is not configured', missing }, 500);
   }
@@ -176,38 +183,25 @@ Deno.serve(async (req) => {
       howToAnswer,
     ].join('\n');
 
-    const sent = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: SUPPORT_FROM,
-        to: [SUPPORT_INBOX],
-        ...(replyTo ? { reply_to: replyTo } : {}),
-        subject,
-        html,
-        text,
-      }),
+    const sent = await sendMail(settings, {
+      to: SUPPORT_INBOX,
+      subject,
+      html,
+      text,
+      ...(replyTo ? { replyTo } : {}),
     });
 
     if (!sent.ok) {
-      const detail = await sent.text();
-      console.error('Resend send failed:', sent.status, detail);
-      // Resend says why it refused — an unverified sending domain, a rejected
-      // key — and that sentence is the whole answer to "why is no mail
+      console.error('SMTP send failed:', sent.code, sent.message);
+      // The server says why it refused — a rejected password, a From it will
+      // not send as — and that sentence is the whole answer to "why is no mail
       // arriving". It describes the account's own mail setup, not the customer
       // or their message, so it is passed back rather than flattened into a
       // generic failure that leaves the reader guessing.
-      let reason = '';
-      try {
-        reason = String(JSON.parse(detail)?.message ?? '');
-      } catch { /* not JSON — the status alone has to carry it */ }
       return json({
         error: 'Could not send the notification email',
-        resend_status: sent.status,
-        ...(reason ? { resend_message: reason } : {}),
+        smtp_code: sent.code,
+        smtp_message: sent.message,
       }, 502);
     }
 
