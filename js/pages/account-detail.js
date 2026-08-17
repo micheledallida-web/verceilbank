@@ -21,7 +21,10 @@ const accountConfigs = {
     title: 'High-Yield Savings',
     balanceLabel: 'Available Balance',
     balanceSourceId: 'savingsBalance',
-    iconBg: '#10B981',
+    // Matches .home-ic-g — the savings tile on the dashboard and the icon at
+    // the head of its own screen are the same product, so they are the same
+    // green.
+    iconBg: '#22C55E',
     iconSvg: '<svg class="w-[26px] h-[26px]" fill="currentColor" viewBox="0 0 24 24"><path d="M19.5 9.5c-0.7 0-1.3 0.3-1.8 0.7-1.2-1.3-2.9-2.2-4.7-2.2H11C8.2 8 6 10.2 6 13c0 0.8 0.2 1.5 0.5 2.2L5 17h3v1c0 0.6 0.4 1 1 1h2c0.6 0 1-0.4 1-1v-1h4v1c0 0.6 0.4 1 1 1h2c0.6 0 1-0.4 1-1v-1.2c1.8-1 3-2.9 3-5.1 0-1.8-1.5-3.3-3.5-3.3zM16 11c0.6 0 1 0.4 1 1s-0.4 1-1 1-1-0.4-1-1 0.4-1 1-1z"/></svg>',
   },
   investments: {
