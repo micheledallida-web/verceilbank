@@ -1263,3 +1263,108 @@ a { text-decoration: none; color: inherit; }
 }
 
 .ira-option-text { display: block; }
+
+/* ==========================================================================
+   HOVER SPOTLIGHT
+   A radial gradient that follows the cursor across the cards: a wash inside
+   whichever card the pointer is over, and, on the bordered promo cards, the
+   same light picked up by the edge nearest it.
+
+   The contract with app.js is two custom properties — --mouse-x and --mouse-y,
+   the cursor's offset within the card — and nothing else. Every colour, size,
+   shape and fade is here, so the effect can be retuned without going near the
+   JavaScript, and the JavaScript is two subtractions.
+
+   Behind `hover: hover` and `pointer: fine`, so it exists only where there is
+   a cursor to follow. A phone has no pointer, and on a touchscreen `:hover`
+   sticks to the last thing tapped — the spotlight would latch onto one card
+   and stay lit there.
+   ========================================================================== */
+
+@media (hover: hover) and (pointer: fine) {
+  .promo-card,
+  .quick-link-item {
+    position: relative;
+    /* The spotlight sits at z-index -1: above the card's own background, below
+       its content. `isolation` gives it a stacking context of its own to be -1
+       inside — without it, it drops behind the section under the card. */
+    isolation: isolate;
+  }
+
+  .promo-card::before,
+  .quick-link-item::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    /* Centred until the cursor says otherwise, so a card lit by a pointer that
+       arrived from off-screen still looks deliberate on the first frame. */
+    background: radial-gradient(
+      var(--spot-size, 320px) circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(17, 122, 202, 0.15),
+      rgba(17, 122, 202, 0.06) 38%,
+      transparent 68%
+    );
+  }
+
+  /* The promo cards clip their own overflow and carry a radius, so the wash
+     takes the card's shape exactly. */
+  .promo-card::before {
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  /* The link tiles have no surface of their own — the spotlight is the surface,
+     running past the icon and the label rather than stopping at them.
+
+     The mask is what keeps it from ending on a hard edge. A card can crop its
+     light because the crop lands on a border; a tile has no border, so the wash
+     met the edge of its own box and stopped in a straight line. Faded towards
+     the edges there is nothing for it to stop against, and the cursor can sit
+     on the rim of a tile without showing a seam. */
+  .quick-link-item::before {
+    inset: -14px -10px -12px;
+    border-radius: 16px;
+    --spot-size: 170px;
+    -webkit-mask-image: radial-gradient(50% 50% at 50% 50%, #000 12%, transparent 100%);
+            mask-image: radial-gradient(50% 50% at 50% 50%, #000 12%, transparent 100%);
+  }
+
+  .promo-card:hover::before,
+  .quick-link-item:hover::before {
+    opacity: 1;
+  }
+
+  /* ---- the edge nearest the cursor ----
+     The border, lit by the same light. A gradient cannot be painted into a
+     border, so this is a one-pixel frame filled with the gradient: the layer is
+     masked with its own padding box cut out of it, leaving only the ring.
+     Bordered cards only — the tiles have no edge to catch it. */
+  .promo-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    background: radial-gradient(
+      260px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+      rgba(17, 122, 202, 0.6),
+      rgba(17, 122, 202, 0.12) 45%,
+      transparent 65%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+  }
+
+  .promo-card:hover::after {
+    opacity: 1;
+  }
+}

@@ -118,7 +118,9 @@
   }
   </script>
 
-  <style>
+  <!-- data-page-style: swapped with the page by the soft navigation in
+       app.js, so the legal layout does not outlive the legal page. -->
+  <style data-page-style>
     /* ==========================================================================
        LEGAL DOCUMENT LAYOUT
 
@@ -775,6 +777,11 @@
     </div>
   </header>
 
+  <!-- SWAP ROOT — see the note in index.html. Same wrapper, same job: this is
+       the part a soft navigation replaces. -->
+  <div id="swap-root">
+
+  <main>
   <div class="legal-shell">
 
     <!-- BREADCRUMB -->
@@ -1380,6 +1387,7 @@
       </article>
     </div>
   </div>
+  </main>
 
   <!-- LEGAL FOOTER -->
   <footer class="legal-footer">
@@ -1402,6 +1410,8 @@
       </p>
     </div>
   </footer>
+
+  </div><!-- /#swap-root -->
 
   <script src="app.js"></script>
 
