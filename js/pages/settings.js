@@ -7,6 +7,8 @@
 // with no home at all was the password, how long a session may sit idle,
 // signing every device out, and how the app looks — so that is what this is.
 
+import { depositInsuranceDisclosure, depositInsuranceLabel } from '../shared/deposit-insurance.js';
+
 const APP_VERSION = '1.0.0';
 
 // The ladder Chase, Citi and the rest offer. There is no "never" on it, and
@@ -155,9 +157,15 @@ export function init(root, ctx) {
     'Your accounts are governed by the Verceil Bank Deposit Account Agreement, Electronic Communications Agreement and Fee Schedule. Contact support for a copy of any of these documents.',
   ));
 
-  on(root.querySelector('#stFdicBtn'), 'click', () => showModal(
-    'FDIC Insurance',
-    'Deposit accounts at Verceil Bank, N.A. are insured by the FDIC up to $250,000 per depositor, per ownership category. Investment products are not deposits, are not FDIC insured and may lose value.',
+  // Label and body both come from the shared module: neither the row nor the
+  // modal may assert insurance the Bank has not confirmed it carries.
+  const fdicRow = root.querySelector('#stFdicBtn');
+  const fdicLabel = fdicRow && fdicRow.querySelector('span');
+  if (fdicLabel) fdicLabel.textContent = depositInsuranceLabel();
+
+  on(fdicRow, 'click', () => showModal(
+    depositInsuranceLabel() === 'FDIC insurance' ? 'FDIC Insurance' : 'Deposit Insurance',
+    depositInsuranceDisclosure(),
   ));
 }
 

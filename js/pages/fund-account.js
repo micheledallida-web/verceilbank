@@ -25,7 +25,8 @@ import { watchRealtime } from '../shared/activity.js';
 // ---------------------------------------------------------------------------
 const DEPOSIT = {
   // Live receiving address. Mainnet P2PKH (base58check, version byte 0x00) —
-  // checksum verified before it went in, as every address here must be.
+  // checksum verified before it went in, the same as the bech32 address it
+  // replaced.
   //
   // Whoever changes this: check the checksum before you deploy it. An address
   // that is merely well-formed but not yours sends customers' deposits to

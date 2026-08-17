@@ -3,6 +3,8 @@
 // back stack and swapping a hidden class is cheaper than tearing the page down
 // and refetching on every hop between them.
 
+import { SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY } from '../shared/account-products.js';
+
 // The categories the support_threads table accepts, paired with something a
 // person would actually recognise. This is the only place the mapping lives.
 // `value` is what is written to support_threads.category, and it is the only
@@ -529,6 +531,15 @@ function hideError(root, selector) {
 }
 
 export async function init(root, ctx, options) {
+  // Written from the shared constant rather than trusted from the markup, so
+  // the General Banking line cannot drift from the number the rest of the app
+  // quotes. The Fraud & Lost Card line below it is a different number and is
+  // left as it is.
+  const callBtn = root.querySelector('#spCallBtn');
+  const callNumber = root.querySelector('#spCallNumber');
+  if (callBtn) callBtn.setAttribute('href', `tel:${SUPPORT_PHONE}`);
+  if (callNumber) callNumber.textContent = SUPPORT_PHONE_DISPLAY;
+
   threads = [];
   latestByThread = {};
   activeThread = null;

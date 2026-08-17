@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Verceil Bank | Premium Mobile Dashboard</title>
 
+  <!-- Tab icon. Browsers reach for /favicon.ico by default and the site had
+       none, so every tab showed the blank-page glyph. Google also uses this in
+       mobile search results, which is why a 96px square (a multiple of 48, as
+       it requires) is declared alongside the .ico. -->
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="theme-color" content="#117ACA">
+
+
   <!-- Theme, applied before anything is painted.
        This is a plain blocking script on purpose: it has to run before the
        browser draws the first frame, which rules out js/main.js (a module, and
@@ -212,7 +225,7 @@
           <div class="home-grid">
             <span class="home-n">Vercel Interest Checking</span>
             <span class="amount-pending home-b" id="interestCheckingBalance"></span>
-            <span class="home-num">Up to 4.00% APY</span>
+            <span class="home-num">4.00% APY</span>
             <span class="home-sl" data-balance-label="interest_checking"></span>
           </div>
           <svg class="home-chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
@@ -279,7 +292,7 @@
            static fallback shown if that script never runs. The 380x48 viewBox
            is the coordinate space that module draws in — it stretches to the
            container's height, so the box must not be re-scaled here. -->
-      <div id="investSparkWrap" class="home-spark">
+      <div id="investSparkWrap" data-chart class="home-spark">
         <svg viewBox="0 0 380 48" fill="none" preserveAspectRatio="none">
           <path id="investSparkFill" d="M0 35 C 30 38, 60 28, 90 32 C 120 36, 150 20, 180 26 C 210 32, 240 22, 270 18 C 300 14, 340 10, 380 5 L 380 48 L 0 48 Z" fill="url(#purpleGlow)" opacity="0.6"></path>
           <path id="investSparkLine" d="M0 35 C 30 38, 60 28, 90 32 C 120 36, 150 20, 180 26 C 210 32, 240 22, 270 18 C 300 14, 340 10, 380 5" stroke="#8B5CF6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -547,7 +560,7 @@
         <div class="home-promo-head">
           <span class="home-promo-eyebrow">Recommended for you</span>
           <span class="home-promo-t">Verceil Interest Checking</span>
-          <span class="home-promo-s">Earn up to <b>4.00% APY</b></span>
+          <span class="home-promo-s">Earn <b>4.00% APY</b></span>
         </div>
 
         <div class="home-promo-foot">
@@ -599,7 +612,7 @@
   </nav>
 
   <!-- BOTTOM NAVIGATION DROPDOWN MENU (CITI-STYLE) -->
-  <div id="navMenuOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden"></div>
+  <div id="navMenuOverlay" data-glass class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden"></div>
   <div id="navMenuSheet" class="fixed left-0 right-0 bottom-0 z-50 hidden translate-y-full transition-transform duration-300 ease-out">
     <div class="w-full max-w-[430px] mx-auto bg-white dark:bg-[#0D1728] rounded-t-[24px] shadow-2xl max-h-[75vh] flex flex-col">
       <div class="flex items-center justify-between px-[20px] pt-[18px] pb-[12px] border-b border-gray-100 dark:border-white/[0.06]">
@@ -608,7 +621,7 @@
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" d="M6 6l12 12M18 6L6 18"></path></svg>
         </button>
       </div>
-      <div id="navMenuList" class="overflow-y-auto px-[8px] py-[8px] pb-[24px]"></div>
+      <div id="navMenuList" data-scroll="polish" class="overflow-y-auto px-[8px] py-[8px] pb-[24px]"></div>
     </div>
   </div>
 
@@ -616,7 +629,7 @@
   <div id="page-root" class="hidden fixed inset-0 z-40 bg-[#0B4CC2] dark:bg-[#060B14] overflow-y-auto"></div>
 
   <!-- INTERACTIVE MODAL OVERLAY -->
-  <div id="actionModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div id="actionModal" data-glass class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <!-- Left-aligned, and roomier than it was. A centred paragraph in 12px
          inside a 320px box is a system alert; a bank telling somebody what to
          do next writes it as a sentence they can read. -->

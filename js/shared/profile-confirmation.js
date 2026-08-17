@@ -11,6 +11,11 @@ export function showConfirmation(root, ctx, { fieldLabel, valueText }) {
   const refNumber = ctx.genRef();
   const dateStr = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
+  // This screen is shared by every Profile field, so the address treatment has
+  // to be opt-in: tagging the New Value row unconditionally would take the
+  // hairline off the Name, Date of Birth, Phone and Email confirmations too.
+  const isAddress = /address/i.test(fieldLabel);
+
   confirmView.innerHTML = `
     <div class="flex flex-col items-center text-center pt-[32px] pb-[8px]">
       <span class="w-[72px] h-[72px] rounded-full bg-green-50 flex items-center justify-center mb-[20px]">
@@ -24,7 +29,7 @@ export function showConfirmation(root, ctx, { fieldLabel, valueText }) {
         <span class="text-[14px] text-[#6B7280] dark:text-[#8E9CBA]">Updated Field</span>
         <span class="text-[15px] font-semibold text-[#0F172A] dark:text-white text-right">${fieldLabel}</span>
       </div>
-      <div class="flex items-center justify-between px-[18px] min-h-[60px] border-b border-[#E5E7EB]">
+      <div${isAddress ? ' data-profile-address' : ''} class="flex items-center justify-between px-[18px] min-h-[60px] border-b border-[#E5E7EB]">
         <span class="text-[14px] text-[#6B7280] dark:text-[#8E9CBA]">New Value</span>
         <span class="text-[15px] font-semibold text-[#0F172A] dark:text-white text-right truncate max-w-[220px]">${valueText}</span>
       </div>

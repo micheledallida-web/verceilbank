@@ -120,7 +120,7 @@ export function init(root, ctx) {
         ? new Date(order.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
         : 'Pending';
       return `
-        <div class="flex items-center justify-between py-[14px]">
+        <div data-row class="flex items-center justify-between py-[14px]">
           <div>
             <div class="text-[14px] font-bold text-[#111827] dark:text-white">${isBuy ? 'Buy' : 'Sell'} ${order.symbol || ''}</div>
             <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA]">${dateLabel}</div>
@@ -160,7 +160,7 @@ export function init(root, ctx) {
     portCategoryCards.innerHTML = Object.keys(categoryMeta).map(key => {
       const meta = categoryMeta[key];
       return `
-        <div class="w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between">
+        <div data-row class="w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between">
           <div class="flex items-center gap-[10px]">
             <span class="w-[10px] h-[10px] rounded-full flex-shrink-0" style="background:${meta.color};"></span>
             <span class="text-[14px] font-semibold text-[#111827] dark:text-white">${meta.label}</span>
@@ -175,7 +175,7 @@ export function init(root, ctx) {
       const val = byCategory[key];
       const pct = totalValue > 0 ? (val / totalValue) * 100 : 0;
       return `
-        <div>
+        <div data-row>
           <div class="flex items-center justify-between mb-[4px]">
             <span class="text-[12px] font-medium text-[#6B7280] dark:text-[#8E9CBA]">${meta.label}</span>
             <span class="text-[12px] font-semibold text-[#111827] dark:text-white">${pct.toFixed(1)}%</span>
@@ -193,7 +193,7 @@ export function init(root, ctx) {
       portTopHoldings.innerHTML = currentHoldings.slice(0, 5).map(holding => {
         const dayChange = Number(holding.day_change || 0);
         return `
-          <div class="w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between">
+          <div data-row class="w-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[16px] p-[14px] shadow-lg flex items-center justify-between">
             <div class="min-w-0">
               <div class="text-[14px] font-bold text-[#111827] dark:text-white">${holding.symbol}</div>
               <div class="text-[12px] text-[#6B7280] dark:text-[#8E9CBA] truncate">${holding.name || ''}</div>

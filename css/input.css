@@ -3128,3 +3128,103 @@ html.dark body .amount-pending {
 @media (prefers-reduced-motion: reduce) {
   .amount-pending { animation: none; }
 }
+
+/* === SCROLL POLISH — APPENDED === */
+
+[data-scroll="polish"] {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scroll-behavior: auto;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+[data-scroll="polish"] [data-row] {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+
+/* Selector list narrowed to the elements that actually carry a backdrop
+   filter in this project — #navMenuOverlay and #actionModal (Tailwind
+   `backdrop-blur-sm`) and .vb-idle-backdrop. There is no `.glass`,
+   `header` or `.floating-header` here, so those were dropped rather than
+   left as dead selectors. */
+html.is-scrolling [data-glass],
+html.is-scrolling #navMenuOverlay,
+html.is-scrolling #actionModal,
+html.is-scrolling .vb-idle-backdrop {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.is-scrolling [data-chart],
+html.is-scrolling [data-row] {
+  box-shadow: none !important;
+}
+
+html.is-scrolling * {
+  transition-duration: 0s !important;
+  animation-play-state: paused !important;
+}
+
+/* Chase-standard address block: no hairline between lines */
+[data-profile-address],
+[data-profile-address] > * {
+  border-bottom: 0 !important;
+  border-top: 0 !important;
+}
+[data-profile-address] + hr {
+  display: none !important;
+}
+
+/* The top bar's inner element is centred on the page — `max-width: --app-col`
+   with auto margins — but its items were left-aligned inside it, so the five
+   tabs sat against the left edge of the content column rather than in the
+   middle of the bar: 246px left of centre on a 1440px screen, 328px on a
+   1920px one. Centring them within the element they already sit in puts them
+   on the page's centre line, because that element is itself centred.
+
+   Scoped to the desktop bar only. Below 1024px this is the pill fixed to the
+   bottom of a phone, which is laid out for a thumb and is not what this is
+   about. */
+@media (min-width: 1024px) {
+  .home-nav > div {
+    justify-content: center;
+  }
+}
+
+/* ---- the clock, up on the greeting line ----
+   Opposite the name, on the right edge the account cards establish.
+
+   Anchored to the shell rather than to anything in the hero, because the shell
+   is the one box that knows both numbers this needs: it is the element the
+   cards' columns are measured from, so the card edge can be derived from its
+   own width instead of guessed. Everything absolutely positioned inside the
+   shell already has its own positioned parent — the promo artwork, the select
+   chevrons, the alerts badge — so giving it a containing block moves nothing
+   else.
+
+   `right` is the shell's padding plus the distance from the content's right
+   edge back to the end of the first card column. `top` is the greeting name's
+   own offset, which is fixed: the header's padding and two lines of type do
+   not change with the width.
+
+   Desktop only — on a phone the clock stays at the end of the line of
+   balances, where it was written to be. */
+@media (min-width: 1024px) {
+  .app-shell { position: relative; }
+
+  .home-clock {
+    position: absolute;
+    top: 32px;
+    right: calc(var(--app-pad) + (100% - 2 * var(--app-pad) + 28px) / 2);
+    margin-left: 0;
+  }
+}
+
+/* Three columns of cards up here, with a 32px gutter between them. */
+@media (min-width: 1600px) {
+  .home-clock {
+    right: calc(var(--app-pad) + ((100% - 2 * var(--app-pad)) * 2 + 64px) / 3);
+  }
+}

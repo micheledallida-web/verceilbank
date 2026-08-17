@@ -927,17 +927,93 @@ constraint is now the only place the length is written down.)
 a code everybody has. Issue your own:
 
 ```sql
--- 500 accounts, no expiry
+-- 500 accounts, seven days each from the day the invitation is emailed
 insert into public.offer_codes (code, label, max_uses)
 values ('4820917', 'launch-2026', 500);
 
--- one-shot, expires at the end of the month
+-- one-shot, dead at the end of the month whenever it was sent
 insert into public.offer_codes (code, label, max_uses, expires_at)
 values ('3051764', 'branch-referral', 1, '2026-09-01T00:00:00Z');
 ```
 
 `max_uses` null means unlimited. `active = false` switches a code off without
 deleting it, which keeps the redemption history attached to something.
+
+### When a code runs out
+
+The clock starts when the invitation is **emailed**, not when the row is
+written — codes get minted in batches and sent later, and a batch cut in
+January and posted in February should not arrive already dead. So whatever
+sends the invitation has to say so, immediately after the send succeeds:
+
+```sql
+select public.mark_offer_code_sent('4820917');   -- returns the deadline now in force
+```
+
+It is service-key only, and the returned timestamp is what to put in the email —
+computing the date separately just gives you something to disagree with.
+
+`revoke ... from public` takes the privilege from `service_role` too — it is
+neither the owner nor a superuser, so it only ever had it by inheritance. The
+script grants it straight back, because without that the function works in the
+SQL editor (where you are the owner) and nowhere else, and every RPC gets
+`permission denied for function mark_offer_code_sent`. `consume_offer_code`
+gets no such grant on purpose: only the sign-up trigger may spend a code.
+
+### Sending them
+
+`supabase/functions/send-offer-code` does the whole thing: mints a code, emails
+it through Resend, and marks it sent — in that order, and only marking it once
+Resend has accepted the message. Marking first would mean a bounced send still
+costs the recipient their window.
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/send-offer-code" \
+  -H "x-admin-secret: $OFFER_CODE_ADMIN_SECRET" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"someone@example.com","label":"launch-2026"}'
+# -> {"ok":true,"code":"4820917","expires_at":"...","minted":true}
+```
+
+| Field | | |
+| --- | --- | --- |
+| `email` | required | who it goes to |
+| `label` | optional | campaign name, stored on the code |
+| `max_uses` | optional | defaults to 1 — an invitation is for one person |
+| `code` | optional | resend an existing code instead of minting. Does **not** extend its deadline |
+
+It needs `RESEND_API_KEY`, `OFFER_CODE_ADMIN_SECRET`, and a from-address in
+`OFFER_CODE_FROM` (or it reuses `SUPPORT_FROM`). It is guarded by that shared
+secret rather than a customer session, because no signed-in user should be able
+to mint themselves an invitation — and with the secret unset it refuses every
+request rather than falling open.
+
+If a send fails, the code is left behind unsent. That is inert — nobody has
+been told it, and with `sent_at` null it cannot age — but it is litter:
+
+```sql
+select code, label, created_at from public.offer_codes where sent_at is null;
+```
+
+| `expires_at` | `sent_at` | Dies |
+| --- | --- | --- |
+| set | either | at `expires_at`, whenever it was sent |
+| null | set | seven days after `sent_at` |
+| null | null | never — **the clock has not started** |
+
+That last row is the point of having two timestamps, and it is worth being
+deliberate about: a code nothing ever marks as sent never expires. That is safe
+only while an unsent code is one nobody has been given. **If nothing in your
+stack calls `mark_offer_code_sent`, no code ever expires** — the column stays
+null and every window stays open.
+
+A resend does not extend the deadline (`sent_at` is only ever set once), or
+"resend my code" would be an unlimited extension. To genuinely restart one,
+clear `sent_at` and mark it sent again.
+
+The seven days is stated in exactly one place, `public.offer_code_expiry`, and
+every check goes through it. Change it there and the pre-check, the gate and
+the "how many are usable" count all move together.
 
 If the requirement is on and there are no usable codes, **nobody can sign up** —
 so the script says so loudly when you run it:
@@ -949,9 +1025,14 @@ WARNING: OFFER CODES: the requirement is ON and there are no usable codes — NO
 ### Watching them
 
 ```sql
--- how much of each code is left
-select code, label, used_count, max_uses, active, expires_at
+-- how much of each code is left, and when it dies
+select code, label, used_count, max_uses, active,
+       sent_at, expires_at,
+       public.offer_code_expiry(expires_at, sent_at) as dies_at
   from public.offer_codes order by created_at desc;
+
+-- issued but never emailed: not on the clock, and nobody can use them
+select code, label from public.offer_codes where sent_at is null;
 
 -- who came in on what, most recent first
 select r.code, r.redeemed_at, u.email
@@ -1034,6 +1115,19 @@ as overloads, so nothing breaks, but only `consume_offer_code(text, uuid)` is
 the one the trigger calls. Drop yours once you have moved off it. If your column
 was converted to `text`, yours will error when called — loudly, not silently.
 
+One it **will**: `consume_offer_code(text, uuid)` itself now returns `text`
+rather than `boolean` — `'ok'`, `'expired'`, `'used'` or `'invalid'` — so the
+gate can say which. A return type cannot be changed by `create or replace`, so
+the script drops that exact signature first. Anything of your own calling it and
+expecting a boolean needs updating; `= 'ok'` is the replacement for a bare truth
+test, and note that in SQL a non-empty string is not true.
+
+The split stops at the gate. `offer_code_status`, the one the anon key can
+reach, still answers only `ok` / `invalid` / `throttled` — telling a stranger
+that a code is real but expired is the enumeration oracle the throttle exists to
+prevent. Reaching the four-way answer costs an actual sign-up attempt, which
+GoTrue rate limits and which leaves a record.
+
 ### The pre-check is rate limited
 
 `offer_code_status` is callable by the anon key, which is what lets the form say
@@ -1079,17 +1173,38 @@ you like:
 delete from public.offer_code_attempts where last_seen < now() - interval '7 days';
 ```
 
+### Creating a user by hand
+
+Don't reach for the switch below. Pass the code the way only the service key
+can, in **app metadata**:
+
+```ts
+await admin.auth.admin.createUser({
+  email: 'someone@example.com',
+  password: '...',
+  app_metadata: { offer_code: '1234567' }
+})
+```
+
+The trigger reads `raw_user_meta_data->>'offer_code'` first and falls back to
+`raw_app_meta_data->>'offer_code'`. The fallback is safe **because
+`auth.signUp` cannot write app metadata** — GoTrue ignores it there, so this is a
+service-key-only channel. The account is opened against a real code, the tally
+moves, and there is a redemption row to say how it was opened.
+
 ### Turning it off
 
-**This is now the setting the app expects.** The form stopped collecting a code,
-so the requirement has to be off for anyone to register:
+**On this branch, off is the setting the app expects.** The form stopped
+collecting a code, so the requirement has to be off for anyone to register at
+all:
 
 ```sql
 update public.bank_settings set offer_code_required = false where id = 1;
 ```
 
-Turning it back on only makes sense alongside restoring the sign-up step —
-on its own it closes registration completely:
+Turning it back on only makes sense alongside restoring the sign-up step. On its
+own it closes customer registration completely — the service-key channel above
+still works, since that passes a code in app metadata:
 
 ```sql
 update public.bank_settings set offer_code_required = true  where id = 1;
@@ -1098,6 +1213,34 @@ update public.bank_settings set offer_code_required = true  where id = 1;
 The switch lives in `bank_settings` so this never means dropping the trigger. It
 defaults to **on**, because a gate that defaults to open is not a gate — and a
 missing `bank_settings` row reads as on for the same reason.
+
+While it is off **no code is consumed and no redemption row is written**, for
+every account created in the window — not just the one you meant. That is the
+usual answer to "sign-ups work but `offer_code_redemptions` is empty":
+
+```sql
+-- is the gate actually on?
+select offer_code_required from public.bank_settings where id = 1;
+
+-- is the trigger actually there? (expect one row)
+select tgname, tgenabled from pg_trigger
+ where tgrelid = 'auth.users'::regclass and tgname = 'on_auth_user_offer_code';
+
+-- accounts opened with no redemption to show for them
+select u.id, u.email, u.created_at
+  from auth.users u
+  left join public.offer_code_redemptions r on r.user_id = u.id
+ where r.user_id is null order by u.created_at desc;
+```
+
+If the gate is on and the trigger is there, no user can have been created
+without spending a code — so anything the last query returns predates one or the
+other.
+
+One more thing that reads as "missing rows" and is not: `offer_code_redemptions`
+is keyed by `user_id`, one row per user, and a second redemption by the same user
+updates that row rather than adding one. It records how an account was opened,
+not a history of attempts.
 
 ### One thing to know about the error
 

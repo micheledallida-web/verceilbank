@@ -856,3 +856,460 @@ a { text-decoration: none; color: inherit; }
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   THE DESKTOP LAYER — APPENDED
+
+   Everything above this point is mobile-first and stops there: the only
+   breakpoints in this file are `max-width`, so a 1440px monitor got the phone
+   layout stretched down the middle of the screen. `.promo-container` is capped
+   at 640px and `.quick-links-grid` at 720px, which is why the page read as one
+   narrow column with the cards stacked in a straight line and half the display
+   empty on either side.
+
+   This block is additive and only takes effect from 1024px up. Below that
+   nothing here applies and the phone layout is untouched, which is the point:
+   the app is used on phones, and that layout was not the thing that was wrong.
+   ========================================================================== */
+
+@media (min-width: 1024px) {
+
+  /* Reach the edges. Scoped to the landing page via the body class, because
+     `.container` is shared with signin, signup and the policy document, and a
+     1440px measure would be wrong for a page of legal text. */
+  .home-page .container {
+    max-width: 1440px;
+    padding: 0 2.5rem;
+  }
+
+  /* ---- Hero ---- */
+  .home-page .hero {
+    min-height: 520px;
+  }
+
+  .home-page .hero-content {
+    max-width: 640px;
+  }
+
+  /* ---- Quick links: one row across, not three per line ---- */
+  .home-page .quick-links-section {
+    padding: 3.5rem 0 3.75rem;
+  }
+
+  .home-page .quick-links-title {
+    font-size: 2rem;
+    margin-bottom: 2.25rem;
+  }
+
+  .home-page .quick-links-grid {
+    /* Beats the 720px/3-column cap above, which carries !important. */
+    grid-template-columns: repeat(9, 1fr) !important;
+    /* One row, but held together in the middle under the heading rather than
+       stretched to the page edges. Spread across a 1440px band the nine links
+       stop reading as one group and start reading as nine separate things
+       adrift on a line. The centred block is what the heading is centred over. */
+    max-width: 1040px !important;
+    margin-left: auto;
+    margin-right: auto;
+    gap: 1.5rem 1rem;
+  }
+
+  /* ---- The three product cards, side by side ---- */
+  .home-page .promo-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.75rem;
+    align-items: stretch;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 2.5rem 2.5rem 1rem;
+  }
+
+  /* Each section is now a grid cell rather than a full-width band. */
+  .home-page .promo-row .promo-section {
+    padding: 0 !important;
+    background: transparent;
+    display: flex;
+  }
+
+  .home-page .promo-row .promo-container {
+    max-width: none !important;
+    padding: 0;
+    width: 100%;
+  }
+
+  /* Equal-height cards with the call to action on a common baseline, which is
+     what makes a row of cards read as a row rather than three loose boxes. */
+  .home-page .promo-row .promo-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .home-page .promo-row .promo-body-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  .home-page .promo-row .promo-cta-btn {
+    margin-top: auto;
+    align-self: flex-start;
+  }
+
+  /* The banner heads sit at a common height so the three cards line up. */
+  .home-page .promo-row .promo-header-banner,
+  .home-page .promo-row .investing-top-banner {
+    min-height: 132px;
+  }
+
+  /* ---- The article, full width beneath the row ---- */
+  .home-page #blog .promo-container {
+    max-width: 1440px !important;
+  }
+
+  .home-page .blog-promo-card {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    align-items: center;
+  }
+
+  .home-page .blog-image-wrapper {
+    height: 100%;
+  }
+
+  .home-page .blog-featured-image {
+    height: 100%;
+    width: 100%;
+    object-fit: cover;
+  }
+
+  .home-page .blog-body-content {
+    padding: 2.5rem;
+  }
+
+  /* ---- Footer: the link groups as columns, all open ---- */
+  .home-page .main-footer {
+    padding: 3rem 2.5rem 2.5rem;
+  }
+
+  .home-page .footer-content-wrapper {
+    max-width: 1440px;
+  }
+
+  .home-page .footer-link-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0 2rem;
+    padding-bottom: 0.5rem;
+  }
+
+  /* No longer a row you open — a column heading. */
+  .home-page .footer-link-grid .footer-section-item {
+    border-bottom: none;
+  }
+
+  .home-page .footer-link-grid .footer-section-header {
+    padding: 0 0 0.9rem;
+    font-size: 0.95rem;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .home-page .footer-link-grid .footer-section-header svg {
+    display: none;
+  }
+
+  /* `!important` because the accordion script writes `display` inline, and an
+     inline style set on a phone would otherwise survive a resize. */
+  .home-page .footer-link-grid .footer-section-links {
+    display: flex !important;
+    padding-bottom: 1.75rem;
+  }
+
+  /* ---- Footer base: side by side rather than stacked ---- */
+  .home-page .footer-badges-area {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+  }
+
+  .home-page .footer-legal-links-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.6rem 1.75rem;
+  }
+}
+
+/* A wide monitor gets more room again, but the measure stops growing — text
+   the full width of a 2560px display is not readable. */
+@media (min-width: 1600px) {
+  .home-page .container,
+  .home-page .promo-row,
+  .home-page #blog .promo-container,
+  .home-page .footer-content-wrapper {
+    max-width: 1600px;
+  }
+}
+
+/* Wrapping the three cards in `.promo-row` moved which sections match
+   `.promo-section + .promo-section` and `:last-of-type`, which would have
+   nudged the phone spacing: Retirement picking up the 2rem tail meant for the
+   last section, and the article gaining a 1.25rem top it never had. Restored
+   here so the phone layout is unchanged to the pixel. */
+@media (max-width: 1023px) {
+  .promo-row .promo-section:last-of-type { padding-bottom: 1.25rem; }
+  #blog.promo-section { padding-top: 0; }
+}
+
+/* ==========================================================================
+   "CHOOSE WHAT'S RIGHT FOR YOU" — A SWIPEABLE TRACK, APPENDED
+
+   Nine links, shown three-to-a-line on a phone and nine across on a laptop.
+   Both are one long list you cannot move through. This makes the row a track
+   you swipe, with the arrows-and-dots control under it.
+
+   The swipe is native — overflow-x plus scroll snapping — so a touch drag
+   works with no script and keeps its momentum. The control is for a mouse,
+   which has no swipe.
+   ========================================================================== */
+
+.quick-links-grid {
+  /* Overrides the `display: grid !important` above; the track is a flex row
+     because the number of items per page changes with the screen and columns
+     would have to be recounted at every breakpoint. */
+  display: flex !important;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 0.75rem;
+}
+
+.quick-links-grid::-webkit-scrollbar { display: none; }
+
+.quick-links-grid:focus-visible {
+  outline: 2px solid var(--vb-blue);
+  outline-offset: 6px;
+}
+
+/* Three to a view on a phone. `flex-shrink: 0` is what makes the row scroll
+   rather than squeezing nine links into one screen. */
+.quick-links-grid > .quick-link-item {
+  flex: 0 0 calc((100% - 1.5rem) / 3);
+  scroll-snap-align: start;
+  min-width: 0;
+}
+
+/* ---- the control ---- */
+.ql-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding-top: 1.4rem;
+}
+
+.ql-nav[hidden] { display: none; }
+
+.ql-nav-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: var(--vb-blue);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ql-nav-btn svg { width: 19px; height: 19px; }
+.ql-nav-btn:hover:not(:disabled) { background: var(--vb-tint); }
+.ql-nav-btn:disabled { color: var(--vb-muted); opacity: 0.45; cursor: default; }
+
+.ql-dots {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ql-dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1.5px solid var(--vb-blue);
+  background: transparent;
+  cursor: pointer;
+}
+
+.ql-dot[aria-selected="true"] { background: var(--vb-blue); }
+
+@media (min-width: 640px) {
+  .quick-links-grid > .quick-link-item { flex: 0 0 calc((100% - 2.25rem) / 4); }
+}
+
+@media (min-width: 1024px) {
+  /* Six to a view. Nine links over six leaves two pages, and because the
+     track cannot scroll past its end the second page shows links four to
+     nine — a full row either way, never a stub. */
+  .home-page .quick-links-grid > .quick-link-item {
+    flex: 0 0 calc((100% - 3.75rem) / 6);
+  }
+}
+
+/* The heading sits in a 720px block that is itself centred (`margin: 0 auto`),
+   but the text inside it was left-aligned — so the block was centred and the
+   words were not, landing them well left of the middle. Centring the text
+   inside the block it already has is the whole fix; the block keeps its width
+   and its own centring. */
+.quick-links-title {
+  text-align: center;
+}
+
+/* ==========================================================================
+   THE CREDIT CARD SECTION — APPENDED
+
+   Card on a green panel to the left, the offer to its right. The card face is
+   drawn in markup rather than shipped as an image: the dashboard's card
+   illustration already works that way, it stays sharp at any size, and it
+   costs a few hundred bytes instead of a photograph.
+   ========================================================================== */
+
+/* Full content width, the same measure as everything else on the page — it
+   was held to 1040px and so stopped short of where the rest reaches. */
+.card-promo-container { max-width: 1440px !important; }
+
+/* No card. The green panel carries the artwork and the offer sits on the page
+   itself, divided from what comes before it by a single rule — which is what
+   the reference does, and why wrapping the pair in a white panel with a border
+   and a shadow read as a different component. */
+.card-promo-card {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--vb-line);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  padding-top: 2.5rem;
+  gap: 1.75rem;
+}
+
+/* The green panel the card sits on. Square, because it is a block of colour
+   behind the artwork rather than a card in its own right. */
+.card-promo-art {
+  background: linear-gradient(160deg, #14532D 0%, #2F7A3E 38%, #86C440 100%);
+  padding: 2rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- the card face ---- */
+/* The product render, cropped to the card and carrying its rounded corners in
+   the alpha channel. The height comes from the file's own ratio rather than a
+   declared one, so the face can never be stretched.
+
+   The radius is repeated here because a box-shadow traces the border box, not
+   the alpha: without it the soft shadow would show square corners behind a
+   rounded card. It is given as a horizontal/vertical percentage pair so the
+   corner stays circular at any width — 3.83% of the width and 6.15% of the
+   height are the same number of pixels at this file's 1.6066 ratio, which a
+   single percentage (an ellipse on a non-square box) would not be. */
+.credit-card {
+  display: block;
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  border-radius: 3.83% / 6.15%;
+  box-shadow: 0 12px 30px rgba(3, 10, 20, 0.45);
+}
+
+/* ---- the offer beside it ---- */
+/* On the page background, not on a surface of its own. */
+.card-promo-body { padding: 0 0.25rem; }
+
+.card-promo-card .promo-headline {
+  font-size: clamp(1.5rem, 3.4vw, 2.1rem);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1rem;
+}
+
+/* Square-ish, and sized to its label — the pill is the shape the offer cards
+   use, and this block is not one of them. */
+.card-promo-body .promo-cta-btn {
+  border-radius: 4px;
+  padding: 0.7rem 1.4rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
+
+.card-promo-terms {
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--vb-muted);
+}
+
+@media (min-width: 900px) {
+  /* Card left, offer right, once there is room for both. */
+  .card-promo-card {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 3.5rem;
+    padding-top: 3rem;
+    padding-bottom: 1rem;
+  }
+
+  .card-promo-art {
+    flex: 0 0 41%;
+    padding: 3rem 2.5rem;
+  }
+
+  .credit-card { max-width: 380px; }
+
+  .card-promo-body {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0;
+    max-width: 46ch;
+  }
+}
+
+/* The body is a flex column, so the button was stretching to the full column
+   width instead of sizing to its label. */
+.card-promo-body .promo-cta-btn { align-self: flex-start; }
+
+/* The card block carries `!important` on its width (it has to beat the 640px
+   cap on .promo-container), which also beat the wide-screen rule that takes
+   every other section to 1600px — so past 1600 it alone stayed at 1440. */
+@media (min-width: 1600px) {
+  .home-page .card-promo-container { max-width: 1600px !important; }
+}
+
+/* The IRA tiles keep the layout they had — two across, tinted, with the blue
+   edge on the left. The only addition is the icon, which sits above the name
+   rather than beside it: the card is one of three in a row and about 435px, so
+   a tile is roughly 187px, and an icon in the same line as the words leaves
+   them about 130px and wraps the heading onto two lines. Above it, the text
+   keeps the full width of the tile. */
+.ira-option-icon {
+  display: block;
+  width: 26px;
+  height: 26px;
+  color: var(--vb-blue);
+  margin-bottom: 0.55rem;
+}
+
+.ira-option-text { display: block; }

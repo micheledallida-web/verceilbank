@@ -1484,6 +1484,47 @@ revoke all on function public.offer_code_client() from public, anon, authenticat
 
 
 -- ---------------------------------------------------------------------------
+-- WHEN A CODE RUNS OUT
+--
+-- The window starts when the invitation is emailed, not when the row is
+-- written. Codes are minted in batches and sent when whoever is running the
+-- campaign gets to them; if the clock started at `created_at`, a batch cut in
+-- January and posted in February would arrive already dead, and the applicant
+-- would be told to contact the person who invited them about a code that was
+-- never usable. `sent_at` is that start, set by the sender — see
+-- `mark_offer_code_sent` below.
+--
+-- Two ways to say when a code dies, and they compose:
+--
+--   `expires_at` set   an explicit deadline, whatever the send date. Campaign
+--                      ends on the 1st, every code in it ends on the 1st.
+--   `expires_at` null  seven days from `sent_at`.
+--   both null          no deadline — the clock has NOT started. An unsent code
+--                      does not age, which is the whole point of separating the
+--                      two timestamps. Note what this means: a code that is
+--                      never marked sent never expires. That is safe only
+--                      because an unsent code is one nobody has been given; if
+--                      you would rather unsent codes be unusable instead, this
+--                      is the one function to change.
+--
+-- Every predicate below goes through this, so the seven days is stated once
+-- and there is no second copy to drift. STABLE rather than IMMUTABLE because
+-- adding a day interval to a timestamptz depends on the session time zone.
+-- ---------------------------------------------------------------------------
+create or replace function public.offer_code_expiry(p_expires_at timestamptz, p_sent_at timestamptz)
+returns timestamptz
+language sql
+stable
+as $$
+  select coalesce(p_expires_at, p_sent_at + interval '7 days');
+$$;
+
+-- No grant needed. Every caller is one of the security-definer functions below,
+-- which run as the owner; nothing reaches this with the anon key directly. It
+-- reads no table either — two timestamps in, one out.
+
+
+-- ---------------------------------------------------------------------------
 -- BINDING TO THE TABLE THAT IS ACTUALLY THERE
 --
 -- A project that rolled its own offer codes did not use these column names, and
@@ -1578,6 +1619,12 @@ begin
     add column if not exists max_uses   integer,
     add column if not exists used_count integer not null default 0,
     add column if not exists expires_at timestamptz,
+    -- When the invitation actually went out. NOT a second created_at: this is
+    -- the start of the seven-day window, and it stays null until something
+    -- sends the code. Deliberately no default — a default of now() would put
+    -- every bulk-minted code on the clock the moment it was written, which is
+    -- the exact failure `sent_at` exists to prevent.
+    add column if not exists sent_at    timestamptz,
     add column if not exists created_at timestamptz not null default now();
 
   -- A tally that is NULL is not a code with no limit, it is a code that has
@@ -1705,7 +1752,7 @@ begin
          where oc.%1$I = p_code
            and oc.%2$I
            and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
-           and (oc.expires_at is null or oc.expires_at > now())
+           and coalesce(public.offer_code_expiry(oc.expires_at, oc.sent_at) > now(), true)
       ) then 'ok' else 'invalid' end into verdict;
 
       if verdict = 'ok' and v_client is not null then
@@ -1717,43 +1764,118 @@ begin
     $body$;
   $fn$, code_col, active_col);
 
-  -- Spend one. True if it was spent, false if it could not be.
+  -- Spend one. 'ok' if it was spent, otherwise WHY it was not.
   --
-  -- The guard is the UPDATE's own WHERE clause, and that is what makes this
-  -- safe under concurrency: two applications racing for the last use of a code
-  -- both try to update the same row, Postgres serialises them on the row lock,
-  -- and the second re-evaluates `used_count < max_uses` against the first one's
-  -- committed value and matches nothing. A read-then-write would let both
-  -- through.
+  -- The guard is still the UPDATE's own WHERE clause, and that is what makes
+  -- this safe under concurrency: two applications racing for the last use of a
+  -- code both try to update the same row, Postgres serialises them on the row
+  -- lock, and the second re-evaluates `used_count < max_uses` against the first
+  -- one's committed value and matches nothing. A read-then-write would let both
+  -- through — which is why the classification below runs only AFTER the spend
+  -- has already failed, and only to choose the wording. It never decides
+  -- whether the code may be spent, so it cannot reintroduce the race.
+  --
+  -- Four answers:
+  --
+  --   'ok'       spent, in this transaction, alongside the user row
+  --   'expired'  the row is real and the window has closed
+  --   'used'     the row is real and every use is gone
+  --   'invalid'  no such code, or the bank has switched it off
+  --
+  -- Splitting these here is safe in a way that splitting them in
+  -- `offer_code_status` is not, and the difference is worth stating because the
+  -- two look like the same question. `offer_code_status` answers any stranger
+  -- holding the anon key, cheaply, all day — so it collapses every refusal to
+  -- 'invalid' rather than confirming which of nine million strings are real
+  -- codes. This is reached only through the sign-up trigger: the caller has to
+  -- actually attempt an account, GoTrue rate limits that, and the attempt is
+  -- recorded. Paying that per guess to learn "real, but expired" is not an
+  -- oracle worth having, and the applicant holding a genuine invitation that
+  -- went stale is owed the real reason.
   --
   -- Not callable by a session — a customer who could call it could spend other
   -- people's codes.
+  --
+  -- Dropped first because the return type changes from boolean; `create or
+  -- replace` cannot do that, and on a database that already ran an older copy
+  -- of this file the old signature is what is there.
+  drop function if exists public.consume_offer_code(text, uuid);
+
   execute format($fn$
     create or replace function public.consume_offer_code(p_code text, p_user_id uuid)
-    returns boolean language plpgsql security definer set search_path = public as $body$
+    returns text language plpgsql security definer set search_path = public as $body$
     declare
-      spent boolean := false;
+      spent   boolean := false;
+      verdict text;
     begin
       update public.offer_codes oc
          set used_count = coalesce(oc.used_count, 0) + 1
        where oc.%1$I = p_code
          and oc.%2$I
          and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
-         and (oc.expires_at is null or oc.expires_at > now())
+         and coalesce(public.offer_code_expiry(oc.expires_at, oc.sent_at) > now(), true)
       returning true into spent;
 
-      if not coalesce(spent, false) then
-        return false;
+      if coalesce(spent, false) then
+        insert into public.offer_code_redemptions (user_id, code)
+        values (p_user_id, p_code)
+        on conflict (user_id) do update set code = excluded.code, redeemed_at = now();
+
+        return 'ok';
       end if;
 
-      insert into public.offer_code_redemptions (user_id, code)
-      values (p_user_id, p_code)
-      on conflict (user_id) do update set code = excluded.code, redeemed_at = now();
+      -- Why not. Expiry is reported ahead of exhaustion when a code is both:
+      -- the deadline is the fact the holder can do nothing about and the one
+      -- the invitation itself set an expectation for.
+      --
+      -- A switched-off code reports 'invalid' rather than a fourth answer. The
+      -- bank pulling a campaign is not something to explain at the sign-up
+      -- form, and "that code was withdrawn" confirms the code was real.
+      select case
+               when not oc.%2$I then 'invalid'
+               when coalesce(public.offer_code_expiry(oc.expires_at, oc.sent_at) <= now(), false)
+                 then 'expired'
+               when oc.max_uses is not null and coalesce(oc.used_count, 0) >= oc.max_uses
+                 then 'used'
+               else 'invalid'
+             end
+        into verdict
+        from public.offer_codes oc
+       where oc.%1$I = p_code;
 
-      return true;
+      -- No row at all leaves verdict null.
+      return coalesce(verdict, 'invalid');
     end;
     $body$;
   $fn$, code_col, active_col);
+
+  -- Start the clock. Called by whatever sends the invitation, immediately
+  -- after the send succeeds — not before, or a bounced email costs the
+  -- recipient their window.
+  --
+  -- First send wins: `coalesce(sent_at, ...)` means a resend does not push the
+  -- deadline back. Otherwise "resend my code" is an unlimited extension and the
+  -- seven days means nothing. To genuinely restart a code, clear `sent_at`
+  -- first and call this again.
+  --
+  -- Returns the deadline now in force, so the sender can put a real date in the
+  -- email rather than computing its own and disagreeing with the database.
+  -- Null back means no such code.
+  execute format($fn$
+    create or replace function public.mark_offer_code_sent(p_code text, p_sent_at timestamptz default now())
+    returns timestamptz language plpgsql security definer set search_path = public as $body$
+    declare
+      deadline timestamptz;
+    begin
+      update public.offer_codes oc
+         set sent_at = coalesce(oc.sent_at, p_sent_at)
+       where oc.%1$I = p_code
+      returning public.offer_code_expiry(oc.expires_at, oc.sent_at) into deadline;
+
+      return deadline;
+    end;
+    $body$;
+  $fn$, code_col);
 
   -- How many codes could be spent right now. Read by the warning at the end of
   -- this section and by the verification block, so neither of those has to know
@@ -1764,7 +1886,7 @@ begin
       select count(*)::integer from public.offer_codes oc
        where oc.%1$I
          and (oc.max_uses   is null or coalesce(oc.used_count, 0) < oc.max_uses)
-         and (oc.expires_at is null or oc.expires_at > now());
+         and coalesce(public.offer_code_expiry(oc.expires_at, oc.sent_at) > now(), true);
     $body$;
   $fn$, active_col);
 end $do$;
@@ -1772,32 +1894,58 @@ end $do$;
 grant  execute on function public.offer_code_status(text)          to anon, authenticated;
 revoke all     on function public.consume_offer_code(text, uuid) from public, anon, authenticated;
 revoke all     on function public.offer_codes_usable()           from public, anon, authenticated;
+-- The sender runs with the service key. A session that could call this could
+-- start — or refuse to start — anybody's window.
+revoke all     on function public.mark_offer_code_sent(text, timestamptz) from public, anon, authenticated;
+
+-- ...and then handed back to the one role that is supposed to call it.
+--
+-- Revoking from PUBLIC takes the privilege from every role that had it only by
+-- inheritance, and service_role is one of them — it is not the owner and it is
+-- not a superuser. Without this grant the function is callable from the SQL
+-- editor, where you are the owner, and from nowhere else: every RPC and Edge
+-- Function attempting it gets "permission denied for function
+-- mark_offer_code_sent". That failure looks like a broken sender rather than a
+-- missing grant, which is a bad afternoon.
+--
+-- Guarded because service_role is a Supabase role. On a plain Postgres there is
+-- nothing to grant to, and an unguarded GRANT would abort the whole file.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    grant execute on function public.mark_offer_code_sent(text, timestamptz) to service_role;
+  end if;
+end $$;
 
 
 -- ---------------------------------------------------------------------------
 -- The gate.
 --
 -- BEFORE INSERT on auth.users. It reads the code off the metadata the sign-up
--- form sends and spends it, and if it cannot, it refuses the insert — which
--- GoTrue reports to the browser as a failed sign-up and which leaves no user
--- behind.
+-- form sends — or, for a user created with the service key, off the app
+-- metadata only that key can write — and spends it; if it cannot, it refuses the
+-- insert, which GoTrue reports to the browser as a failed sign-up and which
+-- leaves no user behind.
 --
 -- The switch is in bank_settings so an operator can turn the requirement off
--- without dropping the trigger, and so creating a user by hand in the Supabase
--- dashboard is possible: flip it, add the user, flip it back. It defaults to
--- ON, because a gate that defaults to open is not a gate.
+-- without dropping the trigger. It defaults to ON, because a gate that defaults
+-- to open is not a gate. Creating one user by hand no longer needs the switch:
+-- pass the code in app_metadata and the account is opened against a real code,
+-- with the redemption row to show for it, instead of through a hole held open
+-- for as long as it takes somebody to remember to close it.
 --
--- READ THIS BEFORE DEPLOYING. The sign-up form no longer collects an offer
--- code — the step was removed — so nothing in the browser sends `offer_code`
--- any more, and with the requirement ON this trigger now refuses EVERY
--- registration on the 'offer code required' branch below. The default is left
--- ON deliberately rather than quietly flipped: a gate's default is not
--- something a change to a form should decide. To open registration, run
+-- READ THIS BEFORE DEPLOYING. The branch this file is merged into removed the
+-- offer-code step from the sign-up form, so nothing in the browser sends
+-- `offer_code` any more and, with the requirement ON, this trigger refuses
+-- EVERY customer registration on the 'offer code required' branch below. The
+-- default is left ON deliberately rather than quietly flipped: a gate's default
+-- is not something a change to a form should decide. To open registration, run
 --
 --   update public.bank_settings set offer_code_required = false where id = 1;
 --
--- Turning it back on means restoring the sign-up step as well; on its own it
--- closes registration completely. See section 5g of docs/supabase-setup.md.
+-- Leaving it ON only makes sense alongside restoring that step. Note this says
+-- nothing about the service-key path above — a code passed in app_metadata is
+-- still spent normally either way. See section 5g of docs/supabase-setup.md.
 -- ---------------------------------------------------------------------------
 alter table public.bank_settings
   add column if not exists offer_code_required boolean not null default true;
@@ -1811,6 +1959,7 @@ as $$
 declare
   required boolean;
   code     text;
+  verdict  text;
 begin
   select coalesce(bs.offer_code_required, true) into required
     from public.bank_settings bs where bs.id = 1;
@@ -1822,7 +1971,28 @@ begin
     return new;
   end if;
 
-  code := nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), '');
+  -- User metadata first, app metadata second. The two are not the same channel
+  -- and the order is the point.
+  --
+  -- `raw_user_meta_data` is whatever the browser put in `options.data`, so it is
+  -- the sign-up form's channel — and also the one a stranger with the anon key
+  -- controls. That costs nothing: a code still has to match a row in
+  -- `offer_codes` to be spent, so control of the field buys an attacker the
+  -- ability to submit a guess, which is what the form already does.
+  --
+  -- `raw_app_meta_data` cannot be set through `auth.signUp` at all — GoTrue
+  -- ignores it there. Only the service key writes it, through
+  -- `admin.createUser({ app_metadata: { offer_code: '1234567' } })`. That makes
+  -- it the channel for users created server-side: an operator adding an account
+  -- by hand, or an invite flow that already knows which code the account is
+  -- being opened against. Without it the only way in is to switch
+  -- `offer_code_required` off, add the user and switch it back — which opens the
+  -- gate for every sign-up in the gap, and leaves no redemption row behind to say
+  -- how that account was opened.
+  code := coalesce(
+    nullif(trim(coalesce(new.raw_user_meta_data->>'offer_code', '')), ''),
+    nullif(trim(coalesce(new.raw_app_meta_data ->>'offer_code', '')), '')
+  );
 
   -- PRESENCE only. What a code looks like is decided in exactly one place —
   -- the `offer_codes_seven_digits` constraint above — and repeating the pattern
@@ -1845,10 +2015,41 @@ begin
             hint    = 'Sign-up needs a valid seven-digit offer code.';
   end if;
 
-  if not public.consume_offer_code(code, new.id) then
-    raise exception 'offer code not usable'
-      using errcode = 'check_violation',
-            hint    = 'That offer code does not exist, has expired, or has been fully used.';
+  -- Spent here, in the transaction that is creating the user. Nothing is
+  -- written on a refusal: the raise below aborts the INSERT, so there is no
+  -- auth user, no profile, no accounts, and the tally is rolled back with them.
+  verdict := public.consume_offer_code(code, new.id);
+
+  -- One message per reason, because the customer's next move differs by
+  -- reason: an expired code needs a new invitation, a used-up one needs a word
+  -- with whoever issued it, and an invalid one is usually four digits typed
+  -- wrong. Every message keeps the words "offer code" — js/auth-errors.js
+  -- matches on them, and the general case still has to be caught by projects
+  -- where GoTrue flattens this to "Database error saving new user".
+  -- IS DISTINCT FROM, not <>. A gate has to fail closed, and `<>` cannot: if
+  -- consume_offer_code ever returns NULL, `NULL <> 'ok'` is NULL, which is not
+  -- true, so this branch never fires and the sign-up is ALLOWED. That is the
+  -- whole gate open on a null. The boolean version this replaced had the same
+  -- hole for the same reason — `not NULL` is also NULL.
+  --
+  -- Nothing should return NULL today; the function coalesces its last branch.
+  -- But "should" is doing the work in that sentence, and the failure mode is
+  -- silent: no error, no log, an account where there should not be one. Written
+  -- so that anything which is not exactly 'ok' — including null, including a
+  -- value added later and not handled here — refuses.
+  if verdict is distinct from 'ok' then
+    raise exception using
+      errcode = 'check_violation',
+      message = case verdict
+                  when 'expired' then 'offer code expired'
+                  when 'used'    then 'offer code already used'
+                  else                'offer code not usable'
+                end,
+      hint    = case verdict
+                  when 'expired' then 'That offer code has passed its expiry date.'
+                  when 'used'    then 'That offer code has already been used.'
+                  else                'That offer code does not exist or is no longer active.'
+                end;
   end if;
 
   return new;
