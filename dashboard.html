@@ -64,6 +64,15 @@
 </head>
 <body class="antialiased relative selection:bg-[#2563EB] selection:text-white has-app-footer">
 
+  <!-- THE BOARD, AND THE BAR THAT BELONGS TO IT
+       One wrapper around the dashboard and its navigation bar, and the reason
+       is the bar: it is sticky rather than fixed, so it rides the bottom of the
+       screen only for as long as this wrapper is under the thumb. Reaching the
+       end of the board parks it, and the footer below carries on past it. A
+       sticky element sticks within its own parent, so without this wrapper the
+       parent would be <body> and the bar would hold on over the footer too. -->
+  <div class="app-scroll">
+
   <!-- APP SHELL CONTAINER (Max width 430px, 16px left/right padding, centered) -->
   <div class="app-shell w-full max-w-[430px] mx-auto px-[16px]">
 
@@ -186,12 +195,18 @@
         <svg viewBox="0 0 24 24"><path d="M7 10l5-7 5 7M7 14l5 7 5-7"></path></svg>
         <span>Transfer</span>
       </button>
+      <!-- A paper plane, not the bare triangle that was here. The triangle read
+           as a play button or a cursor depending on who was looking at it, and
+           an arrowhead is not what anyone pictures when they think "send". -->
       <button id="homeQuickSendMoney" class="home-act">
-        <svg viewBox="0 0 24 24"><path d="M12 3l9 18-9-4-9 4 9-18z"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"></path></svg>
         <span>Send Money</span>
       </button>
+      <!-- An arrow coming down onto a line: money arriving in the account. It
+           was a plain +, which is the mark this app uses for opening a new
+           account — the one thing Deposit does not do. -->
       <button id="homeQuickDeposit" class="home-act">
-        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
+        <svg viewBox="0 0 24 24"><path d="M12 3v12M7 12l5 5 5-5M5 21h14"></path></svg>
         <span>Deposit</span>
       </button>
       <button id="homeQuickStatements" class="home-act">
@@ -593,6 +608,41 @@
 
   </div>
 
+
+  <!-- FIXED BOTTOM NAVIGATION BAR -->
+  <nav class="home-nav">
+    <div class="w-full max-w-[430px] mx-auto grid grid-cols-5">
+
+      <button id="navAccounts" class="home-nv home-nv-on">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.4"></rect><rect x="14" y="4" width="6" height="6" rx="1.4"></rect><rect x="4" y="14" width="6" height="6" rx="1.4"></rect><rect x="14" y="14" width="6" height="6" rx="1.4"></rect></svg>
+        <span>Accounts</span>
+      </button>
+
+      <button id="navPayments" class="home-nv">
+        <svg viewBox="0 0 24 24"><path d="M4 9h16l-3-3M20 15H4l3 3"></path></svg>
+        <span>Payments</span>
+      </button>
+
+      <button id="navInvest" class="home-nv">
+        <svg viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 6-7"></path><path d="M20 8v5h-5"></path></svg>
+        <span>Invest</span>
+      </button>
+
+      <button id="navSupport" class="home-nv">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z"></path></svg>
+        <span>Support</span>
+      </button>
+
+      <button id="navProfile" class="home-nv">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>
+        <span>Profile</span>
+      </button>
+
+    </div>
+  </nav>
+
+  </div><!-- /.app-scroll -->
+
   <!-- ================= SITE FOOTER =================
        The same footer the marketing site ends on, markup for markup, so a
        customer who scrolls past the last card lands somewhere the bank looks
@@ -600,11 +650,10 @@
        css/footer.css and the accordion from js/footer-accordion.js — both
        shared with index.html, so the two can only ever match.
 
-       Outside .app-shell deliberately: the board is a 430px column and the
-       footer is the full width of the page underneath it.
-
-       `app-footer` is the app's one addition — the runway that keeps the
-       disclosures clear of the fixed navigation bar. -->
+       Outside .app-shell, and outside .app-scroll with it: the board is a
+       430px column, and this is the full width of the page below everything —
+       below the navigation bar too, which parks at the end of the board rather
+       than floating over the disclosures. -->
   <footer class="main-footer app-footer">
     <div class="footer-content-wrapper">
       
@@ -670,11 +719,15 @@
           <span>Help & Support</span>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
+        <!-- Signed in, these are screens rather than pages: data-page opens
+             them over the board (wired in js/main.js). The groups above have no
+             equivalent inside the app, so they stay as the marketing site
+             writes them. -->
         <div class="footer-section-links">
           <a href="mailto:support@verceilbank.com">Email Support</a>
-          <a href="#">Customer Service</a>
-          <a href="#">Schedule a Meeting</a>
-          <a href="#">FAQs</a>
+          <a href="#" data-page="contact-support">Customer Service</a>
+          <a href="#" data-page="advisor">Schedule a Meeting</a>
+          <a href="#" data-page="help-center">FAQs</a>
         </div>
       </div>
 
@@ -706,7 +759,7 @@
         <div class="footer-legal-links-list">
           <a href="banking-policy.html">Customer Banking Policy</a>
           <a href="#">Terms & Conditions</a>
-          <a href="#">Privacy</a>
+          <a href="#" data-page="privacy">Privacy</a>
           <a href="#">Notice at Collection</a>
           <a href="#">Do Not Sell or Share My Personal Information</a>
           <a href="#">Accessibility</a>
@@ -721,38 +774,6 @@
 
     </div>
   </footer>
-
-  <!-- FIXED BOTTOM NAVIGATION BAR -->
-  <nav class="home-nav">
-    <div class="w-full max-w-[430px] mx-auto grid grid-cols-5">
-
-      <button id="navAccounts" class="home-nv home-nv-on">
-        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.4"></rect><rect x="14" y="4" width="6" height="6" rx="1.4"></rect><rect x="4" y="14" width="6" height="6" rx="1.4"></rect><rect x="14" y="14" width="6" height="6" rx="1.4"></rect></svg>
-        <span>Accounts</span>
-      </button>
-
-      <button id="navPayments" class="home-nv">
-        <svg viewBox="0 0 24 24"><path d="M4 9h16l-3-3M20 15H4l3 3"></path></svg>
-        <span>Payments</span>
-      </button>
-
-      <button id="navInvest" class="home-nv">
-        <svg viewBox="0 0 24 24"><path d="M4 17l6-6 4 4 6-7"></path><path d="M20 8v5h-5"></path></svg>
-        <span>Invest</span>
-      </button>
-
-      <button id="navSupport" class="home-nv">
-        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H8l-4 4V5a2 2 0 012-2h13a2 2 0 012 2z"></path></svg>
-        <span>Support</span>
-      </button>
-
-      <button id="navProfile" class="home-nv">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c0-4 4-6 8-6s8 2 8 6"></path></svg>
-        <span>Profile</span>
-      </button>
-
-    </div>
-  </nav>
 
   <!-- BOTTOM NAVIGATION DROPDOWN MENU (CITI-STYLE) -->
   <div id="navMenuOverlay" data-glass class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden"></div>
