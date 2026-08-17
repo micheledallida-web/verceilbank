@@ -247,11 +247,43 @@
 
 /* ==========================================================================
    INSIDE THE APP
-   Nothing covers the footer in the app: the navigation bar parks at the end of
-   the board above it rather than floating over it. All it needs is the home
-   indicator's strip on a phone, since it is now the last thing on the page.
+   Two things change when this footer closes the dashboard rather than the
+   marketing site, and both are about it belonging to the page above it.
+
+   It gets air. Butted straight against the last offer, a navy band starting
+   one pixel below a white card reads as a rendering fault rather than the end
+   of the page — no bank ends a board that way.
+
+   And it shares the board's column. This footer sets its own measure, which is
+   wider than the app's: on a laptop the links started level with the window
+   while the cards above them started level with the column, so two grids ran
+   down the same page. The card's gutter is the footer's gutter now, at every
+   width — the whole page lines up on one edge.
+
+   Nothing covers it: the navigation bar parks at the end of the board above it
+   rather than floating over it. The last of the padding is the phone's home
+   indicator, since the footer is the final thing on the page.
    ========================================================================== */
 
 .app-footer {
+  margin-top: 34px;
+  padding-left: 0;
+  padding-right: 0;
   padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+}
+
+.app-footer .footer-content-wrapper {
+  max-width: var(--app-col);
+  padding-left: var(--app-pad);
+  padding-right: var(--app-pad);
+}
+
+/* More air once there is room for it, in step with the footer's own padding,
+   which steps up at the same width. */
+@media (min-width: 1024px) {
+  .app-footer {
+    margin-top: 56px;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
