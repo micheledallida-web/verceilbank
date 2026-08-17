@@ -1989,7 +1989,18 @@ begin
   -- wrong. Every message keeps the words "offer code" — js/auth-errors.js
   -- matches on them, and the general case still has to be caught by projects
   -- where GoTrue flattens this to "Database error saving new user".
-  if verdict <> 'ok' then
+  -- IS DISTINCT FROM, not <>. A gate has to fail closed, and `<>` cannot: if
+  -- consume_offer_code ever returns NULL, `NULL <> 'ok'` is NULL, which is not
+  -- true, so this branch never fires and the sign-up is ALLOWED. That is the
+  -- whole gate open on a null. The boolean version this replaced had the same
+  -- hole for the same reason — `not NULL` is also NULL.
+  --
+  -- Nothing should return NULL today; the function coalesces its last branch.
+  -- But "should" is doing the work in that sentence, and the failure mode is
+  -- silent: no error, no log, an account where there should not be one. Written
+  -- so that anything which is not exactly 'ok' — including null, including a
+  -- value added later and not handled here — refuses.
+  if verdict is distinct from 'ok' then
     raise exception using
       errcode = 'check_violation',
       message = case verdict
