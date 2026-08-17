@@ -122,6 +122,86 @@ create table if not exists public.deposit_events (
 );
 
 
+-- ---- support conversations --------------------------------------------------
+-- The two tables behind the Support screen, and the reason a message sent from
+-- the app came back with "Could not find the table 'public.support_threads' in
+-- the schema cache". Everything else was already built: the screen writes the
+-- thread and the first message, the support-notify function emails the inbox,
+-- and support-inbound turns a reply to that email back into a message in the
+-- customer's app. Section 4 even grants a customer rights over both tables.
+-- Nothing created them, and the RLS block skips a table that is not there with
+-- a notice nobody reads, so the whole path stayed dark until somebody pressed
+-- Send.
+
+create table if not exists public.support_threads (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  category   text not null default 'general',
+  subject    text not null,
+  -- open      the customer is waiting on the bank
+  -- answered  the bank has replied and the customer has not read it — this is
+  --           what puts the unread dot on the thread and the count on the tab
+  -- closed    finished; the composer is hidden
+  status     text not null default 'open'
+             check (status in ('open', 'answered', 'closed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- The thread list is ordered by updated_at, so it is read on every visit to the
+-- screen; the messages of one thread are read by thread_id.
+create index if not exists support_threads_user_updated_idx
+  on public.support_threads (user_id, updated_at desc);
+
+create table if not exists public.support_messages (
+  id         bigint generated always as identity primary key,
+  thread_id  bigint not null references public.support_threads (id) on delete cascade,
+  -- Carried on the message as well as the thread, and not redundantly: RLS on
+  -- this table is written against user_id, so a message without one is a
+  -- message its owner cannot read. The bank's replies are written with the
+  -- service key under the customer's id for the same reason.
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  sender     text not null check (sender in ('user', 'support')),
+  body       text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists support_messages_thread_created_idx
+  on public.support_messages (thread_id, created_at);
+
+-- A thread's standing follows its messages, and it is kept here rather than in
+-- the app because two different writers add them: the customer through the
+-- browser, and support through the inbound email function. Neither should have
+-- to remember to bump the parent row, and the customer could not be trusted to
+-- anyway — marking your own thread answered is not a customer's decision.
+--
+-- A closed thread stays closed. Reopening one because a late message arrived
+-- would contradict the screen, which hides the composer on a closed thread.
+create or replace function public.touch_support_thread()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $touch$
+begin
+  update public.support_threads
+     set updated_at = now(),
+         status = case
+                    when status = 'closed' then status
+                    when new.sender = 'support' then 'answered'
+                    else 'open'
+                  end
+   where id = new.thread_id;
+  return new;
+end;
+$touch$;
+
+drop trigger if exists support_messages_touch_thread on public.support_messages;
+create trigger support_messages_touch_thread
+  after insert on public.support_messages
+  for each row execute function public.touch_support_thread();
+
+
 -- =============================================================================
 -- 2. UNIQUE CONSTRAINTS
 --

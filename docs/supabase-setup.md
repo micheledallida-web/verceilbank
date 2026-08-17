@@ -1342,6 +1342,94 @@ same account.
 
 ---
 
+## 5i. Support messages — the tables, and the mail to your inbox
+
+A message sent from the Support screen came back with:
+
+> Could not find the table `public.support_threads` in the schema cache
+
+Which was true. Everything else on that path was already built — the screen
+writes the thread and the first message, `support-notify` emails your inbox,
+`support-inbound` turns your reply to that email back into a message in the
+customer's app, and section 2 grants a customer rights over both tables. The
+two tables themselves were never created. The RLS block skips a table that is
+not there with a notice, so nothing complained until somebody pressed Send.
+
+### 1. Create them
+
+`supabase/setup.sql` now creates them, so re-run that file — it is written to
+be run repeatedly. To do just this part, run the `support_threads` and
+`support_messages` blocks from section 1 of that file, then re-run section 4 so
+the policies attach to them.
+
+Confirm:
+
+```sql
+select table_name from information_schema.tables
+ where table_schema = 'public' and table_name like 'support%';
+-- -> support_messages, support_threads
+
+select relname, relrowsecurity from pg_class
+ where relname in ('support_threads', 'support_messages');
+-- -> both true
+```
+
+Without RLS on, the anon key in every visitor's browser can read every
+customer's messages to their bank. Do not skip the second query.
+
+### 2. Point the mail at your business address
+
+```bash
+supabase functions deploy support-notify
+supabase secrets set \
+  RESEND_API_KEY=re_xxx \
+  SUPPORT_INBOX=you@yourbusiness.com \
+  SUPPORT_FROM='Verceil Bank <support@verceilbank.com>'
+```
+
+| Secret | | |
+| --- | --- | --- |
+| `RESEND_API_KEY` | required | from resend.com. Server-side only — it must never reach the browser, which is the entire reason this runs as a function |
+| `SUPPORT_INBOX` | required | **where the message lands: your business email** |
+| `SUPPORT_FROM` | required | the sender. Must be an address on a domain verified with Resend, or the mail is refused |
+
+With any of the three unset the function answers "Email is not configured" and
+logs which one is missing. The customer still sees their message saved and the
+thread open, because the app never waits on the mail — a mail outage must not
+look to somebody like a failed send.
+
+### 3. Replying by email (optional)
+
+Set `SUPPORT_INBOUND_ADDRESS` and the mail carries a `Reply-To` tagged with the
+thread id, so a plain reply from any mail client comes back into the
+customer's app through `support-inbound`. Leave it unset and the mail says so
+in its footer rather than promising a reply route that is not there — answer
+from the Supabase dashboard instead.
+
+```bash
+supabase functions deploy support-inbound
+supabase secrets set \
+  SUPPORT_INBOUND_ADDRESS=support@yourbusiness.com \
+  SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
+```
+
+Then point your mail provider's inbound webhook at the function URL and include
+that secret — it is what stops anyone who finds the URL from writing messages
+into a customer's conversation as the bank.
+
+### 4. Check it end to end
+
+Send a message from the app. You should get all three:
+
+- the thread appears on the Support screen with an **Open** pill
+- a row in `support_threads` and one in `support_messages`
+- the mail in your inbox, subject `[VB-<thread id>] <subject>`
+
+If the first two happen and the mail does not, it is the secrets, not the
+tables: `supabase functions logs support-notify` says which.
+
+---
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded
@@ -1417,6 +1505,8 @@ Never put the service key in these variables.
 - [ ] Every other public table confirmed RLS-enabled (section 2)
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
+- [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
+- [ ] `support-notify` deployed with `SUPPORT_INBOX` set to your business email (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**

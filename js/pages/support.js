@@ -150,6 +150,18 @@ function notifySupportInbox(ctx, threadId, messageId) {
     .catch((err) => console.error('Support email notify error:', err));
 }
 
+// Errors written here are meant for the customer. Errors from Postgres, from
+// the network or from an edge function are not, and until now they went
+// straight onto the screen: somebody sending a message to their bank was shown
+// "Could not find the table 'public.support_threads' in the schema cache",
+// which tells them nothing they can act on and tells anyone else the shape of
+// the database. The detail still goes to the console, where it is useful.
+class SupportMessageError extends Error {}
+
+function customerFacing(err, fallback) {
+  return err instanceof SupportMessageError && err.message ? err.message : fallback;
+}
+
 function emptyState(message) {
   return `<div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[14px] px-[16px] py-3 shadow-lg text-center text-[12px] text-[#6B7280] dark:text-[#8E9CBA]">${message}</div>`;
 }
@@ -388,7 +400,7 @@ async function sendReply(root, ctx) {
 
   try {
     const user = await ctx.getCurrentUser();
-    if (!user || !ctx.supabaseClient) throw new Error('You need to be signed in to reply.');
+    if (!user || !ctx.supabaseClient) throw new SupportMessageError('You need to be signed in to reply.');
 
     const { data, error } = await ctx.supabaseClient
       .from('support_messages')
@@ -404,7 +416,7 @@ async function sendReply(root, ctx) {
     scrollToNewest(root);
   } catch (err) {
     console.error('Support reply error:', err);
-    showError(root, '#supReplyError', err && err.message ? err.message : 'Could not send your reply. Please try again.');
+    showError(root, '#supReplyError', customerFacing(err, 'Could not send your reply. Please try again.'));
   } finally {
     sendingReply = false;
     setBusy(root, '#supReplySendBtn', '#supReplySpinner', false);
@@ -472,7 +484,7 @@ async function submitNew(root, ctx) {
 
   try {
     const user = await ctx.getCurrentUser();
-    if (!user || !ctx.supabaseClient) throw new Error('You need to be signed in to send a message.');
+    if (!user || !ctx.supabaseClient) throw new SupportMessageError('You need to be signed in to send a message.');
 
     const { data: thread, error: threadError } = await ctx.supabaseClient
       .from('support_threads')
@@ -480,7 +492,7 @@ async function submitNew(root, ctx) {
       .select()
       .single();
     if (threadError) throw threadError;
-    if (!thread) throw new Error('Could not start the conversation. Please try again.');
+    if (!thread) throw new SupportMessageError('Could not start the conversation. Please try again.');
 
     const { data: firstMessage, error: messageError } = await ctx.supabaseClient
       .from('support_messages')
@@ -499,7 +511,7 @@ async function submitNew(root, ctx) {
     await openThread(root, ctx, thread);
   } catch (err) {
     console.error('Support send error:', err);
-    showError(root, '#supNewError', err && err.message ? err.message : 'Could not send your message. Please try again.');
+    showError(root, '#supNewError', customerFacing(err, 'Could not send your message. Please try again.'));
   } finally {
     sendingNew = false;
     setBusy(root, '#supNewSendBtn', '#supNewSpinner', false);
