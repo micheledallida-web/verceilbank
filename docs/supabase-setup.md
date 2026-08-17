@@ -655,7 +655,7 @@ Keep it current from wherever you take a price feed. If the column is absent or
 the read fails, the app falls back to its built-in figure rather than leaving
 the screen unable to quote anything.
 
-The receiving address on that screen is live — a mainnet P2WPKH address in
+The receiving address on that screen is live — a mainnet P2PKH address in
 `js/pages/fund-account.js`, checksum verified. The QR is drawn from it at
 render time as a BIP-21 `bitcoin:` URI with the amount prefilled, so changing
 the address changes every QR the app draws; there is no image to keep in step.
@@ -879,12 +879,21 @@ is the real file.
 
 ## 5g. Offer codes — sign-up is invite-only
 
-**Nobody opens an account without a seven-digit offer code.** The form asks for
-one as its second step, before the applicant's name — deliberately, because it
-is the only step that can end the application, and asking somebody for their
-date of birth, four digits of their SSN and their home address before telling
-them they cannot open an account is collecting a stranger's identity for
-nothing.
+> **The sign-up form no longer asks for a code.** The step was removed to cut
+> friction, so nothing in the browser sends `offer_code` any more. Everything
+> below still exists in the database — the table, the trigger, the functions —
+> and the trigger still refuses any sign-up that arrives without a code while
+> the requirement is on. **With `offer_code_required` left on, nobody can
+> register at all**, because there is no longer a field that could satisfy it.
+> Switch the requirement off (see *Turning it off*) to reopen sign-up, or put
+> the step back if you want the bank to stay invite-only.
+
+The rule this section describes: **no account opens without a seven-digit offer
+code.** It used to be collected as the form's second step, before the
+applicant's name — deliberately, because it was the only step that could end the
+application, and asking somebody for their date of birth, four digits of their
+SSN and their home address before telling them they cannot open an account is
+collecting a stranger's identity for nothing.
 
 ### Where the rule actually lives
 
@@ -907,10 +916,10 @@ fails after the check, and leaves the decision with the browser.
 constraint. The trigger checks only that a code was *sent* — it does not repeat
 the pattern, because a string that is not a valid code cannot be stored as one,
 so it cannot match a row, so it is refused anyway and for the true reason. If
-you ever move to eight digits, change the constraint and nothing else. (The
-form's `OFFER_CODE_LENGTH` is a separate copy by necessity — the browser cannot
-read a check constraint — but it is one constant, and the field's `maxlength`
-and placeholder are written from it.)
+you ever move to eight digits, change the constraint and nothing else. (The form
+used to carry an `OFFER_CODE_LENGTH` of its own, a separate copy by necessity
+since a browser cannot read a check constraint. With the step gone, the
+constraint is now the only place the length is written down.)
 
 ### Issue a code
 
@@ -1047,11 +1056,10 @@ such code" from "that code is used up" would confirm which of those ten million
 are real, one guess at a time. One word costs an applicant a slightly vaguer
 message and costs an enumerator everything.
 
-The form calls it as the offer step is cleared, so an applicant is told at the
-step instead of at the end. It is a courtesy, not the rule — and a failure to
-reach it is **not** treated as a bad code: the applicant goes through and the
-trigger decides, because refusing somebody because their train went into a
-tunnel would be the form inventing a rejection the bank never made.
+The form used to call it as the offer step was cleared, so an applicant heard at
+the step instead of at the end. That was a courtesy, never the rule. With the
+step removed nothing calls it, but the grant and the throttle below are left in
+place: they cost nothing idle, and they are what the step would need again.
 
 ### If you already had an `offer_codes` table
 
@@ -1186,11 +1194,19 @@ moves, and there is a redemption row to say how it was opened.
 
 ### Turning it off
 
-To open sign-ups to everyone:
+**On this branch, off is the setting the app expects.** The form stopped
+collecting a code, so the requirement has to be off for anyone to register at
+all:
 
 ```sql
 update public.bank_settings set offer_code_required = false where id = 1;
--- ...
+```
+
+Turning it back on only makes sense alongside restoring the sign-up step. On its
+own it closes customer registration completely — the service-key channel above
+still works, since that passes a code in app metadata:
+
+```sql
 update public.bank_settings set offer_code_required = true  where id = 1;
 ```
 
@@ -1408,5 +1424,5 @@ Never put the service key in these variables.
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
 - [ ] `external_accounts` table with the narrowed insert grant (section 5h) — **without it, linking a bank silently fails; without the grant, the 30-day hold is decoration**
-- [ ] `offer_codes` table, the `on_auth_user_offer_code` trigger, **and at least one usable code** (section 5g) — **with the requirement on and no codes issued, nobody can sign up**
+- [ ] `offer_code_required` set to **false** (section 5g) — **the sign-up form no longer sends a code, so leaving the requirement on means nobody can register**
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

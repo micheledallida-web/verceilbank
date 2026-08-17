@@ -173,10 +173,21 @@
     offer_code: {
       // The general case: no such code, one the bank has switched off, or a
       // project where GoTrue flattens the trigger's message and we are
-      // inferring. Says what to do about it without asserting which — and a
-      // code that was fine three screens ago is most often one somebody else
-      // has just taken the last use of.
-      signup: 'We could not open an account with that offer code. Check the seven digits on your invitation, or contact whoever invited you.',
+      // inferring.
+      //
+      // On this branch it has one more meaning, and on the customer path it is
+      // now the ONLY one: the sign-up form no longer collects a code, so the
+      // gate raises 'offer code required' and lands here. An applicant seeing
+      // this did not mistype anything — they were never asked — so the copy
+      // cannot send them to check an invitation. It means the requirement is
+      // still on while the form that fed it is gone, which is ours to fix:
+      // `bank_settings.offer_code_required = false`, see the gate in setup.sql.
+      //
+      // The two kinds above keep their code-specific wording. They can only be
+      // raised against a code that really was submitted, which now happens only
+      // on the service-key path, where the reader is an operator and not a
+      // customer halfway through an application.
+      signup: 'We could not open your account just now. This is a problem on our side, not with the details you entered — please try again shortly.',
       any: 'That offer code could not be used.',
     },
     unconfirmed: {

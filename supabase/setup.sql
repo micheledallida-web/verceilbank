@@ -1933,6 +1933,19 @@ end $$;
 -- pass the code in app_metadata and the account is opened against a real code,
 -- with the redemption row to show for it, instead of through a hole held open
 -- for as long as it takes somebody to remember to close it.
+--
+-- READ THIS BEFORE DEPLOYING. The branch this file is merged into removed the
+-- offer-code step from the sign-up form, so nothing in the browser sends
+-- `offer_code` any more and, with the requirement ON, this trigger refuses
+-- EVERY customer registration on the 'offer code required' branch below. The
+-- default is left ON deliberately rather than quietly flipped: a gate's default
+-- is not something a change to a form should decide. To open registration, run
+--
+--   update public.bank_settings set offer_code_required = false where id = 1;
+--
+-- Leaving it ON only makes sense alongside restoring that step. Note this says
+-- nothing about the service-key path above — a code passed in app_metadata is
+-- still spent normally either way. See section 5g of docs/supabase-setup.md.
 -- ---------------------------------------------------------------------------
 alter table public.bank_settings
   add column if not exists offer_code_required boolean not null default true;
