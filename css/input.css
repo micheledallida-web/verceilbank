@@ -3177,25 +3177,6 @@ html.is-scrolling * {
   display: none !important;
 }
 
-/* ---- the clock, once the hero is wider than a phone column ----
-   `.home-clock` carries `margin-left: auto` so it pins to the far end of the
-   hero row. In a 430px column that reads as "the time, at the end of the line
-   of balances". From 768px up `.home-top` becomes two columns and that same
-   rule throws the time to the right edge of the left column — the middle of
-   the screen, level with nothing, in the gap between the balances and the
-   cards beside them.
-
-   So the auto margin is released above the phone column and the time simply
-   follows Savings, on the same baseline and the same gap as the figures it
-   belongs with. Left-aligned with everything else in that band, which is what
-   the rest of the hero already does. */
-@media (min-width: 768px) {
-  .home-clock {
-    margin-left: 0;
-    text-align: left;
-  }
-}
-
 /* The top bar's inner element is centred on the page — `max-width: --app-col`
    with auto margins — but its items were left-aligned inside it, so the five
    tabs sat against the left edge of the content column rather than in the
@@ -3209,5 +3190,36 @@ html.is-scrolling * {
 @media (min-width: 1024px) {
   .home-nav > div {
     justify-content: center;
+  }
+}
+
+/* ---- the clock, back at the far end of the hero row ----
+   `.home-clock` keeps the `margin-left: auto` it was written with, so the time
+   sits opposite the balances at the end of the line.
+
+   What was wrong was not the clock, it was the line it sits on. `.home-top`
+   splits 1.35fr / 1fr while the cards below split into equal columns, so the
+   hero row ran 73px past the right edge of the Savings card at 1440 and the
+   time landed in the gutter between Verceil Checking and the investment block
+   rather than above the card's edge.
+
+   The row is now held to the same width as the column of cards underneath it,
+   so the time lands exactly on the Savings card's right edge — the same
+   formula the shell uses for its own width, so the two cannot drift apart.
+   Only the stats line is constrained; the greeting, the balance and the
+   actions beside them are untouched. */
+@media (min-width: 1024px) {
+  .home-hero-row {
+    /* less the 4px of horizontal padding `.home-hero` puts around the row,
+       which otherwise carries the right edge 4px past the card's. */
+    max-width: calc((min(100vw, var(--app-col)) - 2 * var(--app-pad) - 28px) / 2 - 4px);
+  }
+}
+
+/* Three columns of cards up here, and the gap widens to 32px with them, so the
+   first column is a third of the board less two of those gaps. */
+@media (min-width: 1600px) {
+  .home-hero-row {
+    max-width: calc((min(100vw, var(--app-col)) - 2 * var(--app-pad) - 64px) / 3 - 4px);
   }
 }
