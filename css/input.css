@@ -1258,11 +1258,156 @@ html.dark body {
 
 .home-dots:active, .home-pill-btn:active { transform: scale(0.94); }
 
-/* ---- hero total ---- */
+/* ---- hero total ----
+   The balance is the one thing on this screen everybody opens the app to see,
+   and it used to be loose text over the page with a hairline under it — the
+   quick actions below it were a card, so the most important figure in the app
+   was the only block that wasn't. It is a card now: dark navy glass, the same
+   20-22px family of corners the rest of the board uses, lifted off the
+   background rather than ruled off from it.
+
+   The card is a two-layer stack — the light behind, the figures in front —
+   built as a one-cell grid rather than the obvious `position: relative` plus an
+   absolutely positioned glow, and that is deliberate. The clock in the balance
+   row is absolutely positioned on desktop and anchored to `.app-shell`, on the
+   stated grounds that the shell is the only box that knows where the card
+   column ends. Positioning this card — or giving it a `backdrop-filter`, which
+   creates a containing block just as surely — would quietly capture that clock
+   and drop it inside the card. Both children sit in the same grid cell
+   instead, so nothing here becomes a containing block and the clock still
+   measures itself against the shell.
+
+   There is no `backdrop-filter` for a second reason as well: behind this card
+   is one flat colour in both themes, and blurring a flat colour returns the
+   same flat colour. It would cost a full-card filter pass per frame to change
+   nothing. The glass comes from the translucent tints below. */
 .home-hero {
-  padding: 0 4px 18px;
+  display: grid;
+  isolation: isolate;
+  border-radius: 22px;
   margin-bottom: 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  /* Two layers: a blue pool in the bottom-right corner where the light
+     collects, over the diagonal sheen that makes the panel read as glass. */
+  background:
+    radial-gradient(120% 108% at 88% 112%, rgba(37, 99, 235, 0.24) 0%, rgba(37, 99, 235, 0) 58%),
+    linear-gradient(158deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.022) 48%, rgba(255, 255, 255, 0.05) 100%);
+  box-shadow:
+    0 18px 40px -26px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* The padding lives here rather than on the card so that the light layer,
+   which is the other half of the same grid cell, reaches the card's edge
+   instead of stopping short at a padding box. */
+.home-hero-body {
+  grid-area: 1 / 1;
+  padding: 18px 18px 20px;
+}
+
+/* On the blue light theme the same white glass would read as grey haze, so the
+   tint is cooled and the corner pool lightened to sit on #0B4CC2. */
+html:not(.dark) .home-hero {
+  border-color: rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(120% 108% at 88% 112%, rgba(191, 219, 254, 0.30) 0%, rgba(191, 219, 254, 0) 58%),
+    linear-gradient(158deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+/* ---- the light sweep ----
+   A neon light-trail across the bottom-right of the card rather than a
+   gradient: a thin curved arc, white through the middle and electric blue at
+   the bright end, with a wide soft bloom under it.
+
+   Both layers are the same trick and differ only in thickness, colour and
+   blur. The `background` is a flat left-to-right colour ramp — that is what
+   makes the streak change colour along its length — and the `mask` is a
+   radial ring whose centre sits well below the card, so the only part of the
+   ring that survives is a shallow curve rising to the right. Shape from the
+   mask, colour from the background.
+
+   Drawn this way each layer is exactly one card-sized box. The obvious
+   alternative — an enormous bordered ellipse clipped by the card — is the same
+   picture built out of a 1500px element, and on a phone at 3x that is a
+   multi-megabyte blurred layer for a 2px line.
+
+   `.home-hero-light` is an empty span sharing the grid cell with the figures.
+   `z-index: -1` puts it behind them and, because the card isolates, still in
+   front of the card's own background; `overflow: hidden` crops the two arcs to
+   the card. It is the positioned element the arcs hang off, which is what
+   keeps that job off the card itself. */
+.home-hero-light {
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: -1;
+  overflow: hidden;
+  /* One pixel inside the card's radius: the border is drawn beneath this and
+     a square corner here would cut across it. */
+  border-radius: 21px;
+  pointer-events: none;
+}
+
+.home-hero-light::before,
+.home-hero-light::after {
+  content: '';
+  position: absolute;
+  /* Wider than the card so the drift below never walks an end into view. */
+  left: -25%;
+  right: -25%;
+  top: 0;
+  bottom: 0;
+  animation: home-hero-sweep 14s ease-in-out infinite;
+}
+
+/* The bloom: thick, heavily blurred, blue, and dim. */
+.home-hero-light::before {
+  background: linear-gradient(
+    96deg,
+    rgba(56, 189, 248, 0) 14%,
+    rgba(56, 189, 248, 0.16) 40%,
+    rgba(125, 211, 252, 0.42) 62%,
+    rgba(37, 99, 235, 0.72) 84%,
+    rgba(37, 99, 235, 0) 100%
+  );
+  -webkit-mask-image: radial-gradient(167% 290% at 96.7% 250.5%, transparent 62.4%, #000 63.2%, #000 64.8%, transparent 65.6%);
+          mask-image: radial-gradient(167% 290% at 96.7% 250.5%, transparent 62.4%, #000 63.2%, #000 64.8%, transparent 65.6%);
+  filter: blur(11px);
+  opacity: 0.55;
+}
+
+/* The trail itself: hairline, barely blurred, white running into blue. */
+.home-hero-light::after {
+  background: linear-gradient(
+    96deg,
+    rgba(255, 255, 255, 0) 16%,
+    rgba(255, 255, 255, 0.14) 38%,
+    rgba(255, 255, 255, 0.62) 54%,
+    rgba(255, 255, 255, 0.95) 66%,
+    rgba(147, 197, 253, 0.95) 80%,
+    rgba(59, 130, 246, 0.8) 92%,
+    rgba(59, 130, 246, 0) 100%
+  );
+  -webkit-mask-image: radial-gradient(167% 290% at 96.7% 250.5%, transparent 63.6%, #000 63.85%, #000 64.15%, transparent 64.4%);
+          mask-image: radial-gradient(167% 290% at 96.7% 250.5%, transparent 63.6%, #000 63.85%, #000 64.15%, transparent 64.4%);
+  filter: blur(1.1px);
+  opacity: 0.85;
+}
+
+/* The sweep. Transform and opacity only — nothing here repaints, so the
+   browser blurs each layer once and then just moves the finished picture.
+   Animating the gradient's position instead would re-blur a card-sized layer
+   every frame, which is the difference between free and expensive on a phone.
+   `html.is-scrolling *` pauses this outright while the board is moving. */
+@keyframes home-hero-sweep {
+  0%, 100% { transform: translate3d(-4%, 1.5%, 0); opacity: 0.78; }
+  50%      { transform: translate3d(4%, -1.5%, 0); opacity: 1; }
+}
+
+/* A light that never stops travelling is the kind of motion this setting
+   exists to switch off. The trail stays; only the travelling stops. */
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-light::before,
+  .home-hero-light::after { animation: none; }
 }
 
 .home-hero-lab {
@@ -1513,7 +1658,12 @@ html.dark body {
 }
 
 .home-ic-b { background: #1D61F2; }
-.home-ic-g { background: #10B981; }
+/* Savings. #22C55E, not the #10B981 the rest of the app uses for success
+   states: this is the product's identity colour rather than a "done" tick, and
+   the brief calls for the vivid green. The two are close enough that they were
+   being read as the same colour and far enough apart that they never matched.
+   The success green elsewhere is untouched. */
+.home-ic-g { background: #22C55E; }
 .home-ic-p { background: #8B5CF6; }
 .home-ic-r { background: #F4523B; }
 
@@ -2368,10 +2518,10 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
     align-items: start;
   }
 
+  /* Side by side with the actions there is nothing beneath the balance to be
+     separated from, so only the gap goes. The card keeps its own padding. */
   .home-hero {
-    border-bottom: 0;
     margin-bottom: 0;
-    padding-bottom: 0;
   }
 }
 
@@ -2442,12 +2592,10 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
     margin-bottom: 8px;
   }
 
-  /* The rule under the balance separated it from the actions below. Side by
-     side there is nothing beneath it to separate. */
+  /* The balance sat above the actions and needed a gap under it. Side by side
+     it does not — but it is a card here, so its padding stays. */
   .home-hero {
-    border-bottom: 0;
     margin-bottom: 0;
-    padding-bottom: 0;
   }
 
   /* ---- accounts and offers in two columns ---- */

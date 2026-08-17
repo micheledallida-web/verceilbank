@@ -128,40 +128,46 @@
 
     <!-- ================= TOTAL BALANCE (was the Account Summary page) ================= -->
     <div class="home-hero">
-      <p class="home-hero-lab">Total balance</p>
-      <p class="amount-pending home-hero-amt" id="homeTotalBalance"></p>
-      <!-- It said "Deposits" and one number, which told a customer nothing
-           about where their money actually is. It now names the accounts and
-           gives each its own balance.
-           Two lines, and only two: Checking and Savings. They are the everyday
-           money, they are what the total above adds up, and they are the two
-           every customer holds.
-           An investment account is not everyday spending — its value moves on
-           its own and is reported on its own card — so it is not here and is
-           not inside the total.
-           A second checking account of any kind rolls INTO the Checking line
-           rather than adding a third one. The line is the product, not the
-           row: two interest checking accounts show one Checking figure with
-           both balances in it, and nothing is counted twice.
-           Each line is hidden until the account behind it is actually open,
-           and appears on its own the moment one is. -->
-      <div class="home-hero-row">
-        <div id="homeCheckingStat" class="hidden">
-          <span class="home-hero-k">Checking</span>
-          <span class="amount-pending home-hero-v" id="homeCheckingTotal"></span>
-        </div>
-        <div id="homeSavingsStat" class="hidden">
-          <span class="home-hero-k">Savings</span>
-          <span class="amount-pending home-hero-v" id="homeSavingsTotal"></span>
-        </div>
+      <!-- The light sweep across the card. Empty and aria-hidden: it is
+           decoration, it holds no information, and a screen reader should walk
+           straight from the heading to the balance. -->
+      <span class="home-hero-light" aria-hidden="true"></span>
+      <div class="home-hero-body">
+        <p class="home-hero-lab">Total balance</p>
+        <p class="amount-pending home-hero-amt" id="homeTotalBalance"></p>
+        <!-- It said "Deposits" and one number, which told a customer nothing
+             about where their money actually is. It now names the accounts and
+             gives each its own balance.
+             Two lines, and only two: Checking and Savings. They are the everyday
+             money, they are what the total above adds up, and they are the two
+             every customer holds.
+             An investment account is not everyday spending — its value moves on
+             its own and is reported on its own card — so it is not here and is
+             not inside the total.
+             A second checking account of any kind rolls INTO the Checking line
+             rather than adding a third one. The line is the product, not the
+             row: two interest checking accounts show one Checking figure with
+             both balances in it, and nothing is counted twice.
+             Each line is hidden until the account behind it is actually open,
+             and appears on its own the moment one is. -->
+        <div class="home-hero-row">
+          <div id="homeCheckingStat" class="hidden">
+            <span class="home-hero-k">Checking</span>
+            <span class="amount-pending home-hero-v" id="homeCheckingTotal"></span>
+          </div>
+          <div id="homeSavingsStat" class="hidden">
+            <span class="home-hero-k">Savings</span>
+            <span class="amount-pending home-hero-v" id="homeSavingsTotal"></span>
+          </div>
 
-        <!-- The time where the customer is, at the far end of the row.
-             Its own classes rather than home-hero-k/v, and not by accident:
-             Hide Balances blurs .home-hero-v, and a blurred clock would be
-             absurd. The time is not a balance. -->
-        <div id="homeClock" class="home-clock hidden">
-          <span class="home-clock-z" id="homeClockZone"></span>
-          <span class="home-clock-t" id="homeClockTime"></span>
+          <!-- The time where the customer is, at the far end of the row.
+               Its own classes rather than home-hero-k/v, and not by accident:
+               Hide Balances blurs .home-hero-v, and a blurred clock would be
+               absurd. The time is not a balance. -->
+          <div id="homeClock" class="home-clock hidden">
+            <span class="home-clock-z" id="homeClockZone"></span>
+            <span class="home-clock-t" id="homeClockTime"></span>
+          </div>
         </div>
       </div>
     </div>
