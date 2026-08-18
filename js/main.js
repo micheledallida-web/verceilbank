@@ -1003,6 +1003,20 @@ const pageRoot = document.getElementById('page-root');
 //
 // Text inputs are left alone: Home, End and the arrows belong to the caret
 // while someone is typing.
+// The element a scrolling key should move: the innermost thing inside the open
+// screen that both can scroll and has room left, falling back to the overlay
+// itself. `overflow: auto` alone is not enough — a pane with nothing overflowing
+// would swallow the key and look broken.
+function scrollerIn(overlay) {
+  const panes = overlay.querySelectorAll('*');
+  for (const pane of panes) {
+    if (pane.scrollHeight <= pane.clientHeight) continue;
+    const overflowY = getComputedStyle(pane).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') return pane;
+  }
+  return overlay.scrollHeight > overlay.clientHeight ? overlay : null;
+}
+
 const SCROLL_KEYS = {
   ArrowDown: (h) => 80,
   ArrowUp: () => -80,
@@ -1024,15 +1038,21 @@ document.addEventListener('keydown', (event) => {
   const step = SCROLL_KEYS[event.key];
   if (!step) return;
 
+  // Some screens scroll themselves rather than scrolling the overlay — a
+  // conversation is a fixed column whose message list is the only thing that
+  // moves. Scroll whichever one actually has somewhere to go, innermost first,
+  // or the remote does nothing on exactly the screen that needs it most.
+  const scroller = scrollerIn(pageRoot);
+
   // Nothing to scroll is not a failure — a short screen should let the key
   // through to whatever else might want it.
-  if (pageRoot.scrollHeight <= pageRoot.clientHeight) return;
+  if (!scroller) return;
 
-  const delta = step(pageRoot.clientHeight);
+  const delta = step(scroller.clientHeight);
   event.preventDefault();
-  if (delta === Infinity) pageRoot.scrollTop = pageRoot.scrollHeight;
-  else if (delta === -Infinity) pageRoot.scrollTop = 0;
-  else pageRoot.scrollTop += delta;
+  if (delta === Infinity) scroller.scrollTop = scroller.scrollHeight;
+  else if (delta === -Infinity) scroller.scrollTop = 0;
+  else scroller.scrollTop += delta;
 });
 let activePageCleanup = null;
 

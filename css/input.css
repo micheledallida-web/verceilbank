@@ -2418,41 +2418,47 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
    Presentation only. Every id the script reads is still here, and nothing in
    this block knows anything about what is stored or sent. */
+/* The conversation is a column exactly as tall as the room it has: a header
+   that does not move, the messages scrolling between, and the composer resting
+   on the bottom. Nothing here is pinned to the window and nothing here scrolls
+   the page behind it.
+
+   That is what it was before, and it is why it came apart at every width. The
+   header was sticky, so its offset had to be re-stated for the desktop bar —
+   and a sticky offset is measured from the scroller's padding edge, which
+   already held that same clearance, so the band landed a bar's height too low
+   and sat on top of the first message. The composer was fixed to the window and
+   had to be told where the navigation bar was at each breakpoint. And the whole
+   screen was what scrolled, so writing a reply moved the conversation rather
+   than the list.
+   
+   Fixed to the viewport, inset by the two measurements the app already keeps:
+   the clearance the top bar needs where it exists, and the bar's own height at
+   the foot where it does not. */
 .sup-chat {
-  min-height: 100%;
+  position: fixed;
+  top: var(--screen-top, 0px);
+  bottom: var(--screen-bottom, var(--nav-h));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
   background: #F1F4F9;
-  /* The composer is fixed over the foot of this screen, so the conversation has
-     to end above it. The navigation bar's own height is already reserved by
-     #page-root; this is the composer on top of that. */
-  padding-bottom: 120px;
 }
+
+/* Tailwind's utility and this rule carry the same weight, and this file is
+   emitted after the utilities, so a hidden thread would otherwise be a visible
+   flex column over the whole screen. */
+.sup-chat.hidden { display: none; }
 
 .dark .sup-chat { background: #060B14; }
-
-/* The surface, for the whole window rather than only for as far as the messages
-   reach. #page-root reserves a runway at the foot of every screen for the
-   navigation bar, and that reserved strip is the blue of the screen container —
-   which showed up as a band of blue between a short conversation and the
-   composer standing over it. This paints the conversation's own surface across
-   the viewport, behind everything in the view and above the container's
-   background, so the screen is one surface however little has been said. */
-.sup-chat::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: #F1F4F9;
-}
-
-.dark .sup-chat::before { background: #060B14; }
 
 /* ---- the header band ---- */
 /* Sticky rather than fixed: it belongs to this screen, so it scrolls in and out
    with the view being swapped rather than needing to be toggled separately the
    way the composer does. */
 .sup-chat-head {
-  position: sticky;
-  top: 0;
+  flex: 0 0 auto;
   z-index: 3;
   background: #0B4CC2;
   padding: 14px 0 15px;
@@ -2548,7 +2554,22 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 .dark .sup-chat-cat { color: #8E9CBA; }
 
 /* ---- the exchange ---- */
-.sup-chat-body { padding-top: 18px; }
+.sup-chat-body {
+  flex: 1 1 auto;
+  /* min-height:0 or a long conversation refuses to shrink inside the column
+     and pushes the composer off the bottom of the screen. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  padding-top: 18px;
+  padding-bottom: 14px;
+}
+
+/* Three messages should sit above the reply box, not float under the header
+   with a screen of empty surface below them. */
+.sup-chat-msgs { margin-top: auto; }
 
 .sup-chat-msgs {
   display: flex;
@@ -2684,6 +2705,7 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
 /* ---- the composer ---- */
 .sup-composer {
+  flex: 0 0 auto;
   background: #F1F4F9;
   border-top: 1px solid rgba(17, 24, 39, 0.07);
 }
@@ -3095,27 +3117,14 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
     padding-top: 96px;
   }
 
-  /* The composer keeps the centring the narrower screens gave it; only its
-     width changes here. Without this it would snap back to the left edge.
-
-     `bottom` goes back to the foot of the window as well. On a phone the
-     composer stands on top of the navigation bar, which is why it is offset by
-     that bar's measured height — but here the bar is at the TOP of the page,
-     so the same offset would leave the reply box hovering seventy-odd pixels
-     above the bottom of the screen with nothing under it. */
-  #supComposer {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    width: var(--page-col);
-    bottom: 0;
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
+  /* The screen starts below the top bar and runs to the foot of the window:
+     the bar is no longer at the bottom here, so nothing is reserved for it.
+     The composer and the header need no rules of their own — they are rows of
+     a column that is already the right height. */
+  :root {
+    --screen-top: 96px;
+    --screen-bottom: 0px;
   }
-
-  /* The conversation's own header sticks below the top bar rather than under
-     it — the same clearance #page-root gives its content. */
-  .sup-chat-head { top: 96px; }
 }
 
 /* ================= LARGE DESKTOPS AND TELEVISIONS =================
