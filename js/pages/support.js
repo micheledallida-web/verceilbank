@@ -254,6 +254,21 @@ function renderThreadsSummary(root) {
   sub.textContent = [newest.subject, when].filter(Boolean).join(' · ');
 }
 
+
+
+// The unread count on every history button. It is the same number as the pill
+// on the home row and the count on the list, kept in one function so the three
+// cannot disagree — a badge that says 2 next to a list showing none is worse
+// than no badge.
+function renderHistoryBadges(root) {
+  const unread = threads.filter((thread) => thread.status === 'answered').length;
+  root.querySelectorAll('.sup-history-dot').forEach((dot) => {
+    dot.textContent = unread > 9 ? '9+' : String(unread);
+    dot.classList.toggle('hidden', unread === 0);
+    dot.classList.toggle('flex', unread > 0);
+  });
+}
+
 function renderThreads(root, ctx) {
   const list = root.querySelector('#supThreads');
   const unreadEl = root.querySelector('#supUnreadCount');
@@ -343,6 +358,7 @@ async function loadThreads(root, ctx) {
 
   renderThreads(root, ctx);
   renderThreadsSummary(root);
+  renderHistoryBadges(root);
 }
 
 // ---------- View 2: Thread detail ----------
@@ -376,10 +392,50 @@ function updateReplyEnabled(root) {
   btn.disabled = sendingReply || isClosed || !input.value.trim();
 }
 
+// Opening a conversation is reading it, so the dot goes when it is opened.
+//
+// 'answered' is the unread mark — the trigger sets it when the bank writes a
+// reply — and returning the thread to 'open' is what clears it. That value is
+// used rather than a new one because it is the one every version of this
+// schema already accepts: a status a table forbids would fail here silently
+// and leave the dot on forever.
+//
+// The change is made locally first. The dot belongs to the moment the thread
+// opens, not to a round trip, and if the update never lands the customer has
+// still read the message — the worst case is a dot that comes back on reload,
+// which is honest, rather than a screen that waits to redraw itself.
+async function markThreadRead(root, ctx, thread) {
+  if (!thread || thread.status !== 'answered') return;
+
+  thread.status = 'open';
+  const listed = threads.find((entry) => String(entry.id) === String(thread.id));
+  if (listed) listed.status = 'open';
+
+  renderThreadsSummary(root);
+  renderHistoryBadges(root);
+
+  try {
+    if (!ctx.supabaseClient) return;
+    const { error } = await ctx.supabaseClient
+      .from('support_threads')
+      .update({ status: 'open' })
+      .eq('id', thread.id);
+    if (error) throw error;
+  } catch (err) {
+    // Not shown to the customer: they have read the message either way, and
+    // an error about a dot would be noise on top of the reply they came for.
+    console.error('Support mark-read error:', err);
+  }
+}
+
 async function openThread(root, ctx, thread) {
   const { supabaseClient, getCurrentUser } = ctx;
   activeThread = thread;
   activeMessages = [];
+
+  // Before the header is drawn, so the pill shows what the thread now is
+  // rather than flashing 'Answered' and correcting itself.
+  await markThreadRead(root, ctx, thread);
 
   root.querySelector('#supThreadSubject').textContent = thread.subject || '';
   const statusEl = root.querySelector('#supThreadStatus');
@@ -608,6 +664,23 @@ export async function init(root, ctx, options) {
 
   root.querySelectorAll('[data-action="sup-home"]').forEach((btn) => {
     on(btn, 'click', () => showView(root, 'home'));
+  });
+
+  // The compose screen is opened from the home screen and from topic rows, so
+  // its arrow goes back there. It used to land on the message list, which is
+  // somewhere the reader had not been.
+  root.querySelectorAll('[data-action="sup-back-home"]').forEach((btn) => {
+    on(btn, 'click', () => showView(root, 'home'));
+  });
+
+  // One button, the same on every screen, that opens the conversation history.
+  // Reaching it used to mean pressing back the right number of times and
+  // knowing where that would land.
+  root.querySelectorAll('[data-action="sup-history"]').forEach((btn) => {
+    on(btn, 'click', () => {
+      showView(root, 'list');
+      loadThreads(root, ctx);
+    });
   });
 
   on(root.querySelector('#supThreadsRow'), 'click', () => {
