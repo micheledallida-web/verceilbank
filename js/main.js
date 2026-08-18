@@ -991,6 +991,49 @@ modalCloseBtn.addEventListener('click', hideModal);
 // injected there only while it's open, then cleared again on close — so the
 // DOM never carries the weight of 30 screens at once.
 const pageRoot = document.getElementById('page-root');
+
+// Keyboard scrolling for the open screen, wherever the focus happens to be.
+//
+// Focusing the overlay when it opens is most of the fix, but focus moves the
+// moment anything inside is clicked or tabbed to, and a button does not scroll.
+// On a laptop that is invisible — the wheel scrolls whatever is under the
+// pointer. On a television there is no pointer and no wheel: the remote sends
+// key events, they land on whatever has focus, and the document behind is
+// frozen, so a screen longer than the viewport simply stopped where it was.
+//
+// Text inputs are left alone: Home, End and the arrows belong to the caret
+// while someone is typing.
+const SCROLL_KEYS = {
+  ArrowDown: (h) => 80,
+  ArrowUp: () => -80,
+  PageDown: (h) => h * 0.9,
+  PageUp: (h) => -h * 0.9,
+  ' ': (h) => h * 0.9,
+  Home: () => -Infinity,
+  End: () => Infinity,
+};
+
+document.addEventListener('keydown', (event) => {
+  if (pageRoot.classList.contains('hidden')) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+  const target = event.target;
+  const tag = target && target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (target && target.isContentEditable)) return;
+
+  const step = SCROLL_KEYS[event.key];
+  if (!step) return;
+
+  // Nothing to scroll is not a failure — a short screen should let the key
+  // through to whatever else might want it.
+  if (pageRoot.scrollHeight <= pageRoot.clientHeight) return;
+
+  const delta = step(pageRoot.clientHeight);
+  event.preventDefault();
+  if (delta === Infinity) pageRoot.scrollTop = pageRoot.scrollHeight;
+  else if (delta === -Infinity) pageRoot.scrollTop = 0;
+  else pageRoot.scrollTop += delta;
+});
 let activePageCleanup = null;
 
 /**
@@ -1029,6 +1072,10 @@ export async function loadPage(name, ...args) {
   pageRoot.innerHTML = html;
   pageRoot.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  // Focus the scroller itself, so the keys that scroll a page scroll this one.
+  // preventScroll because focusing must not jump the screen that just opened
+  // away from its top.
+  pageRoot.focus({ preventScroll: true });
   // The navigation bar is sticky to the board, so it parks at the end of it and
   // lets the footer past. A screen opens over the whole viewport with the page
   // behind it frozen, and the bar has to be on the screen for that — pinned for
