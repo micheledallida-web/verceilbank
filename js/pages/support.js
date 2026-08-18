@@ -543,7 +543,12 @@ async function openThread(root, ctx, thread) {
 // The page container is what scrolls, so the newest message is brought into
 // view by parking that container at its full height.
 function scrollToNewest(root) {
-  requestAnimationFrame(() => { root.scrollTop = root.scrollHeight; });
+  // The message list is what scrolls now, not the screen. Scrolling the screen
+  // is what made writing a reply throw the whole conversation to the bottom —
+  // the page moved under the header and the composer while the list stayed
+  // where it was.
+  const list = root.querySelector('.sup-chat-body') || root;
+  requestAnimationFrame(() => { list.scrollTop = list.scrollHeight; });
 }
 
 async function sendReply(root, ctx) {

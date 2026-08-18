@@ -146,51 +146,50 @@
       <div id="supMessages" class="sup-chat-msgs"></div>
     </div>
 
-  </div>
+      <!-- The composer is the last row of the conversation's own column rather
+           than a bar pinned to the window. Pinned, it had to be told where the
+           navigation bar was and re-told at every width — and it drifted anyway,
+           because the page behind it was what scrolled. As a row it is simply
+           the bottom of a column that is exactly as tall as the space it has,
+           and the only thing that scrolls is the messages between. -->
+    <div id="supComposer" class="sup-composer">
+      <div class="sup-composer-in">
 
-  <!-- Reply composer. Fixed to the bottom of the screen so it stays put while the
-       conversation scrolls behind it; shown and hidden with the thread view. -->
-  <!-- Above the bottom navigation, not over it. It used to be pinned to the foot
-       of the viewport at z-41, where the nav bar painted over the reply box; then
-       at z-51, where the reply box painted over the five tabs. Sitting it on top
-       of the bar — `bottom` is the bar's own measured height — is the only
-       arrangement where both are whole. -->
-  <div id="supComposer" class="hidden fixed bottom-[var(--nav-h)] left-0 right-0 z-[51] sup-composer">
-    <div class="sup-composer-in">
+        <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
 
-      <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
+        <!-- Documents do not go through this table, so the paperclip says where
+             they do go rather than opening a picker that leads nowhere. -->
+        <div id="supAttachNote" class="hidden sup-attach-note"></div>
 
-      <!-- Documents do not go through this table, so the paperclip says where
-           they do go rather than opening a picker that leads nowhere. -->
-      <div id="supAttachNote" class="hidden sup-attach-note"></div>
+        <div id="supReplyRow" class="sup-composer-row">
+          <button id="supAttachBtn" type="button" class="sup-attach" aria-label="Sending a document">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.2a3.67 3.67 0 0 1 5.18 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.6-2.59l8.5-8.49"></path>
+            </svg>
+          </button>
+          <input id="supReplyInput" type="text" placeholder="Write a secure message..." class="sup-composer-input">
+          <button id="supReplySendBtn" type="button" disabled class="sup-send">
+            <span id="supReplySpinner" class="kyc-spinner hidden"></span>
+            <span id="supReplyLabel">Send</span>
+          </button>
+        </div>
 
-      <div id="supReplyRow" class="sup-composer-row">
-        <button id="supAttachBtn" type="button" class="sup-attach" aria-label="Sending a document">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.2a3.67 3.67 0 0 1 5.18 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.6-2.59l8.5-8.49"></path>
+        <div id="supClosedNotice" class="hidden">
+          <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] text-center mb-[10px]">This conversation is closed.</div>
+          <button id="supClosedNewBtn" type="button" class="w-full h-[42px] rounded-[12px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer">Start a new message</button>
+        </div>
+
+        <div class="sup-secure">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="10" width="16" height="11" rx="2.4"></rect>
+            <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
           </svg>
-        </button>
-        <input id="supReplyInput" type="text" placeholder="Write a secure message..." class="sup-composer-input">
-        <button id="supReplySendBtn" type="button" disabled class="sup-send">
-          <span id="supReplySpinner" class="kyc-spinner hidden"></span>
-          <span id="supReplyLabel">Send</span>
-        </button>
-      </div>
+          <span>Your messages are secure and encrypted.</span>
+        </div>
 
-      <div id="supClosedNotice" class="hidden">
-        <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] text-center mb-[10px]">This conversation is closed.</div>
-        <button id="supClosedNewBtn" type="button" class="w-full h-[42px] rounded-[12px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer">Start a new message</button>
       </div>
-
-      <div class="sup-secure">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="4" y="10" width="16" height="11" rx="2.4"></rect>
-          <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
-        </svg>
-        <span>Your messages are secure and encrypted.</span>
-      </div>
-
     </div>
+
   </div>
 
   <!-- ============================ VIEW 3: NEW MESSAGE ============================ -->
