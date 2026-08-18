@@ -979,6 +979,41 @@ customer's app, and section 2 grants a customer rights over both tables. The
 two tables themselves were never created. The RLS block skips a table that is
 not there with a notice, so nothing complained until somebody pressed Send.
 
+### 0. What is already there
+
+Before working through the steps below, ask the setup what it has. Two checks,
+because no single vantage point can see the whole path — the database cannot
+see an edge function's secrets, and an HTTP check cannot see RLS.
+
+```bash
+npm run check:support              # tables, functions, which secrets are set
+npm run check:support -- --verify  # also logs in to the mailbox, sends nothing
+npm run check:support -- --test    # also sends one real email (service role key)
+```
+
+```
+  ✓ table support_threads     exists, API can see it
+  ✓ function support-notify   deployed
+  ✗ mailbox secrets           not set: SMTP_PASSWORD — supabase secrets set SMTP_USER=… SMTP_PASSWORD=…
+  – replies by email          off. Correct on Namecheap: a mailbox cannot post arriving mail to a webhook
+```
+
+It reads `SUPABASE_URL` and `SUPABASE_ANON_KEY` from the environment, or from
+`js/config.js` once `npm run build` has generated it. `--test` additionally
+needs `SUPABASE_SERVICE_ROLE_KEY`, because the function gates a real send on it.
+
+Then paste **`supabase/check-support-mail.sql`** into the SQL editor for the
+database half: both tables, RLS on each, how many policies are attached, the
+trigger that moves a thread to `answered`, and what traffic has actually gone
+through — including how many threads are sitting unanswered, which is the
+closest thing the database has to "the mail is not arriving". It creates
+nothing and changes nothing.
+
+Four marks, and the fourth matters: `✓` present, `✗` missing, `–` not
+applicable (never a fault), `?` **could not be checked**. A `?` means nothing
+answered — a wrong URL, a rejected key, a proxy in the way — and is not a pass.
+A check that cannot reach the project says so rather than guessing.
+
 ### 1. Create them
 
 `supabase/setup.sql` now creates them, so re-run that file — it is written to
