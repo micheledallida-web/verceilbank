@@ -53,7 +53,7 @@ js/config.js` and fill it in for quick testing. Note that a later
 index.html              # Marketing site. No auth, no Supabase — the Sign in and
                         # Get Started links go to the two pages below.
 signin.html             # Sign in, and password recovery
-signup.html             # The account application: product, offer code, identity,
+signup.html             # The account application: product, identity,
                         # SSN, address, email, password
 reset-password.html     # Where the emailed reset link lands
 dashboard.html          # The app shell: accounts, nav, modal, #page-root
@@ -78,8 +78,8 @@ pages/
   ...
 supabase/
   setup.sql             # Everything the database needs, in the order it needs it
-  functions/            # Edge functions: the deposit webhook, support mail,
-                        # and the offer-code invitation sender
+  functions/            # Edge functions: the deposit webhook, and support mail
+                        # out through the support mailbox
 docs/
   supabase-setup.md     # What setup.sql does, section by section
 ```
@@ -149,12 +149,6 @@ Open it with `loadPage('your-page-name')`, or from markup with
   the same stolen session that links an account would otherwise activate it. The
   refusal is shown when a transfer is attempted, not when the account is added.
   See `readExternalAccountStanding()` in `js/shared/account-products.js`.
-- **Sign-up is invite-only, and the form is not what enforces it.** A seven-digit
-  offer code is asked for at step two and spent by a `BEFORE INSERT` trigger on
-  `auth.users`, in the same transaction that creates the user — so a code that
-  cannot be spent leaves no user behind, and a sign-up that fails for any other
-  reason leaves the code unspent. `setup.sql` issues no codes; with the
-  requirement on and none issued, nobody can sign up. See `docs/supabase-setup.md` §5g.
 - **The activity outbox is keyed per customer.** One shared queue on a device
   where two people bank mixes their rows, and a row written under the wrong
   session is refused by RLS forever — which stops every later ledger write on

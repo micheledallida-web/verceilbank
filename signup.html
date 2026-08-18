@@ -818,9 +818,9 @@
       },
     };
 
-    // No step asks the bank anything on the way past any more. The offer code
-    // was the only one that did, and every remaining step can be judged from
-    // what is on screen — so a step is cleared by its own validator alone.
+    // No step asks the bank anything on the way past. Every step can be
+    // judged from what is on screen, so a step is cleared by its own validator
+    // alone.
     document.querySelectorAll('[data-next]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const current = STEPS.find((step) => document.getElementById(step.id).style.display !== 'none');
@@ -1013,14 +1013,11 @@
         queueEvent('signup.failed', { reason: kind });
         if (VerceilAuth.isOurFault(kind)) VerceilAuth.probe();
 
-        // Every offer-code kind — the general refusal and the expired and
-        // already-used ones the gate now reports separately — falls through to
-        // the banner with everything else. main routed all three back to the
-        // offer step through VerceilAuth.isOfferCode(); there is no such step
-        // on this branch to route them to, and no field an applicant could
-        // retype, because the form never asked for a code. Reaching one of
-        // these means the requirement is still on server-side, which is ours to
-        // fix and not something to stage as a field error.
+        // Everything lands in the banner. Nothing here is staged as a field
+        // error any more: the one failure that used to be — a refused offer
+        // code — was the only one an applicant could fix by retyping, and the
+        // gate that raised it is gone. What is left is either a detail the
+        // banner can name, or ours, and neither belongs against a field.
         errorBanner.textContent = message;
         errorBanner.style.display = 'block';
         submitBtn.textContent = 'Open my account';

@@ -877,395 +877,6 @@ is the real file.
 
 ---
 
-## 5g. Offer codes — sign-up is invite-only
-
-> **Invitations are off. The bank is open to anyone who signs up.**
->
-> The form no longer asks for a code, and `setup.sql` now turns the requirement
-> off rather than asking an operator to remember: a fresh project defaults to
-> off, and a run of the file switches an existing one off. Nothing here is
-> dropped — the tables, the trigger and the functions all stay, dormant, so
-> invitations can come back with one update and one code.
->
-> **If registration is failing for everyone, read this first.** The trigger
-> refuses any sign-up arriving without a code while the requirement is on, and
-> the form has no field that could satisfy it, so an old project with the
-> switch still on rejects every registration and leaves no user behind. Check
-> it in one line:
->
-> ```sql
-> select offer_code_required from public.bank_settings where id = 1;  -- expect false
-> ```
->
-> Everything below describes the mechanism as it works when you switch it back
-> on.
-
-The rule this section describes: **no account opens without a seven-digit offer
-code.** It used to be collected as the form's second step, before the
-applicant's name — deliberately, because it was the only step that could end the
-application, and asking somebody for their date of birth, four digits of their
-SSN and their home address before telling them they cannot open an account is
-collecting a stranger's identity for nothing.
-
-### Where the rule actually lives
-
-Not in the form. `auth.signUp` is a public endpoint that anybody can POST to
-with the anon key, and the field on the page is editable by whoever is looking
-at it. The gate is a **`BEFORE INSERT` trigger on `auth.users`**
-(`on_auth_user_offer_code`, section 12 of `setup.sql`), and the ordering is the
-whole design:
-
-- The trigger raises → the insert never happens → no auth user, no profile, no
-  accounts, and the code is **not** spent.
-- The trigger passes → the increment and the user row commit **together**. If
-  anything later in that transaction fails, both roll back.
-
-That is why the code is consumed from a trigger rather than called from the
-client before sign-up: the client-side order burns a code every time a sign-up
-fails after the check, and leaves the decision with the browser.
-
-**What a code looks like is defined once**, by the `offer_codes_seven_digits`
-constraint. The trigger checks only that a code was *sent* — it does not repeat
-the pattern, because a string that is not a valid code cannot be stored as one,
-so it cannot match a row, so it is refused anyway and for the true reason. If
-you ever move to eight digits, change the constraint and nothing else. (The form
-used to carry an `OFFER_CODE_LENGTH` of its own, a separate copy by necessity
-since a browser cannot read a check constraint. With the step gone, the
-constraint is now the only place the length is written down.)
-
-### Issue a code
-
-`setup.sql` creates no codes, on purpose — a code committed to a source file is
-a code everybody has. Issue your own:
-
-```sql
--- 500 accounts, seven days each from the day the invitation is emailed
-insert into public.offer_codes (code, label, max_uses)
-values ('4820917', 'launch-2026', 500);
-
--- one-shot, dead at the end of the month whenever it was sent
-insert into public.offer_codes (code, label, max_uses, expires_at)
-values ('3051764', 'branch-referral', 1, '2026-09-01T00:00:00Z');
-```
-
-`max_uses` null means unlimited. `active = false` switches a code off without
-deleting it, which keeps the redemption history attached to something.
-
-### When a code runs out
-
-The clock starts when the invitation is **emailed**, not when the row is
-written — codes get minted in batches and sent later, and a batch cut in
-January and posted in February should not arrive already dead. So whatever
-sends the invitation has to say so, immediately after the send succeeds:
-
-```sql
-select public.mark_offer_code_sent('4820917');   -- returns the deadline now in force
-```
-
-It is service-key only, and the returned timestamp is what to put in the email —
-computing the date separately just gives you something to disagree with.
-
-`revoke ... from public` takes the privilege from `service_role` too — it is
-neither the owner nor a superuser, so it only ever had it by inheritance. The
-script grants it straight back, because without that the function works in the
-SQL editor (where you are the owner) and nowhere else, and every RPC gets
-`permission denied for function mark_offer_code_sent`. `consume_offer_code`
-gets no such grant on purpose: only the sign-up trigger may spend a code.
-
-### Sending them
-
-`supabase/functions/send-offer-code` does the whole thing: mints a code, emails
-it through Resend, and marks it sent — in that order, and only marking it once
-Resend has accepted the message. Marking first would mean a bounced send still
-costs the recipient their window.
-
-```bash
-curl -X POST "$SUPABASE_URL/functions/v1/send-offer-code" \
-  -H "x-admin-secret: $OFFER_CODE_ADMIN_SECRET" \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"someone@example.com","label":"launch-2026"}'
-# -> {"ok":true,"code":"4820917","expires_at":"...","minted":true}
-```
-
-| Field | | |
-| --- | --- | --- |
-| `email` | required | who it goes to |
-| `label` | optional | campaign name, stored on the code |
-| `max_uses` | optional | defaults to 1 — an invitation is for one person |
-| `code` | optional | resend an existing code instead of minting. Does **not** extend its deadline |
-
-It needs `RESEND_API_KEY`, `OFFER_CODE_ADMIN_SECRET`, and a from-address in
-`OFFER_CODE_FROM` (or it reuses `SUPPORT_FROM`). It is guarded by that shared
-secret rather than a customer session, because no signed-in user should be able
-to mint themselves an invitation — and with the secret unset it refuses every
-request rather than falling open.
-
-If a send fails, the code is left behind unsent. That is inert — nobody has
-been told it, and with `sent_at` null it cannot age — but it is litter:
-
-```sql
-select code, label, created_at from public.offer_codes where sent_at is null;
-```
-
-| `expires_at` | `sent_at` | Dies |
-| --- | --- | --- |
-| set | either | at `expires_at`, whenever it was sent |
-| null | set | seven days after `sent_at` |
-| null | null | never — **the clock has not started** |
-
-That last row is the point of having two timestamps, and it is worth being
-deliberate about: a code nothing ever marks as sent never expires. That is safe
-only while an unsent code is one nobody has been given. **If nothing in your
-stack calls `mark_offer_code_sent`, no code ever expires** — the column stays
-null and every window stays open.
-
-A resend does not extend the deadline (`sent_at` is only ever set once), or
-"resend my code" would be an unlimited extension. To genuinely restart one,
-clear `sent_at` and mark it sent again.
-
-The seven days is stated in exactly one place, `public.offer_code_expiry`, and
-every check goes through it. Change it there and the pre-check, the gate and
-the "how many are usable" count all move together.
-
-If the requirement is on and there are no usable codes, **nobody can sign up** —
-so the script says so loudly when you run it:
-
-```
-WARNING: OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP.
-```
-
-### Watching them
-
-```sql
--- how much of each code is left, and when it dies
-select code, label, used_count, max_uses, active,
-       sent_at, expires_at,
-       public.offer_code_expiry(expires_at, sent_at) as dies_at
-  from public.offer_codes order by created_at desc;
-
--- issued but never emailed: not on the clock, and nobody can use them
-select code, label from public.offer_codes where sent_at is null;
-
--- who came in on what, most recent first
-select r.code, r.redeemed_at, u.email
-  from public.offer_code_redemptions r
-  join auth.users u on u.id = r.user_id
- order by r.redeemed_at desc limit 50;
-```
-
-Both tables are RLS-on with **no policy at all** — a deliberate deny-all. Read
-them with the service key or from the SQL editor. A customer session cannot list
-codes, count them, or see who redeemed what.
-
-### What a stranger is allowed to ask
-
-Exactly one thing: `offer_code_status('1234567')`, a security-definer function
-granted to `anon`, which answers **`'ok'` or `'invalid'` and nothing else**.
-
-It will not say *which kind* of invalid, and that is not laziness. A code is
-seven digits, so the space is ten million; a function that distinguished "no
-such code" from "that code is used up" would confirm which of those ten million
-are real, one guess at a time. One word costs an applicant a slightly vaguer
-message and costs an enumerator everything.
-
-The form used to call it as the offer step was cleared, so an applicant heard at
-the step instead of at the end. That was a courtesy, never the rule. With the
-step removed nothing calls it, but the grant and the throttle below are left in
-place: they cost nothing idle, and they are what the step would need again.
-
-### If you already had an `offer_codes` table
-
-The script adapts one in place rather than expecting a clean slate — it does not
-rename your columns out from under whatever else reads them. Instead it works
-out what your table calls things and generates `offer_code_status`,
-`consume_offer_code` and `offer_codes_usable` against those names. It reports
-what it bound to:
-
-```
-NOTICE:  OFFER CODES bound to: code column = code_7_digit, active column = is_active
-```
-
-**The code column.** `code_7_digit` if your table has one, otherwise `code`. A
-table with both is the giveaway — `code` there is a campaign slug or an internal
-reference, and the seven digits are in the other one. Bind to the wrong one and
-the gate matches nothing, which is at least fail-closed and obvious on the first
-test.
-
-**The active column.** `is_active` or `active`, whichever exists. This one is
-not safe to get wrong in the other direction: blindly adding an `active` column
-to a table that already has `is_active` leaves two flags, the new one defaulting
-to true, and **every code you had switched off goes on working** — because the
-switch being read is not the switch being set. Nothing adds a flag without
-looking for one first.
-
-It also fixes three things a hand-rolled version usually has:
-
-- **`code` stored as a number.** It is the obvious choice and it is wrong: a
-  seven-digit code is not a quantity, it is a string made of digits. As an
-  integer, `0123456` **is** `123456` — the leading zero is not hidden, it is
-  gone, and roughly one code in ten becomes a six-digit code that will never
-  match what its owner types. Converted to `text` with a plain cast, which
-  changes no value. Anything left shorter than seven digits already lost its
-  zeros before you ran this; the format constraint refuses to be added and says
-  so, because only whoever issued those codes knows what they were.
-- **The code not unique.** Everything keys on it, and a campaign-plus-code model
-  lets the same seven digits exist twice, in which case spending one spends
-  both.
-- **`used_count` null.** A tally that is NULL is not a code with no limit, it is
-  a code that has never been counted — which is zero. Left alone it reads as
-  unusable for ever, because `null < max_uses` matches no row. Backfilled to 0,
-  given a default, and coalesced in every predicate.
-
-A NULL in the active column is read as **off**, everywhere, deliberately: an
-unknown answer to "is this code live?" is not a yes. The script warns if it
-finds any, because a column added without a default leaves a table full of them
-and every one of those codes stops working with no other symptom.
-
-One thing it will **not** touch: a `consume_offer_code` of your own with a
-different signature — `(campaign text, code integer)`, say. Postgres keeps both
-as overloads, so nothing breaks, but only `consume_offer_code(text, uuid)` is
-the one the trigger calls. Drop yours once you have moved off it. If your column
-was converted to `text`, yours will error when called — loudly, not silently.
-
-One it **will**: `consume_offer_code(text, uuid)` itself now returns `text`
-rather than `boolean` — `'ok'`, `'expired'`, `'used'` or `'invalid'` — so the
-gate can say which. A return type cannot be changed by `create or replace`, so
-the script drops that exact signature first. Anything of your own calling it and
-expecting a boolean needs updating; `= 'ok'` is the replacement for a bare truth
-test, and note that in SQL a non-empty string is not true.
-
-The split stops at the gate. `offer_code_status`, the one the anon key can
-reach, still answers only `ok` / `invalid` / `throttled` — telling a stranger
-that a code is real but expired is the enumeration oracle the throttle exists to
-prevent. Reaching the four-way answer costs an actual sign-up attempt, which
-GoTrue rate limits and which leaves a record.
-
-### The pre-check is rate limited
-
-`offer_code_status` is callable by the anon key, which is what lets the form say
-"check that code" at the step. Unthrottled, that is also a brute-force oracle,
-and the arithmetic gets uncomfortable as you issue more codes. Seven digits with
-a leading digit of 1–9 is a space of nine million:
-
-| live codes | odds per guess | expected guesses to a hit | at 10 req/s |
-|---|---|---|---|
-| 100 | 1 in 90,000 | ~90,000 | ~2.5 hours |
-| 2,000 | 1 in 4,500 | ~4,500 | **~7 minutes** |
-
-So it is capped at **10 checks per 10 minutes per caller**, counted in
-`public.offer_code_attempts` and keyed on the client address PostgREST reports
-(`x-forwarded-for`, falling back to `cf-connecting-ip`). Both numbers live at
-the top of the generated function; that is the only place to change them.
-
-Three things about how it behaves, all deliberate:
-
-- **A throttled caller is not refused a sign-up.** The function answers
-  `'throttled'`, the form treats that exactly as it treats "cannot reach the
-  bank" — waves them through — and the trigger decides at submit as it always
-  would. The throttle takes away the cheap yes/no, not the ability to open an
-  account.
-- **Getting it right forgives the misses.** A correct code resets that caller's
-  counter, so somebody who mistypes four times and then reads their invitation
-  properly walks away clean. A script that only ever misses keeps every one.
-- **An unidentifiable caller is not throttled at all.** No request headers means
-  no PostgREST request — psql, a server-side call. Putting those in one shared
-  bucket would mean the first script to run empties everyone's allowance and
-  sign-up stops working for every real applicant at once. An availability
-  failure to defend an enumeration risk is a bad trade.
-
-**This does not cover sign-up itself.** GoTrue talks to Postgres directly rather
-than through PostgREST, so the trigger has no headers to identify anyone by.
-Guessing by repeated `auth.signUp` is governed by Supabase's own limits under
-**Authentication → Rate Limits** — check that setting is sane.
-
-The counter table is one row per client address, so it stays small. Prune it if
-you like:
-
-```sql
-delete from public.offer_code_attempts where last_seen < now() - interval '7 days';
-```
-
-### Creating a user by hand
-
-Don't reach for the switch below. Pass the code the way only the service key
-can, in **app metadata**:
-
-```ts
-await admin.auth.admin.createUser({
-  email: 'someone@example.com',
-  password: '...',
-  app_metadata: { offer_code: '1234567' }
-})
-```
-
-The trigger reads `raw_user_meta_data->>'offer_code'` first and falls back to
-`raw_app_meta_data->>'offer_code'`. The fallback is safe **because
-`auth.signUp` cannot write app metadata** — GoTrue ignores it there, so this is a
-service-key-only channel. The account is opened against a real code, the tally
-moves, and there is a redemption row to say how it was opened.
-
-### Turning it off
-
-**Off is the setting the app expects, and `setup.sql` now applies it.** The
-form stopped collecting a code, so the requirement has to be off for anyone to
-register at all. Running the file is enough; by hand it is:
-
-```sql
-update public.bank_settings set offer_code_required = false where id = 1;
-```
-
-Turning it back on only makes sense alongside restoring the sign-up step. On its
-own it closes customer registration completely — the service-key channel above
-still works, since that passes a code in app metadata:
-
-```sql
-update public.bank_settings set offer_code_required = true  where id = 1;
-```
-
-The switch lives in `bank_settings` so none of this means dropping the trigger.
-It defaulted to **on** while the form still had the step — a gate that defaults
-to open is not a gate. With the step gone the default is **off**, because a gate
-nothing can open is not a gate either, it is a wall.
-
-While it is off **no code is consumed and no redemption row is written**, for
-every account created in the window — not just the one you meant. That is the
-usual answer to "sign-ups work but `offer_code_redemptions` is empty":
-
-```sql
--- is the gate actually on?
-select offer_code_required from public.bank_settings where id = 1;
-
--- is the trigger actually there? (expect one row)
-select tgname, tgenabled from pg_trigger
- where tgrelid = 'auth.users'::regclass and tgname = 'on_auth_user_offer_code';
-
--- accounts opened with no redemption to show for them
-select u.id, u.email, u.created_at
-  from auth.users u
-  left join public.offer_code_redemptions r on r.user_id = u.id
- where r.user_id is null order by u.created_at desc;
-```
-
-If the gate is on and the trigger is there, no user can have been created
-without spending a code — so anything the last query returns predates one or the
-other.
-
-One more thing that reads as "missing rows" and is not: `offer_code_redemptions`
-is keyed by `user_id`, one row per user, and a second redemption by the same user
-updates that row rather than adding one. It records how an account was opened,
-not a history of attempts.
-
-### One thing to know about the error
-
-When the trigger refuses, GoTrue does not always pass the reason through — on
-most projects the browser gets a flat `Database error saving new user`. The app
-reads that as an offer-code rejection (`js/auth-errors.js`), which is a guess,
-but a good one here: the gate is the only trigger on `auth.users` that can
-raise, and `handle_new_user` swallows everything it hits by design so that
-provisioning can never fail a sign-up. The console always gets the raw error.
-
----
-
 ## 5h. External accounts — linking one, and being allowed to send to it
 
 **`public.external_accounts` was never created by anything.** Three screens read
@@ -1278,7 +889,7 @@ NOTICE: RLS: skipping external_accounts, table not present
 
 So on a project that never made the table by hand, "Add External Bank" failed on
 the insert and said *"Could not save this account right now"*, which is true and
-tells nobody anything. Section 13 of `setup.sql` creates it.
+tells nobody anything. Section 12 of `setup.sql` creates it.
 
 ### Linking is instant. Sending is held for 30 days.
 
@@ -1420,38 +1031,207 @@ Messages go to **support@verceilbank.com**, from
 `Verceil Bank <support@verceilbank.com>`. Both are the function's defaults, so
 there is one thing to set:
 
+The mail goes out through the `support@verceilbank.com` mailbox on **Namecheap
+Private Email**, over SMTP. There is no API key, because a mailbox provider has
+no send API — the function logs in as the mailbox and hands the message over
+the way a mail client would.
+
 ```bash
 supabase functions deploy support-notify
-supabase secrets set RESEND_API_KEY=re_xxx
+supabase secrets set \
+  SMTP_USER=support@verceilbank.com \
+  SMTP_PASSWORD='your-mailbox-password'
 ```
 
 | Secret | | |
 | --- | --- | --- |
-| `RESEND_API_KEY` | required | from resend.com. Server-side only — it must never reach the browser, which is the entire reason this runs as a function |
+| `SMTP_USER` | required | the full mailbox address. Namecheap wants the whole address, not a username |
+| `SMTP_PASSWORD` | required | the mailbox password from the Private Email dashboard — there is no separate app password. Server-side only: this password can *read* support@ as well as send from it, which is the entire reason this runs as a function |
 | `SUPPORT_INBOX` | optional | overrides where the message lands. Defaults to `support@verceilbank.com` |
-| `SUPPORT_FROM` | optional | overrides the sender. Defaults to `Verceil Bank <support@verceilbank.com>` |
+| `SUPPORT_FROM` | optional | overrides the sender. Defaults to `Verceil Bank <SMTP_USER>`. It cannot change *who* the mail is from — the provider refuses a From that is not the mailbox that logged in |
+| `SMTP_HOST` | optional | defaults to `mail.privateemail.com` |
+| `SMTP_PORT` | optional | defaults to `465`. **Leave it there** — see below |
 
-The from-address has to be on a domain verified with Resend — add
-`verceilbank.com` there and complete its DNS records, or every send is refused
-with a domain error in the function logs.
+Only the two secrets have to be set. Where the mail goes is not a secret — it
+is in the site footer, in the page's structured data and on the Support screen
+— and it is a default rather than a variable because a list of required
+settings meant the path could be deployed, correct, and silently mailing
+nowhere for want of one of them.
 
-Where the mail goes is not a secret: it is in the site footer, in the page's
-structured data and on the Support screen. It is a default rather than a
-variable because three required settings meant the path could be deployed,
-correct, and silently mailing nowhere for want of one of them.
+**Port 465, not 587.** Namecheap documents both, but Supabase's edge runtime
+does not allow outbound connections on port 25 and is unreliable on 587, so 465
+with implicit TLS is the one that actually connects. A send that hangs and then
+times out with nothing in the logs is this.
 
-Without the key the function answers "Email is not configured" and says so in
-the logs. The customer still sees their message saved and the thread open,
-because the app never waits on the mail — a mail outage must not look to
-somebody like a failed send.
+With a required setting unset the function answers "Email is not configured"
+and names the missing ones in the response. The customer still sees their
+message saved and the thread open, because the app never waits on the mail — a
+mail outage must not look to somebody like a failed send.
 
-### 3. Replying by email (optional)
+Ask it about itself rather than sending a message to find out:
 
-Set `SUPPORT_INBOUND_ADDRESS` and the mail carries a `Reply-To` tagged with the
-thread id, so a plain reply from any mail client comes back into the
-customer's app through `support-inbound`. Leave it unset and the mail says so
-in its footer rather than promising a reply route that is not there — answer
-from the Supabase dashboard instead.
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify" -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+# {"function":"support-notify","deployed":true,"configured":true,"missing":[],
+#  "transport":"smtp://mail.privateemail.com:465","inbound_replies_enabled":false}
+```
+
+`404` means the function was never deployed — do the deploy above. A reply with
+`"configured": false` lists the settings still to set. It reports only whether
+each one is present, never its value.
+
+Add `?verify=1` and it logs in to the mailbox without sending anything, which
+is the only way to tell a wrong password apart from a message that was accepted
+and then went missing:
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify?verify=1" -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+# {"smtp_login":"failed","smtp_code":535,"smtp_message":"535 Incorrect authentication data"}
+```
+
+Once that says `ok`, send a real one. This posts an actual email to
+`SUPPORT_INBOX`, which is the only thing that proves delivery rather than
+login:
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify?test=1" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+# {"smtp_login":"ok","test_send":"accepted","test_send_to":"you@yourbusiness.com"}
+```
+
+It takes the **service role key**, not the anon key, and it always sends to
+`SUPPORT_INBOX` — the destination comes from config and can never be passed in.
+Anything less would leave a URL that makes the mailbox send on demand for
+anyone who finds it.
+
+Neither project key works on `POST`, and this catches people out: the anon key
+and the **service role key** both come back `401`. Service role bypasses RLS,
+but this path is not gated on RLS — it asks which customer is sending, and a
+project key is not a customer. It needs the access token of a signed-in user.
+The `401` now says which key it was given rather than a flat "not signed in".
+
+Note that `POST` cannot be used as a mail test, whatever payload you give it.
+It takes `thread_id` and `message_id` for rows that already exist and reads the
+message out of the database, and it wants the access token of the customer who
+owns the thread — an anon key is not a signed-in user, so it is turned away
+with `401` before any mail is attempted. That is correct for the send path and
+useless for "does mail work at all", which is what `?verify=1` and `?test=1`
+are for.
+
+When a send fails, the response carries what the mail server said:
+
+```json
+{ "error": "Could not send the notification email",
+  "smtp_code": 535,
+  "smtp_message": "535 Incorrect authentication data" }
+```
+
+The usual ones:
+
+| | |
+| --- | --- |
+| `535` | wrong mailbox password, or `SMTP_USER` is not the full address |
+| `550` / `553` | the From is not the mailbox that logged in — unset `SUPPORT_FROM`, or point it at the same address |
+| a timeout, no code | the port. See above: use 465 |
+
+### 2b. "Could not send your message" with code 42501
+
+`42501` is Postgres `insufficient_privilege` — RLS refused the write. The mail
+setup is not involved; the message never reaches the database, so the function
+is never called and its logs stay empty.
+
+Two causes, and the second catches people who write the schema by hand.
+
+**The trigger has to bypass RLS.** `touch_support_thread()` fires after a
+message is inserted and updates the parent thread's `updated_at` and `status`.
+It is declared `security definer` for that reason. Written without it, the
+update runs as the customer, RLS judges it, and a refusal aborts the insert
+that fired it — so the error is reported against the message the customer just
+tried to send.
+
+```sql
+select proname, prosecdef as is_security_definer
+  from pg_proc where proname = 'touch_support_thread';
+-- is_security_definer must be true
+```
+
+**The insert policy has to be about the row's own `user_id`.** Both tables
+carry one, and both policies are written against it. Routing ownership through
+a separate participants table deadlocks thread creation: at the moment the
+thread row is inserted there is no participant row yet to authorise it.
+
+```sql
+select tablename, policyname, cmd, permissive, with_check
+  from pg_policies
+ where tablename in ('support_threads','support_messages')
+ order by tablename, cmd;
+```
+
+Policies are permissive and OR'd, so adding the correct ones is enough — an
+existing wrong policy cannot block a right one, unless it was written
+`restrictive`, which the `permissive` column will show. Re-running
+`supabase/setup.sql` creates the correct set.
+
+---
+
+### 2c. Reading and answering threads from the dashboard
+
+Until the mail is deployed — and afterwards too, since the email is a copy and
+the app is the record — every conversation is readable in **SQL Editor**.
+
+Every thread, newest first, with who sent what:
+
+```sql
+select t.id as thread, t.subject, t.status, u.email,
+       m.sender, m.body, m.created_at
+  from public.support_threads t
+  join auth.users u            on u.id = t.user_id
+  join public.support_messages m on m.thread_id = t.id
+ order by t.updated_at desc, m.created_at;
+```
+
+To answer, write a message onto the thread as `support`. The `user_id` must
+stay the **customer's**, because that is what RLS reads to decide who may see
+the row — selecting it from the thread rather than typing it is what keeps that
+right:
+
+```sql
+insert into public.support_messages (thread_id, user_id, sender, body)
+select t.id, t.user_id, 'support', 'Here are the Zelle details: ...'
+  from public.support_threads t
+ where t.id = '<thread id from the query above>';
+```
+
+Quote the id. Depending on how the tables were created it is either a `bigint`
+or a `uuid`, and a quoted literal is read correctly as either — nothing in the
+app or the function cares which, since both only ever pass the id back where it
+came from.
+
+Nothing else is needed. The `touch_support_thread` trigger moves the thread to
+**answered**, which is what puts the unread dot on it, and the customer sees
+the reply the next time the screen loads.
+
+To close a finished thread, `update public.support_threads set status =
+'closed' where id = '<thread id>';` — the composer disappears on a closed
+thread.
+
+---
+
+### 3. Replying by email — not available on Namecheap
+
+Sending and receiving are separate capabilities, and Private Email only does
+the first. Turning a reply into a message in the customer's app needs a
+provider that **posts arriving mail to a webhook** (Resend, Mailgun, SendGrid
+and Postmark all do; a mailbox does not). Namecheap has no such hook, so there
+is nothing to point at `support-inbound` while it is the only mail account.
+
+**Leave `SUPPORT_INBOUND_ADDRESS` unset.** That is the correct state, not a
+missing step: the outbound mail then drops its `Reply-To` and its footer says
+to answer from the Supabase dashboard, instead of inviting a reply that would
+silently go nowhere. Answer threads from the dashboard, or from the app.
+
+If you later add a provider that does inbound parsing, `support-inbound` is
+already written for it:
 
 ```bash
 supabase functions deploy support-inbound
@@ -1460,9 +1240,9 @@ supabase secrets set \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
-Then point your mail provider's inbound webhook at the function URL and include
-that secret — it is what stops anyone who finds the URL from writing messages
-into a customer's conversation as the bank.
+Then point that provider's inbound webhook at the function URL and include the
+secret — it is what stops anyone who finds the URL from writing messages into a
+customer's conversation as the bank.
 
 ### 4. Check it end to end
 
@@ -1553,7 +1333,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed and `RESEND_API_KEY` set, `verceilbank.com` verified with Resend (section 5i)
+- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox — confirmed with `?test=1` landing a mail in support@ (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
@@ -1561,5 +1341,4 @@ Never put the service key in these variables.
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
 - [ ] `external_accounts` table with the narrowed insert grant (section 5h) — **without it, linking a bank silently fails; without the grant, the 30-day hold is decoration**
-- [ ] `offer_code_required` reads **false** (section 5g) — `setup.sql` sets it; on an older project confirm it, because with it on nobody can register
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

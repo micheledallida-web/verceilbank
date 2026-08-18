@@ -146,8 +146,24 @@ function notifySupportInbox(ctx, threadId, messageId) {
   if (!ctx.supabaseClient || !ctx.supabaseClient.functions || !threadId || !messageId) return;
   ctx.supabaseClient.functions
     .invoke('support-notify', { body: { thread_id: threadId, message_id: messageId } })
-    .then(({ error }) => { if (error) console.error('Support email notify error:', error); })
-    .catch((err) => console.error('Support email notify error:', err));
+    .then(({ error }) => { if (error) reportNotifyFailure(error); })
+    .catch((err) => reportNotifyFailure(err));
+}
+
+// On a non-2xx the client hands back an error whose message is only ever
+// "Edge Function returned a non-2xx status code" — the body that says which
+// secret is missing, or what Resend refused, hangs off `context` as the raw
+// response. Logging the error alone threw that away and left the console
+// saying nothing useful about a send that quietly did not happen.
+function reportNotifyFailure(error) {
+  const response = error && error.context;
+  if (!response || typeof response.json !== 'function') {
+    console.error('Support email notify error:', error);
+    return;
+  }
+  response.json()
+    .then((body) => console.error('Support email notify error:', response.status, body))
+    .catch(() => console.error('Support email notify error:', response.status, error));
 }
 
 // Errors written here are meant for the customer. Errors from Postgres, from

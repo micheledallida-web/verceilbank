@@ -86,34 +86,19 @@
 
     if (status === 429 || /rate limit|too many requests|only request this after|after \d+ seconds/.test(m)) return 'rate_limited';
 
-    // The invite-only gate — the BEFORE INSERT trigger on auth.users, which
-    // refuses a sign-up whose offer code cannot be spent.
+    // A trigger on auth.users threw, and the insert that fired it was rolled
+    // back with it. GoTrue reports that two ways: on a project that surfaces
+    // the database's own words we get the message the trigger raised, and on
+    // one that does not, every exception from that insert comes back as the
+    // same flat "Database error saving new user".
     //
-    // Two shapes, because GoTrue reports a trigger's exception two different
-    // ways. On a project that surfaces the database's own words we get the
-    // message the trigger raised; on one that does not, every exception from
-    // that insert comes back as the same flat "Database error saving new user".
-    //
-    // Both are read as this. The second is a guess — but it is a very good one
-    // on this project: the only trigger on auth.users that can raise is the
-    // offer-code gate, and the other one, handle_new_user, swallows everything
-    // it hits by design so that provisioning can never fail a sign-up. The copy
-    // is written to be true either way.
-    //
-    // Where the database's own words DO come through, they say which of three
-    // things went wrong, so there are three kinds here. Most specific first:
-    // all three messages contain "offer code", so the general match has to come
-    // last or it would swallow the other two.
-    //
-    // Note what is NOT here: the pre-check the form runs while you type
-    // (`offer_code_status`) still answers only ok/invalid. It is callable by
-    // anyone holding the anon key, so it must not confirm which strings are
-    // real codes. These three arrive only from a sign-up that was actually
-    // attempted, which is expensive and logged — see consume_offer_code.
-    if (/offer code expired/.test(m)) return 'offer_code_expired';
-    if (/offer code already used/.test(m)) return 'offer_code_used';
-    if (/offer code/.test(m)) return 'offer_code';
-    if (/database error saving new user|error saving new user/.test(m)) return 'offer_code';
+    // This used to be read as an offer-code refusal, because the invite-only
+    // gate was the only trigger on auth.users that could raise — handle_new_user
+    // swallows everything it hits by design. The gate is gone now, and that
+    // reading would be wrong in the way that costs most: it would tell an
+    // applicant to go and check an invitation that no longer exists, for a
+    // failure that is entirely ours.
+    if (/database error saving new user|error saving new user/.test(m)) return 'provisioning';
 
     if (/signups? not allowed|signups? are disabled|signup is disabled/.test(m)) return 'signups_disabled';
     if (/already registered|already been registered|user already exists/.test(m)) return 'already_registered';
@@ -154,41 +139,12 @@
       signup: 'An account already exists for that email address. Sign in instead, or use "Forgot password" if you cannot get in.',
       any: 'That email address is already in use.',
     },
-    // The three the gate can distinguish. Each one names a different next move,
-    // which is the whole reason for telling them apart: an expired code needs a
-    // new invitation, a spent one needs a word with whoever issued it, and an
-    // unrecognised one is usually a digit typed wrong.
-    //
-    // None of them states how long a code lasts. That number lives in exactly
-    // one place — offer_code_expiry in setup.sql — and a copy of it here would
-    // go on confidently quoting seven days the week somebody changes it to ten.
-    offer_code_expired: {
-      signup: 'That offer code has expired. Offer codes run out a set time after we email them. Ask whoever invited you to send a new one.',
-      any: 'That offer code has expired.',
-    },
-    offer_code_used: {
-      signup: 'That offer code has already been used. If you have not opened an account with it yourself, contact whoever invited you.',
-      any: 'That offer code has already been used.',
-    },
-    offer_code: {
-      // The general case: no such code, one the bank has switched off, or a
-      // project where GoTrue flattens the trigger's message and we are
-      // inferring.
-      //
-      // On this branch it has one more meaning, and on the customer path it is
-      // now the ONLY one: the sign-up form no longer collects a code, so the
-      // gate raises 'offer code required' and lands here. An applicant seeing
-      // this did not mistype anything — they were never asked — so the copy
-      // cannot send them to check an invitation. It means the requirement is
-      // still on while the form that fed it is gone, which is ours to fix:
-      // `bank_settings.offer_code_required = false`, see the gate in setup.sql.
-      //
-      // The two kinds above keep their code-specific wording. They can only be
-      // raised against a code that really was submitted, which now happens only
-      // on the service-key path, where the reader is an operator and not a
-      // customer halfway through an application.
+    provisioning: {
+      // Nothing the applicant can act on, and nothing they got wrong: a
+      // trigger on auth.users threw. Naming a field or an invitation here
+      // would send somebody off to fix details that were never the problem.
       signup: 'We could not open your account just now. This is a problem on our side, not with the details you entered — please try again shortly.',
-      any: 'That offer code could not be used.',
+      any: 'We could not complete that just now. Please try again shortly.',
     },
     unconfirmed: {
       signin: 'Confirm your email address first — check your inbox for the link we sent when you applied.',
@@ -298,21 +254,8 @@
     // knows when to run the probe.
     isOurFault: function (kind) {
       return kind === 'timeout' || kind === 'network' || kind === 'config' ||
-             kind === 'signups_disabled' || kind === 'unknown';
-    },
-    // Every kind that means the gate refused the code, whatever the reason —
-    // so the sign-up page can put the applicant back on the step that can fix
-    // it instead of leaving them on the password screen.
-    //
-    // A predicate here rather than a list of kinds in the page, because this
-    // file is what decides which kinds exist. When the gate learned to say
-    // 'expired' and 'used' separately, a page testing `kind === 'offer_code'`
-    // silently stopped recognising the two most specific offer-code failures
-    // there are. Adding a kind must not be able to do that again.
-    isOfferCode: function (kind) {
-      return kind === 'offer_code' ||
-             kind === 'offer_code_expired' ||
-             kind === 'offer_code_used';
+             kind === 'signups_disabled' || kind === 'provisioning' ||
+             kind === 'unknown';
     },
   };
 })();
