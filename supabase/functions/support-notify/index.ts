@@ -86,6 +86,24 @@ function secretMatches(a: string, b: string) {
 // exactly like the one that should have gone out when it was written — same
 // subject tag, same Reply-To, same footer. A second format for the same thing
 // would be a second thing to keep correct.
+// A message may carry a file. The file itself is not attached to this email —
+// the bucket is private and a signed link in an inbox outlives the inbox — but
+// an email that does not mention it at all reads as an empty message, and
+// whoever is answering has no reason to open the thread. The name and size are
+// what they need to know it is there.
+function withAttachmentLine(body: string, message: Record<string, unknown>) {
+  const name = message.attachment_name;
+  if (!name) return body;
+
+  const size = Number(message.attachment_size);
+  const readable = size > 0
+    ? size < 1024 * 1024 ? `${Math.round(size / 1024)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`
+    : '';
+
+  const line = `[File attached: ${String(name)}${readable ? ` (${readable})` : ''} — open the thread in the dashboard to view it]`;
+  return body ? `${body}\n\n${line}` : line;
+}
+
 function buildMail(
   thread: { id: unknown; subject?: string; category?: string },
   body: string,
@@ -260,7 +278,7 @@ Deno.serve(async (req) => {
         const { data: owner } = await admin.auth.admin.getUserById(String(thread.user_id));
         const { subject, html, text, replyTo } = buildMail(
           thread,
-          String(first.body),
+          withAttachmentLine(String(first.body ?? ''), first),
           owner?.user?.email ?? 'unknown',
           SUPPORT_INBOUND_ADDRESS,
         );
@@ -378,7 +396,7 @@ Deno.serve(async (req) => {
 
     const { subject, html, text, replyTo } = buildMail(
       thread,
-      String(message.body),
+      withAttachmentLine(String(message.body ?? ''), message),
       user.email ?? 'unknown',
       SUPPORT_INBOUND_ADDRESS,
     );

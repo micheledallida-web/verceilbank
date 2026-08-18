@@ -1398,6 +1398,45 @@ tables: `supabase functions logs support-notify` says which.
 
 ---
 
+## 5j. Support attachments — the bucket a customer's files go to
+
+The Support composer's paperclip opens a real file picker: one file per reply,
+up to 10 MB, images or documents. The file goes to a **private** storage bucket
+and the message row points at it — the same arrangement `kyc-documents` uses,
+for the same reason. A bank statement is not something anybody holding a URL
+should be able to read, so the bucket is private and the app mints a short-lived
+signed link each time a file is looked at.
+
+### What to run
+
+Re-run `supabase/setup.sql`. It is idempotent, and the new part of it is:
+
+- four nullable columns on `support_messages` — `attachment_path`,
+  `attachment_name`, `attachment_type`, `attachment_size`;
+- the `support-attachments` bucket, created private;
+- two policies on `storage.objects`, scoped so that the first folder of every
+  key is the uploader's own user id — read your own, insert your own.
+
+There is no UPDATE policy and no DELETE policy, and both omissions are
+deliberate. Every upload writes a key that has never been used, so nothing ever
+needs to be overwritten; and a file already sent to the bank is a record of what
+was sent, not something to withdraw afterwards.
+
+### If you have not run it yet
+
+Sending words keeps working exactly as before — the app only names the new
+columns when there is actually a file on the message. Sending a *file* will
+fail, and the error on screen carries a reference: `42703` or `PGRST204` both
+mean the columns are not there yet. Run the file.
+
+### The email to your inbox
+
+`support-notify` does not attach the file — a signed link would outlive the
+inbox it landed in. It appends one line saying a file came with the message and
+what it was called, so whoever is answering knows to open the thread. That line
+lives in the function, so **redeploy `support-notify`** after pulling this
+change, or the email will simply show the message body as it always did.
+
 ## 6. Optional but recommended
 
 ### Close accounts that were never funded

@@ -169,6 +169,56 @@ create table if not exists public.support_messages (
 create index if not exists support_messages_thread_created_idx
   on public.support_messages (thread_id, created_at);
 
+-- ---------------------------------------------------------------------------
+-- Attachments. A message may carry one file: a statement somebody was asked
+-- for, a photograph of a letter, a screenshot of the thing that went wrong.
+--
+-- The FILE lives in storage; these four columns are what the app needs to draw
+-- it without fetching it — where it is, what the customer called it, what kind
+-- of thing it is, and how big. The name is kept here rather than in the storage
+-- key because a key has to be safe for a URL and a filesystem, and "Statement
+-- (March) #2.pdf" is neither.
+--
+-- All four are nullable and every one of them is added with `if not exists`:
+-- the overwhelming majority of messages are words, and a database that has not
+-- run this block yet must still accept them. The app only names these columns
+-- when there is actually a file, so an install that is behind on this file
+-- keeps working for everything except sending one.
+alter table public.support_messages add column if not exists attachment_path text;
+alter table public.support_messages add column if not exists attachment_name text;
+alter table public.support_messages add column if not exists attachment_type text;
+alter table public.support_messages add column if not exists attachment_size bigint;
+
+-- ---------------------------------------------------------------------------
+-- The bucket those files go to. PRIVATE, like kyc-documents and for the same
+-- reason: a customer's bank statement is not something anybody holding the URL
+-- should be able to read. Links are minted signed and short-lived by the app.
+-- ---------------------------------------------------------------------------
+insert into storage.buckets (id, name, public)
+values ('support-attachments', 'support-attachments', false)
+on conflict (id) do update set public = false;
+
+-- Same shape of policy as kyc-documents: the first folder of every path is the
+-- uploader's own user id, and that is what each rule is scoped to.
+--
+-- INSERT but no UPDATE, and that difference is deliberate. An identity document
+-- may be retaken, so that bucket allows an upsert; a file already attached to a
+-- message someone has read may not be swapped for a different one underneath
+-- them. Every upload here writes a new object under a key that has never been
+-- used, so it never needs to.
+--
+-- No DELETE either: what was sent to the bank is a record of what was sent.
+drop policy if exists "own support attachments read"   on storage.objects;
+drop policy if exists "own support attachments insert" on storage.objects;
+
+create policy "own support attachments read"
+  on storage.objects for select to authenticated
+  using (bucket_id = 'support-attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "own support attachments insert"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'support-attachments' and (storage.foldername(name))[1] = auth.uid()::text);
+
 -- A thread's standing follows its messages, and it is kept here rather than in
 -- the app because two different writers add them: the customer through the
 -- browser, and support through the inbound email function. Neither should have

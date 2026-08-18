@@ -2666,6 +2666,7 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 }
 
 .sup-chat-head-in,
+.sup-histbar,
 .sup-chat-body,
 .sup-composer-in {
   width: 100%;
@@ -2746,6 +2747,47 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 }
 
 .dark .sup-chat-cat { color: #8E9CBA; }
+
+/* ---- message history ----
+   A word and a clock on the conversation's own surface, above the exchange
+   rather than inside the header band. As a round icon among two other round
+   icons it was a symbol you had to press to learn the meaning of; this says
+   what it is, and the unread count rides beside the word. */
+.sup-histbar {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  /* The sides come from the column rule above, so the bar and its hairline end
+     where the conversation ends rather than at the edge of the window. */
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.dark .sup-histbar { border-bottom-color: rgba(255, 255, 255, 0.06); }
+
+.sup-hist {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: #1D61F2;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dark .sup-hist { color: #3B82F6; }
+
+.sup-hist svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
 
 /* ---- the exchange ---- */
 .sup-chat-body {
@@ -2834,10 +2876,15 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   border-radius: 18px;
   font-size: 14px;
   line-height: 1.5;
-  /* Paragraphs somebody typed stay paragraphs, and a long reference or address
-     wraps inside the bubble rather than widening it off the screen. */
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Paragraphs somebody typed stay paragraphs. This sits on the words rather
+   than on the bubble because the bubble may also hold a file, and pre-wrap
+   around an element renders the markup's own indentation as blank lines. */
+.sup-bubble-t {
+  display: block;
+  white-space: pre-wrap;
 }
 
 .sup-msg-out .sup-bubble {
@@ -2945,20 +2992,136 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 .sup-attach svg { width: 20px; height: 20px; }
 .dark .sup-attach { color: #8E9CBA; }
 
-.sup-attach-note {
+/* ---- the file waiting to be sent ---- */
+.sup-att-chip {
+  align-items: center;
+  gap: 9px;
   margin-bottom: 8px;
-  padding: 9px 12px;
+  padding: 9px 10px 9px 12px;
   border-radius: 12px;
   background: rgba(29, 97, 242, 0.08);
-  font-size: 12px;
-  line-height: 1.45;
-  color: #4B5563;
+  font-size: 12.5px;
+  color: #111827;
 }
 
-.dark .sup-attach-note {
-  background: rgba(255, 255, 255, 0.06);
-  color: #8E9CBA;
+.dark .sup-att-chip { background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
+
+.sup-att-chip-i {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #1D61F2;
 }
+
+.dark .sup-att-chip-i { color: #3B82F6; }
+
+.sup-att-chip-n {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sup-att-chip-s {
+  flex-shrink: 0;
+  color: #6B7280;
+}
+
+.dark .sup-att-chip-s { color: #8E9CBA; }
+
+.sup-att-x {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: #6B7280;
+  cursor: pointer;
+}
+
+.sup-att-x svg { width: 14px; height: 14px; }
+.dark .sup-att-x { color: #8E9CBA; }
+
+/* ---- a file that has been sent ---- */
+.sup-att-img {
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.sup-att-img img {
+  display: block;
+  max-width: 240px;
+  max-height: 280px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+}
+
+.sup-att-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.06);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sup-msg-out .sup-att-file { background: rgba(255, 255, 255, 0.18); }
+.dark .sup-msg-in .sup-att-file { background: rgba(255, 255, 255, 0.07); }
+
+.sup-att-file svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.sup-att-file-in {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.sup-att-file-n {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sup-att-file-s {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* A picture with a line under it needs the two separated; a bubble with only
+   one thing in it must not gain a gap it has no use for. */
+.sup-bubble > * + * { margin-top: 8px; }
+
+/* A picture sent on its own is the message. The bubble becomes a thin frame
+   around it rather than a paragraph's worth of padding holding nothing. */
+.sup-bubble-img { padding: 4px; }
 
 .sup-composer-input {
   flex: 1;
@@ -3337,6 +3500,7 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
      thing in the conversation, and the back arrow — the control that undoes
      the list — sat two hundred pixels away from it. */
   .sup-chat-main .sup-chat-head-in,
+  .sup-chat-main .sup-histbar,
   .sup-chat-main .sup-chat-body,
   .sup-chat-main .sup-composer-in {
     margin-left: 0;

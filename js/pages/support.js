@@ -175,6 +175,8 @@ function customerFacing(err, fallback) {
   //   42P01     the table really is not there
   //   42501     the row was refused by row level security
   //   23503     the thread this message belongs to does not exist
+  //   42703     the attachment columns are not on support_messages yet
+  //   PGRST204  the same, seen through PostgREST's schema cache
   const ref = err && (err.code || err.status);
   return ref ? `${fallback} (ref ${String(ref).slice(0, 16)})` : fallback;
 }
@@ -407,6 +409,179 @@ async function loadThreads(root, ctx) {
   renderRail(root);
 }
 
+// ---------- Attachments ----------
+
+// The bucket a customer's own files go to. Private, and every object under a
+// folder named for the person who owns it — the same shape and the same rule
+// as kyc-documents, so there is one story about where a customer's files live
+// and one kind of policy protecting them. The SQL is in supabase/setup.sql.
+const ATTACHMENT_BUCKET = 'support-attachments';
+
+// Ten megabytes. Large enough for a photograph of a document from a phone,
+// small enough that a mistake — a video, a disk image — is refused here rather
+// than after a two-minute upload.
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+// How long a link to one of these objects is good for. They are minted on
+// demand and never stored, so this only has to outlast looking at the thread.
+const ATTACHMENT_URL_TTL = 60 * 60;
+
+let stagedFile = null;
+let attachmentUrls = {};
+
+function formatBytes(bytes) {
+  const size = Number(bytes);
+  if (!size || isNaN(size)) return '';
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImage(type) {
+  return String(type || '').startsWith('image/');
+}
+
+// A storage key made only of characters that cannot be misread by a URL, a
+// shell or a filesystem, with the customer's own name for the file kept in a
+// column rather than in the key.
+function storageKey(userId, threadId, file) {
+  const dot = file.name.lastIndexOf('.');
+  const ext = dot > 0 ? file.name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) : '';
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${userId}/${threadId}/${stamp}${ext ? `.${ext}` : ''}`;
+}
+
+// Chosen, not yet sent. The file sits here until Send is pressed, so backing
+// out costs nothing and nothing is uploaded that no message refers to.
+function stageFile(root, file) {
+  if (!file) {
+    clearStagedFile(root);
+    return;
+  }
+
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    clearStagedFile(root);
+    showError(root, '#supReplyError', `That file is ${formatBytes(file.size)}. The limit is ${formatBytes(ATTACHMENT_MAX_BYTES)}.`);
+    return;
+  }
+
+  hideError(root, '#supReplyError');
+  stagedFile = file;
+
+  root.querySelector('#supAttachName').textContent = file.name;
+  root.querySelector('#supAttachSize').textContent = formatBytes(file.size);
+  root.querySelector('#supAttachChip').classList.remove('hidden');
+  root.querySelector('#supAttachChip').classList.add('flex');
+  updateReplyEnabled(root);
+}
+
+function clearStagedFile(root) {
+  stagedFile = null;
+  const chip = root.querySelector('#supAttachChip');
+  if (chip) {
+    chip.classList.add('hidden');
+    chip.classList.remove('flex');
+  }
+  const input = root.querySelector('#supAttachInput');
+  if (input) input.value = '';
+  updateReplyEnabled(root);
+}
+
+// The file first, the row second. A row pointing at an object that failed to
+// upload is a message with a broken paperclip on it forever; an object with no
+// row is a few kilobytes nobody sees. If this throws, no message is written.
+async function uploadStagedFile(supabaseClient, userId, threadId) {
+  const file = stagedFile;
+  const path = storageKey(userId, threadId, file);
+
+  const { error } = await supabaseClient
+    .storage
+    .from(ATTACHMENT_BUCKET)
+    .upload(path, file, { contentType: file.type || undefined, upsert: false });
+  if (error) throw error;
+
+  return {
+    attachment_path: path,
+    attachment_name: file.name,
+    attachment_type: file.type || 'application/octet-stream',
+    attachment_size: file.size,
+  };
+}
+
+// Signed links for the pictures in a thread, so an image is a picture rather
+// than a filename. Only images: everything else is a row that mints its link
+// when somebody actually asks for the file.
+async function hydrateAttachmentUrls(ctx) {
+  if (!ctx.supabaseClient) return;
+
+  const wanted = activeMessages
+    .filter((message) => message.attachment_path && isImage(message.attachment_type) && !attachmentUrls[message.attachment_path])
+    .map((message) => message.attachment_path);
+  if (!wanted.length) return;
+
+  try {
+    const { data, error } = await ctx.supabaseClient
+      .storage
+      .from(ATTACHMENT_BUCKET)
+      .createSignedUrls(wanted, ATTACHMENT_URL_TTL);
+    if (error) throw error;
+    (data || []).forEach((entry) => {
+      if (entry && entry.path && entry.signedUrl) attachmentUrls[entry.path] = entry.signedUrl;
+    });
+  } catch (err) {
+    // A preview that will not load is not worth an error on the screen: the
+    // file row underneath still opens it.
+    console.error('Support attachment link error:', err);
+  }
+}
+
+function attachmentHtml(message) {
+  if (!message.attachment_path) return '';
+
+  const name = escapeHtml(message.attachment_name || 'Attachment');
+  const size = escapeHtml(formatBytes(message.attachment_size));
+  const path = escapeHtml(message.attachment_path);
+  const url = attachmentUrls[message.attachment_path];
+
+  if (isImage(message.attachment_type) && url) {
+    return `
+      <button type="button" class="sup-att-img" data-path="${path}" data-name="${name}" title="${name}">
+        <img src="${escapeHtml(url)}" alt="${name}" loading="lazy">
+      </button>
+    `;
+  }
+
+  return `
+    <button type="button" class="sup-att-file" data-path="${path}" data-name="${name}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path>
+        <path d="M14 3v4h4"></path>
+      </svg>
+      <span class="sup-att-file-in">
+        <span class="sup-att-file-n">${name}</span>
+        <span class="sup-att-file-s">${size}</span>
+      </span>
+    </button>
+  `;
+}
+
+// Opening one. The link is minted at the moment of asking rather than held on
+// the page, so a thread left open overnight has no stale URLs on it.
+async function openAttachment(root, ctx, path, name) {
+  if (!ctx.supabaseClient) return;
+  try {
+    const { data, error } = await ctx.supabaseClient
+      .storage
+      .from(ATTACHMENT_BUCKET)
+      .createSignedUrl(path, ATTACHMENT_URL_TTL, { download: name || undefined });
+    if (error) throw error;
+    if (data && data.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  } catch (err) {
+    console.error('Support attachment open error:', err);
+    showError(root, '#supReplyError', customerFacing(err, 'Could not open that file. Please try again.'));
+  }
+}
+
 // ---------- View 2: Thread detail ----------
 
 // An address or a link inside a reply is usually the thing the customer came
@@ -496,7 +671,10 @@ function renderMessages(root) {
       <div class="sup-msg ${isUser ? 'sup-msg-out' : 'sup-msg-in'}">
         <div class="sup-msg-line">
           ${isUser ? '' : '<span class="sup-avatar" aria-hidden="true">V</span>'}
-          <div class="sup-bubble">${linkify(escapeHtml(message.body))}</div>
+          <div class="sup-bubble${!message.body && isImage(message.attachment_type) ? ' sup-bubble-img' : ''}">
+            ${attachmentHtml(message)}
+            ${message.body ? `<span class="sup-bubble-t">${linkify(escapeHtml(message.body))}</span>` : ''}
+          </div>
         </div>
         <div class="sup-msg-meta">
           <span>${escapeHtml(messageTime(message.created_at))}</span>
@@ -519,7 +697,7 @@ function updateReplyEnabled(root) {
   const input = root.querySelector('#supReplyInput');
   const btn = root.querySelector('#supReplySendBtn');
   const isClosed = activeThread && activeThread.status === 'closed';
-  btn.disabled = sendingReply || isClosed || !input.value.trim();
+  btn.disabled = sendingReply || isClosed || (!input.value.trim() && !stagedFile);
 }
 
 // Opening a conversation is reading it, so the dot goes when it is opened.
@@ -577,7 +755,7 @@ async function openThread(root, ctx, thread) {
 
   root.querySelector('#supReplyInput').value = '';
   hideError(root, '#supReplyError');
-  hideAttachNote(root);
+  clearStagedFile(root);
 
   // Which row the rail shows as the one being read. markThreadRead redraws it
   // too, but only for a thread that was unread — this is every thread.
@@ -601,6 +779,7 @@ async function openThread(root, ctx, thread) {
     console.error('Support messages error:', err);
   }
 
+  await hydrateAttachmentUrls(ctx);
   renderMessages(root);
   scrollToNewest(root);
 }
@@ -620,7 +799,9 @@ async function sendReply(root, ctx) {
   if (sendingReply || !activeThread) return;
   const input = root.querySelector('#supReplyInput');
   const body = input.value.trim();
-  if (!body || activeThread.status === 'closed') return;
+  // A file on its own is a reply. Somebody sending the statement they were
+  // asked for has already said everything in the message above it.
+  if ((!body && !stagedFile) || activeThread.status === 'closed') return;
 
   sendingReply = true;
   setBusy(root, '#supReplySendBtn', '#supReplySpinner', true);
@@ -631,16 +812,22 @@ async function sendReply(root, ctx) {
     const user = await ctx.getCurrentUser();
     if (!user || !ctx.supabaseClient) throw new SupportMessageError('You need to be signed in to reply.');
 
+    // The object goes to the bucket before the row is written, so a message can
+    // never point at a file that is not there.
+    const attachment = stagedFile ? await uploadStagedFile(ctx.supabaseClient, user.id, activeThread.id) : null;
+
     const { data, error } = await ctx.supabaseClient
       .from('support_messages')
-      .insert({ thread_id: activeThread.id, user_id: user.id, sender: 'user', body })
+      .insert({ thread_id: activeThread.id, user_id: user.id, sender: 'user', body, ...(attachment || {}) })
       .select()
       .single();
     if (error) throw error;
 
-    activeMessages = activeMessages.concat(data ? [data] : [{ sender: 'user', body, created_at: new Date().toISOString() }]);
+    activeMessages = activeMessages.concat(data ? [data] : [{ sender: 'user', body, created_at: new Date().toISOString(), ...(attachment || {}) }]);
     notifySupportInbox(ctx, activeThread.id, data && data.id);
     input.value = '';
+    clearStagedFile(root);
+    await hydrateAttachmentUrls(ctx);
     renderMessages(root);
     scrollToNewest(root);
   } catch (err) {
@@ -750,13 +937,6 @@ async function submitNew(root, ctx) {
 
 // ---------- Shared bits ----------
 
-// The paperclip's note. Closed again whenever a thread is opened, so it is
-// something the reader asked for rather than something waiting for them.
-function hideAttachNote(root) {
-  const note = root.querySelector('#supAttachNote');
-  if (note) note.classList.add('hidden');
-}
-
 function setBusy(root, buttonSelector, spinnerSelector, busy) {
   const btn = root.querySelector(buttonSelector);
   const spinner = root.querySelector(spinnerSelector);
@@ -804,6 +984,8 @@ export async function init(root, ctx, options) {
   pendingCategory = (options && options.category) || '';
   sendingNew = false;
   sendingReply = false;
+  stagedFile = null;
+  attachmentUrls = {};
 
   renderCategoryOptions(root);
   renderTopics(root);
@@ -902,14 +1084,28 @@ export async function init(root, ctx, options) {
 
   on(root.querySelector('#supRailNewBtn'), 'click', () => ctx.openSupportMessage({ category: 'general' }));
 
-  // Documents are not carried by support_messages, and adding a picker that
-  // led nowhere would be worse than the paperclip not being there at all. It
-  // says where a document does go instead — the same mailbox the home screen
-  // and the send function quote, from the same constant.
-  const attachNote = root.querySelector('#supAttachNote');
-  if (attachNote) attachNote.textContent = `To send a document, email it to ${SUPPORT_EMAIL} and mention this conversation.`;
+  // The paperclip. A real picker on a real bucket: the button stands in for the
+  // file input, because a bare <input type="file"> cannot be styled and every
+  // browser draws it differently.
   on(root.querySelector('#supAttachBtn'), 'click', () => {
-    if (attachNote) attachNote.classList.toggle('hidden');
+    const input = root.querySelector('#supAttachInput');
+    if (input) input.click();
+  });
+
+  on(root.querySelector('#supAttachInput'), 'change', (e) => {
+    stageFile(root, e.target.files && e.target.files[0]);
+    // Cleared so choosing the same file twice in a row still fires a change.
+    e.target.value = '';
+  });
+
+  on(root.querySelector('#supAttachClear'), 'click', () => stageFile(root, null));
+
+  // Delegated on the message list, because the messages are redrawn on every
+  // send and on every thread that is opened.
+  on(root.querySelector('#supMessages'), 'click', (e) => {
+    const hit = e.target.closest('.sup-att-img, .sup-att-file');
+    if (!hit) return;
+    openAttachment(root, ctx, hit.getAttribute('data-path'), hit.getAttribute('data-name'));
   });
 
   if (options && options.view === 'new') {
@@ -941,4 +1137,6 @@ export function cleanup() {
   pendingCategory = '';
   sendingNew = false;
   sendingReply = false;
+  stagedFile = null;
+  attachmentUrls = {};
 }
