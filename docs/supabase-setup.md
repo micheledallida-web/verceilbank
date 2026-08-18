@@ -1545,15 +1545,21 @@ right:
 insert into public.support_messages (thread_id, user_id, sender, body)
 select t.id, t.user_id, 'support', 'Here are the Zelle details: ...'
   from public.support_threads t
- where t.id = 1;          -- the thread id from the query above
+ where t.id = '<thread id from the query above>';
 ```
+
+Quote the id. Depending on how the tables were created it is either a `bigint`
+or a `uuid`, and a quoted literal is read correctly as either — nothing in the
+app or the function cares which, since both only ever pass the id back where it
+came from.
 
 Nothing else is needed. The `touch_support_thread` trigger moves the thread to
 **answered**, which is what puts the unread dot on it, and the customer sees
 the reply the next time the screen loads.
 
 To close a finished thread, `update public.support_threads set status =
-'closed' where id = 1;` — the composer disappears on a closed thread.
+'closed' where id = '<thread id>';` — the composer disappears on a closed
+thread.
 
 ---
 
