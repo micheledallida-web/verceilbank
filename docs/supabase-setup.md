@@ -1480,6 +1480,46 @@ The usual ones:
 | `550` / `553` | the From is not the mailbox that logged in — unset `SUPPORT_FROM`, or point it at the same address |
 | a timeout, no code | the port. See above: use 465 |
 
+### 2b. "Could not send your message" with code 42501
+
+`42501` is Postgres `insufficient_privilege` — RLS refused the write. The mail
+setup is not involved; the message never reaches the database, so the function
+is never called and its logs stay empty.
+
+Two causes, and the second catches people who write the schema by hand.
+
+**The trigger has to bypass RLS.** `touch_support_thread()` fires after a
+message is inserted and updates the parent thread's `updated_at` and `status`.
+It is declared `security definer` for that reason. Written without it, the
+update runs as the customer, RLS judges it, and a refusal aborts the insert
+that fired it — so the error is reported against the message the customer just
+tried to send.
+
+```sql
+select proname, prosecdef as is_security_definer
+  from pg_proc where proname = 'touch_support_thread';
+-- is_security_definer must be true
+```
+
+**The insert policy has to be about the row's own `user_id`.** Both tables
+carry one, and both policies are written against it. Routing ownership through
+a separate participants table deadlocks thread creation: at the moment the
+thread row is inserted there is no participant row yet to authorise it.
+
+```sql
+select tablename, policyname, cmd, permissive, with_check
+  from pg_policies
+ where tablename in ('support_threads','support_messages')
+ order by tablename, cmd;
+```
+
+Policies are permissive and OR'd, so adding the correct ones is enough — an
+existing wrong policy cannot block a right one, unless it was written
+`restrictive`, which the `permissive` column will show. Re-running
+`supabase/setup.sql` creates the correct set.
+
+---
+
 ### 3. Replying by email — not available on Namecheap
 
 Sending and receiving are separate capabilities, and Private Email only does
