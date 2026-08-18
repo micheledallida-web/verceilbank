@@ -153,26 +153,25 @@
         <div class="sup-chat-sub">
           <span id="supThreadStatus" class="sup-chat-status"></span>
           <span id="supThreadCategory" class="sup-chat-cat"></span>
+          <!-- Message history. A screen you can reach on purpose, rather than
+               by guessing how many times to press back. It says what it is — a
+               clock and the word — and it lives in the header band, at the end
+               of the line that says what this conversation is, so it is at the
+               top of the screen whatever the conversation is doing. The unread
+               count rides with it, so the way in is also the thing that says
+               there is something waiting. -->
+          <button data-action="sup-history" class="sup-history-btn sup-hist" title="Message history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v5h5"></path>
+              <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+              <polyline points="12 7 12 12 15 14"></polyline>
+            </svg>
+            <span>History</span>
+            <span class="sup-history-dot hidden min-w-[18px] h-[18px] px-[5px] rounded-full bg-white text-[#0B4CC2] text-[10px] font-bold items-center justify-center leading-none"></span>
+          </button>
         </div>
 
       </div>
-    </div>
-
-    <!-- Message history. A screen you can reach on purpose, rather than by
-         guessing how many times to press back. It says what it is: a clock and
-         the word, on the conversation's own surface, where a round icon in the
-         header band was one more symbol to decode. It carries the unread count
-         so the way in is also the thing that says there is something waiting. -->
-    <div class="sup-histbar">
-      <button data-action="sup-history" class="sup-history-btn sup-hist" title="Message history">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v5h5"></path>
-          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
-          <polyline points="12 7 12 12 15 14"></polyline>
-        </svg>
-        <span>History</span>
-        <span class="sup-history-dot hidden min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
-      </button>
     </div>
 
     <div class="sup-chat-body">
