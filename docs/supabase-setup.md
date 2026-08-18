@@ -879,14 +879,26 @@ is the real file.
 
 ## 5g. Offer codes — sign-up is invite-only
 
-> **The sign-up form no longer asks for a code.** The step was removed to cut
-> friction, so nothing in the browser sends `offer_code` any more. Everything
-> below still exists in the database — the table, the trigger, the functions —
-> and the trigger still refuses any sign-up that arrives without a code while
-> the requirement is on. **With `offer_code_required` left on, nobody can
-> register at all**, because there is no longer a field that could satisfy it.
-> Switch the requirement off (see *Turning it off*) to reopen sign-up, or put
-> the step back if you want the bank to stay invite-only.
+> **Invitations are off. The bank is open to anyone who signs up.**
+>
+> The form no longer asks for a code, and `setup.sql` now turns the requirement
+> off rather than asking an operator to remember: a fresh project defaults to
+> off, and a run of the file switches an existing one off. Nothing here is
+> dropped — the tables, the trigger and the functions all stay, dormant, so
+> invitations can come back with one update and one code.
+>
+> **If registration is failing for everyone, read this first.** The trigger
+> refuses any sign-up arriving without a code while the requirement is on, and
+> the form has no field that could satisfy it, so an old project with the
+> switch still on rejects every registration and leaves no user behind. Check
+> it in one line:
+>
+> ```sql
+> select offer_code_required from public.bank_settings where id = 1;  -- expect false
+> ```
+>
+> Everything below describes the mechanism as it works when you switch it back
+> on.
 
 The rule this section describes: **no account opens without a seven-digit offer
 code.** It used to be collected as the form's second step, before the
@@ -1194,9 +1206,9 @@ moves, and there is a redemption row to say how it was opened.
 
 ### Turning it off
 
-**On this branch, off is the setting the app expects.** The form stopped
-collecting a code, so the requirement has to be off for anyone to register at
-all:
+**Off is the setting the app expects, and `setup.sql` now applies it.** The
+form stopped collecting a code, so the requirement has to be off for anyone to
+register at all. Running the file is enough; by hand it is:
 
 ```sql
 update public.bank_settings set offer_code_required = false where id = 1;
@@ -1210,9 +1222,10 @@ still works, since that passes a code in app metadata:
 update public.bank_settings set offer_code_required = true  where id = 1;
 ```
 
-The switch lives in `bank_settings` so this never means dropping the trigger. It
-defaults to **on**, because a gate that defaults to open is not a gate — and a
-missing `bank_settings` row reads as on for the same reason.
+The switch lives in `bank_settings` so none of this means dropping the trigger.
+It defaulted to **on** while the form still had the step — a gate that defaults
+to open is not a gate. With the step gone the default is **off**, because a gate
+nothing can open is not a gate either, it is a wall.
 
 While it is off **no code is consumed and no redemption row is written**, for
 every account created in the window — not just the one you meant. That is the
@@ -1377,26 +1390,60 @@ select relname, relrowsecurity from pg_class
 Without RLS on, the anon key in every visitor's browser can read every
 customer's messages to their bank. Do not skip the second query.
 
-### 2. Point the mail at your business address
+If the app still says the table is missing after you have created it, it is the
+API's schema cache, not the database. PostgREST answers from its own picture of
+the schema and a table created a moment ago is not in it yet. Running
+`setup.sql` ends by asking for a reload; on its own:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+### What the reference on the error means
+
+The Support screen shows a plain sentence with a short code on the end. The
+code is the fault, and it says which of these to fix:
+
+| Ref | Meaning |
+| --- | --- |
+| `PGRST205` | the table is not in the API's schema cache — create it, or reload the cache as above |
+| `42P01` | the table really is not there — run step 1 |
+| `42501` | row level security refused the row — section 4 has not run against these tables |
+| `23503` | the thread the message belongs to does not exist |
+
+No code on the end means the request never reached the database: the browser
+was offline, or the project URL and anon key are wrong.
+
+### 2. Point the mail at your inbox
+
+Messages go to **support@verceilbank.com**, from
+`Verceil Bank <support@verceilbank.com>`. Both are the function's defaults, so
+there is one thing to set:
 
 ```bash
 supabase functions deploy support-notify
-supabase secrets set \
-  RESEND_API_KEY=re_xxx \
-  SUPPORT_INBOX=you@yourbusiness.com \
-  SUPPORT_FROM='Verceil Bank <support@verceilbank.com>'
+supabase secrets set RESEND_API_KEY=re_xxx
 ```
 
 | Secret | | |
 | --- | --- | --- |
 | `RESEND_API_KEY` | required | from resend.com. Server-side only — it must never reach the browser, which is the entire reason this runs as a function |
-| `SUPPORT_INBOX` | required | **where the message lands: your business email** |
-| `SUPPORT_FROM` | required | the sender. Must be an address on a domain verified with Resend, or the mail is refused |
+| `SUPPORT_INBOX` | optional | overrides where the message lands. Defaults to `support@verceilbank.com` |
+| `SUPPORT_FROM` | optional | overrides the sender. Defaults to `Verceil Bank <support@verceilbank.com>` |
 
-With any of the three unset the function answers "Email is not configured" and
-logs which one is missing. The customer still sees their message saved and the
-thread open, because the app never waits on the mail — a mail outage must not
-look to somebody like a failed send.
+The from-address has to be on a domain verified with Resend — add
+`verceilbank.com` there and complete its DNS records, or every send is refused
+with a domain error in the function logs.
+
+Where the mail goes is not a secret: it is in the site footer, in the page's
+structured data and on the Support screen. It is a default rather than a
+variable because three required settings meant the path could be deployed,
+correct, and silently mailing nowhere for want of one of them.
+
+Without the key the function answers "Email is not configured" and says so in
+the logs. The customer still sees their message saved and the thread open,
+because the app never waits on the mail — a mail outage must not look to
+somebody like a failed send.
 
 ### 3. Replying by email (optional)
 
@@ -1409,7 +1456,7 @@ from the Supabase dashboard instead.
 ```bash
 supabase functions deploy support-inbound
 supabase secrets set \
-  SUPPORT_INBOUND_ADDRESS=support@yourbusiness.com \
+  SUPPORT_INBOUND_ADDRESS=support@verceilbank.com \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
@@ -1506,7 +1553,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed with `SUPPORT_INBOX` set to your business email (section 5i)
+- [ ] `support-notify` deployed and `RESEND_API_KEY` set, `verceilbank.com` verified with Resend (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
@@ -1514,5 +1561,5 @@ Never put the service key in these variables.
 - [ ] `deposit_requests` / `deposit_events` tables, secrets and the deployed webhook (section 5e)
 - [ ] `statements` bucket (private), its read policy and the storage columns (section 5f) — only needed to serve the bank's own PDFs; downloads already work without it
 - [ ] `external_accounts` table with the narrowed insert grant (section 5h) — **without it, linking a bank silently fails; without the grant, the 30-day hold is decoration**
-- [ ] `offer_code_required` set to **false** (section 5g) — **the sign-up form no longer sends a code, so leaving the requirement on means nobody can register**
+- [ ] `offer_code_required` reads **false** (section 5g) — `setup.sql` sets it; on an older project confirm it, because with it on nobody can register
 - [ ] `pg_cron` jobs scheduled, if you want the deadline enforced (section 6)

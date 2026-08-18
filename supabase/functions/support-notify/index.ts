@@ -61,8 +61,15 @@ Deno.serve(async (req) => {
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
   const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-  const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX');
-  const SUPPORT_FROM = Deno.env.get('SUPPORT_FROM');
+  // The bank's own address, and the only secret genuinely worth being a secret
+  // here is the API key. Where the mail goes is not confidential — it is on the
+  // marketing site, in the footer, in the page's structured data and on the
+  // Support screen itself — and leaving it to configuration meant the whole
+  // path could be deployed, correct, and silently mailing nowhere because one
+  // of three variables was missed. Either can still be overridden from the
+  // environment; without one, it is right rather than unset.
+  const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX') || 'support@verceilbank.com';
+  const SUPPORT_FROM = Deno.env.get('SUPPORT_FROM') || 'Verceil Bank <support@verceilbank.com>';
   // Deliberately no fallback. Until a domain is set up to receive mail there is
   // no address a reply could come back through, and quietly falling back to the
   // inbox itself would put a Reply-To on the mail that just loops to the reader.
@@ -70,8 +77,11 @@ Deno.serve(async (req) => {
   const SUPPORT_INBOUND_ADDRESS = Deno.env.get('SUPPORT_INBOUND_ADDRESS');
   const inboundReady = !!SUPPORT_INBOUND_ADDRESS;
 
-  if (!RESEND_API_KEY || !SUPPORT_INBOX || !SUPPORT_FROM) {
-    console.error('support-notify is missing RESEND_API_KEY, SUPPORT_INBOX or SUPPORT_FROM');
+  // One thing left to set, and it fails closed without it: no key, no send, and
+  // a line in the logs saying so. The customer's message is already saved by the
+  // time this runs, so a refusal here costs the notification and nothing else.
+  if (!RESEND_API_KEY) {
+    console.error('support-notify is missing RESEND_API_KEY — nothing was emailed');
     return json({ error: 'Email is not configured' }, 500);
   }
 

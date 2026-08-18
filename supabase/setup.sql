@@ -2014,21 +2014,45 @@ end $$;
 -- with the redemption row to show for it, instead of through a hole held open
 -- for as long as it takes somebody to remember to close it.
 --
--- READ THIS BEFORE DEPLOYING. The branch this file is merged into removed the
--- offer-code step from the sign-up form, so nothing in the browser sends
--- `offer_code` any more and, with the requirement ON, this trigger refuses
--- EVERY customer registration on the 'offer code required' branch below. The
--- default is left ON deliberately rather than quietly flipped: a gate's default
--- is not something a change to a form should decide. To open registration, run
+-- THE REQUIREMENT IS OFF, AND THAT IS NOW A DECISION RATHER THAN A DEFAULT.
 --
---   update public.bank_settings set offer_code_required = false where id = 1;
+-- The sign-up form no longer has an offer-code step, so nothing in the browser
+-- sends `offer_code`. With the requirement ON this trigger refuses EVERY
+-- customer registration — the sign-up page reports a failed sign-up and leaves
+-- no user behind, for everybody, with no other symptom. An earlier pass left
+-- the default ON and a note asking an operator to turn it off by hand, on the
+-- grounds that a gate's default is not something a change to a form should
+-- decide. Correct then; the product has since dropped invitations altogether,
+-- and a gate nothing can open is not a gate, it is a wall.
 --
--- Leaving it ON only makes sense alongside restoring that step. Note this says
--- nothing about the service-key path above — a code passed in app_metadata is
--- still spent normally either way. See section 5g of docs/supabase-setup.md.
+-- So: the default is off for a new project, the existing column's default is
+-- changed for a project that already has one, and the switch is turned off
+-- outright below — a run of this file opens registration rather than reminding
+-- somebody to.
+--
+-- Nothing is dropped. The tables, the trigger and consume_offer_code all stay,
+-- dormant and costing nothing, so invitations can come back with one update
+-- and a code:
+--
+--   update public.bank_settings set offer_code_required = true where id = 1;
+--   insert into public.offer_codes (code, label, max_uses) values ('1234567', 'launch', 500);
+--
+-- This says nothing about the service-key path above: a code passed in
+-- app_metadata is still spent normally either way. See section 5g of
+-- docs/supabase-setup.md.
 -- ---------------------------------------------------------------------------
 alter table public.bank_settings
-  add column if not exists offer_code_required boolean not null default true;
+  add column if not exists offer_code_required boolean not null default false;
+
+-- `add column if not exists` does nothing to a column that is already there, so
+-- a project set up before this change keeps both its old default and its old
+-- value. Both are corrected here.
+alter table public.bank_settings
+  alter column offer_code_required set default false;
+
+update public.bank_settings
+   set offer_code_required = false
+ where offer_code_required is distinct from false;
 
 create or replace function public.require_offer_code()
 returns trigger
@@ -2153,10 +2177,10 @@ begin
   -- switch on this project's table is called `active` or `is_active`.
   usable := public.offer_codes_usable();
 
-  if usable = 0 and coalesce((select offer_code_required from public.bank_settings where id = 1), true) then
-    raise warning 'OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP. Issue one, e.g. insert into public.offer_codes (code, label, max_uses) values (''1234567'', ''launch-2026'', 500);';
+  if usable = 0 and coalesce((select offer_code_required from public.bank_settings where id = 1), false) then
+    raise warning 'OFFER CODES: the requirement is ON and there are no usable codes — NOBODY CAN SIGN UP. Either issue one, e.g. insert into public.offer_codes (code, label, max_uses) values (''1234567'', ''launch-2026'', 500), or turn the requirement off: update public.bank_settings set offer_code_required = false where id = 1;';
   else
-    raise notice 'offer codes: % usable', usable;
+    raise notice 'offer codes: % usable, requirement off — registration is open', usable;
   end if;
 end $$;
 
@@ -2580,3 +2604,22 @@ having a.balance is distinct from
 -- says the link cannot be used — which looks like a broken link rather than a
 -- missing setting. Add every origin you use, including preview deployments.
 -- ==============================================================================
+
+
+-- =============================================================================
+-- 9. TELL POSTGREST WHAT JUST CHANGED
+--
+-- The API in front of this database keeps its own picture of the schema, and it
+-- answers from that picture rather than from the database. A table created a
+-- moment ago is not there as far as the API is concerned until the picture is
+-- rebuilt, and the app is told exactly that:
+--
+--   Could not find the table 'public.support_threads' in the schema cache
+--
+-- Which reads like the table was never created, whether or not it was. Supabase
+-- usually reloads on its own within a few seconds of a DDL change; this asks
+-- outright, so a run of this file ends with the API knowing everything the file
+-- just did. Harmless to repeat, and it costs nothing when there was no change.
+-- =============================================================================
+
+notify pgrst, 'reload schema';
