@@ -144,15 +144,22 @@ begin
     -- nothing in it. The customer saw an error and their text still in the box;
     -- what is left here is the count of times that happened. It is the one
     -- number in this report that means a customer tried and did not get through.
+    -- Threads written in the last two minutes are left out: on a live project
+    -- one of them may be a send still in flight, its message a moment behind
+    -- its thread, and counting that as a failure would report a fault that
+    -- resolves itself while you are reading about it.
     execute $q$
-      select count(*) from public.support_threads t
-       where not exists (select 1 from public.support_messages m where m.thread_id = t.id)
-    $q$ into n;
+      select count(*), min(created_at) from public.support_threads t
+       where t.created_at < now() - interval '2 minutes'
+         and not exists (select 1 from public.support_messages m where m.thread_id = t.id)
+    $q$ into n, seen;
     if n > 0 then
       part := 'threads holding no message';
       status := 'info';
       detail := n || ' — each one is a send whose message was refused after the '
-                || 'thread was written. Check the policies on support_messages';
+                || 'thread was written, oldest ' || seen::text
+                || '. Check the policies on support_messages, and whether the '
+                || 'dates cluster: a cluster that stopped is a fault already fixed';
       return next;
     end if;
 
