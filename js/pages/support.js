@@ -41,6 +41,10 @@ let listeners = [];
 let threads = [];
 let latestByThread = {};
 let activeThread = null;
+// Where the conversation was opened from, so its back arrow returns there.
+// Sending a new message drops somebody straight into the thread from the home
+// screen; backing out of that onto a list they never visited is not going back.
+let threadOrigin = 'list';
 let activeMessages = [];
 let topicFilter = '';
 let pendingCategory = '';
@@ -171,6 +175,15 @@ function emptyState(message) {
 }
 
 // ---------- View switching ----------
+
+// Which of the four is on screen. Read rather than remembered, so it cannot
+// disagree with what somebody is actually looking at.
+function currentView(root) {
+  if (!root.querySelector('#supListView').classList.contains('hidden')) return 'list';
+  if (!root.querySelector('#supNewView').classList.contains('hidden')) return 'new';
+  if (!root.querySelector('#supThreadView').classList.contains('hidden')) return 'thread';
+  return 'home';
+}
 
 function showView(root, name) {
   root.querySelector('#supHomeView').classList.toggle('hidden', name !== 'home');
@@ -503,6 +516,7 @@ async function openThread(root, ctx, thread) {
   const { supabaseClient, getCurrentUser } = ctx;
   activeThread = thread;
   activeMessages = [];
+  threadOrigin = currentView(root);
 
   // Before the header is drawn, so the pill shows what the thread now is
   // rather than flashing 'Answered' and correcting itself.
@@ -734,6 +748,7 @@ export async function init(root, ctx, options) {
   latestByThread = {};
   activeThread = null;
   activeMessages = [];
+  threadOrigin = 'list';
   topicFilter = '';
   pendingCategory = (options && options.category) || '';
   sendingNew = false;
@@ -742,13 +757,20 @@ export async function init(root, ctx, options) {
   renderCategoryOptions(root);
   renderTopics(root);
 
-  on(root.querySelector('[data-action="close"]'), 'click', ctx.close);
+  // Two of them now: the home screen's arrow, and the chat box's exit. A
+  // querySelector would have wired the first and left the other dead.
+  root.querySelectorAll('[data-action="close"]').forEach((btn) => on(btn, 'click', ctx.close));
 
   // The thread and compose views back out to the list; the list backs out to
   // the home screen.
   root.querySelectorAll('[data-action="sup-back"]').forEach((btn) => {
     on(btn, 'click', () => {
-      showView(root, 'list');
+      // Back goes where this conversation was opened from. Opened from a send,
+      // that is the home screen; opened from the list, the list. The history
+      // button beside it is the one that always means "my conversations", so
+      // the two are not the same press twice.
+      const back = threadOrigin === 'list' ? 'list' : 'home';
+      showView(root, back);
       loadThreads(root, ctx);
     });
   });

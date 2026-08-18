@@ -8,18 +8,6 @@
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-[20px] font-bold text-white truncate flex-1 min-w-0">Support</div>
-      <!-- Message history. A screen you can reach on purpose, rather than by
-           guessing how many times to press back. It carries the unread count
-           so the way in is also the thing that tells you there is something
-           waiting. -->
-      <button data-action="sup-history" class="sup-history-btn relative w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Message history" title="Message history">
-        <svg class="w-[19px] h-[19px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v5h5"></path>
-          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
-          <polyline points="12 7 12 12 15 14"></polyline>
-        </svg>
-        <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
-      </button>
     </div>
 
     <input id="supSearch" type="text" placeholder="Search help" class="w-full h-[44px] px-[14px] rounded-[14px] bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none shadow-lg mb-[18px]">
@@ -116,7 +104,11 @@
       <div class="sup-chat-head-in">
 
         <div class="sup-chat-head-row">
-          <button data-action="sup-back" class="sup-chat-icon" aria-label="Back">
+          <!-- Back goes one step, to the conversation list. Leaving the
+               support screen altogether is its own button on the other side —
+               a conversation is the one screen deep enough that "out of here"
+               and "back to the list" are different intentions. -->
+          <button data-action="sup-back" class="sup-chat-icon" aria-label="Back to messages">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           <div id="supThreadSubject" class="sup-chat-title"></div>
@@ -131,6 +123,9 @@
               <polyline points="12 7 12 12 15 14"></polyline>
             </svg>
             <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
+          </button>
+          <button data-action="close" class="sup-chat-icon" aria-label="Close support">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
           </button>
         </div>
 
@@ -200,18 +195,6 @@
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
       </button>
       <div class="text-[20px] font-bold text-white truncate flex-1 min-w-0">New message</div>
-      <!-- Message history. A screen you can reach on purpose, rather than by
-           guessing how many times to press back. It carries the unread count
-           so the way in is also the thing that tells you there is something
-           waiting. -->
-      <button data-action="sup-history" class="sup-history-btn relative w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Message history" title="Message history">
-        <svg class="w-[19px] h-[19px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v5h5"></path>
-          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
-          <polyline points="12 7 12 12 15 14"></polyline>
-        </svg>
-        <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
-      </button>
     </div>
 
     <div class="bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] rounded-[20px] p-[16px] shadow-lg mb-[14px]">
