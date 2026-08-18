@@ -81,6 +81,61 @@ function secretMatches(a: string, b: string) {
   return diff === 0;
 }
 
+// Builds the email for one message on one thread. Shared by the live send and
+// by the resend below, so a message recovered from the database arrives looking
+// exactly like the one that should have gone out when it was written — same
+// subject tag, same Reply-To, same footer. A second format for the same thing
+// would be a second thing to keep correct.
+function buildMail(
+  thread: { id: unknown; subject?: string; category?: string },
+  body: string,
+  fromEmail: string,
+  inboundAddress: string | undefined,
+) {
+  const category = CATEGORY_LABELS[String(thread.category)] ?? thread.category ?? 'General';
+  const replyTo = inboundAddress ? replyToAddress(String(inboundAddress), String(thread.id)) : '';
+
+  // What the footer promises has to match what is actually wired up.
+  const howToAnswer = inboundAddress
+    ? "Reply to this email and your answer appears in the customer's app."
+    : 'Replies by email are not enabled yet. Answer from the Supabase dashboard using the thread id above.';
+
+  // The subject tag is a fallback: if a mail client ever drops the Reply-To,
+  // the inbound side can still find the thread from the subject line.
+  const subject = `[VB-${thread.id}] ${thread.subject || 'Support request'}`;
+
+  const html = `
+      <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:14px;line-height:1.55">
+        <p style="margin:0 0 16px"><strong>${escapeHtml(thread.subject || 'Support request')}</strong></p>
+        <p style="margin:0 0 16px;white-space:pre-wrap">${escapeHtml(body)}</p>
+        <hr style="border:0;border-top:1px solid #E5E7EB;margin:20px 0">
+        <p style="margin:0;color:#6B7280;font-size:12px">
+          Category: ${escapeHtml(category)}<br>
+          From: ${escapeHtml(fromEmail)}<br>
+          Thread: ${escapeHtml(thread.id)}
+        </p>
+        <p style="margin:16px 0 0;color:#6B7280;font-size:12px">
+          ${escapeHtml(howToAnswer)}
+        </p>
+      </div>
+    `;
+
+  const text = [
+    thread.subject || 'Support request',
+    '',
+    body,
+    '',
+    '---',
+    `Category: ${category}`,
+    `From: ${fromEmail}`,
+    `Thread: ${thread.id}`,
+    '',
+    howToAnswer,
+  ].join('\n');
+
+  return { subject, html, text, replyTo };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST' && req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -145,6 +200,93 @@ Deno.serve(async (req) => {
       if (!SERVICE_KEY || !secretMatches(supplied, SERVICE_KEY)) {
         return json({ error: 'A test send needs the service role key' }, 401);
       }
+    }
+
+    // Sends messages that are already in the database to the support inbox.
+    //
+    // A message is saved whether or not the mail goes out — the app never waits
+    // on the send, because a mail outage must not look to a customer like a
+    // failed send. The cost of that choice is that a spell of broken mail
+    // leaves real requests sitting in the database that nobody has read. This
+    // is how they are collected afterwards.
+    //
+    // It sends what the customer wrote, addressed the way the original would
+    // have been. It is not a reply to them: nothing here mails a customer, and
+    // this does not change that.
+    //
+    // Same two guards as a test send, for the same reasons. The service role
+    // key, because anything less leaves a URL that makes the mailbox send on
+    // demand for whoever finds it. And SUPPORT_INBOX as the only destination,
+    // never a caller's — with an address taken from the request this would be
+    // an open relay with a database of real names attached to it.
+    const wantsResend = params.get('resend') === '1';
+    if (wantsResend) {
+      const supplied = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+      if (!SERVICE_KEY || !secretMatches(supplied, SERVICE_KEY)) {
+        return json({ error: 'A resend needs the service role key' }, 401);
+      }
+      if (!settings || missing.length > 0) return json({ error: 'Email is not configured', missing }, 500);
+
+      const admin = createClient(SUPABASE_URL, SERVICE_KEY);
+      const onlyThread = params.get('thread');
+      // A cap, and a low one. This exists to clear a backlog of a few hours,
+      // not to replay a year of it into somebody's inbox in one go.
+      const limit = Math.min(Number(params.get('limit') || 25) || 25, 100);
+
+      let query = admin.from('support_threads').select('*').order('created_at', { ascending: true }).limit(limit);
+      if (onlyThread) query = query.eq('id', onlyThread);
+      const { data: threads, error: threadsError } = await query;
+      if (threadsError) return json({ error: 'Could not read the threads', detail: threadsError.message }, 500);
+
+      const sentOut: unknown[] = [];
+      for (const thread of threads ?? []) {
+        // The customer's own words, oldest first — the message that should have
+        // been mailed when it was written.
+        const { data: messages } = await admin
+          .from('support_messages')
+          .select('*')
+          .eq('thread_id', thread.id)
+          .order('created_at', { ascending: true });
+
+        const first = (messages ?? [])[0];
+        // A thread with nothing in it is not a request anybody made: the app
+        // writes the thread before the first message, so an empty one is a send
+        // that failed. There is nothing to forward.
+        if (!first) {
+          sentOut.push({ thread: thread.id, skipped: 'no messages on this thread' });
+          continue;
+        }
+
+        const { data: owner } = await admin.auth.admin.getUserById(String(thread.user_id));
+        const { subject, html, text, replyTo } = buildMail(
+          thread,
+          String(first.body),
+          owner?.user?.email ?? 'unknown',
+          SUPPORT_INBOUND_ADDRESS,
+        );
+
+        const out = await sendMail(settings, {
+          to: SUPPORT_INBOX,
+          subject,
+          html,
+          text,
+          ...(replyTo ? { replyTo } : {}),
+        });
+        sentOut.push(
+          out.ok
+            ? { thread: thread.id, sent: true }
+            : { thread: thread.id, sent: false, smtp_code: out.code, smtp_message: out.message },
+        );
+      }
+
+      return json({
+        function: 'support-notify',
+        resend: true,
+        to: SUPPORT_INBOX,
+        threads_considered: (threads ?? []).length,
+        sent: sentOut.filter((r) => (r as { sent?: boolean }).sent).length,
+        results: sentOut,
+      });
     }
 
     const check = wantsVerify && settings ? await verifySmtp(settings) : null;
@@ -234,46 +376,12 @@ Deno.serve(async (req) => {
       return json({ error: 'Message not found on that thread' }, 404);
     }
 
-    const category = CATEGORY_LABELS[thread.category] ?? thread.category ?? 'General';
-    const replyTo = inboundReady ? replyToAddress(String(SUPPORT_INBOUND_ADDRESS), String(thread.id)) : '';
-
-    // What the footer promises has to match what is actually wired up.
-    const howToAnswer = inboundReady
-      ? "Reply to this email and your answer appears in the customer's app."
-      : 'Replies by email are not enabled yet. Answer from the Supabase dashboard using the thread id above.';
-
-    // The subject tag is a fallback: if a mail client ever drops the Reply-To,
-    // the inbound side can still find the thread from the subject line.
-    const subject = `[VB-${thread.id}] ${thread.subject || 'Support request'}`;
-
-    const html = `
-      <div style="font-family:Arial,Helvetica,sans-serif;color:#111827;font-size:14px;line-height:1.55">
-        <p style="margin:0 0 16px"><strong>${escapeHtml(thread.subject || 'Support request')}</strong></p>
-        <p style="margin:0 0 16px;white-space:pre-wrap">${escapeHtml(message.body)}</p>
-        <hr style="border:0;border-top:1px solid #E5E7EB;margin:20px 0">
-        <p style="margin:0;color:#6B7280;font-size:12px">
-          Category: ${escapeHtml(category)}<br>
-          From: ${escapeHtml(user.email ?? 'unknown')}<br>
-          Thread: ${escapeHtml(thread.id)}
-        </p>
-        <p style="margin:16px 0 0;color:#6B7280;font-size:12px">
-          ${escapeHtml(howToAnswer)}
-        </p>
-      </div>
-    `;
-
-    const text = [
-      thread.subject || 'Support request',
-      '',
-      message.body,
-      '',
-      '---',
-      `Category: ${category}`,
-      `From: ${user.email ?? 'unknown'}`,
-      `Thread: ${thread.id}`,
-      '',
-      howToAnswer,
-    ].join('\n');
+    const { subject, html, text, replyTo } = buildMail(
+      thread,
+      String(message.body),
+      user.email ?? 'unknown',
+      SUPPORT_INBOUND_ADDRESS,
+    );
 
     const sent = await sendMail(settings, {
       to: SUPPORT_INBOX,
