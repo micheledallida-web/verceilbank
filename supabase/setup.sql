@@ -2580,3 +2580,22 @@ having a.balance is distinct from
 -- says the link cannot be used — which looks like a broken link rather than a
 -- missing setting. Add every origin you use, including preview deployments.
 -- ==============================================================================
+
+
+-- =============================================================================
+-- 9. TELL POSTGREST WHAT JUST CHANGED
+--
+-- The API in front of this database keeps its own picture of the schema, and it
+-- answers from that picture rather than from the database. A table created a
+-- moment ago is not there as far as the API is concerned until the picture is
+-- rebuilt, and the app is told exactly that:
+--
+--   Could not find the table 'public.support_threads' in the schema cache
+--
+-- Which reads like the table was never created, whether or not it was. Supabase
+-- usually reloads on its own within a few seconds of a DDL change; this asks
+-- outright, so a run of this file ends with the API knowing everything the file
+-- just did. Harmless to repeat, and it costs nothing when there was no change.
+-- =============================================================================
+
+notify pgrst, 'reload schema';

@@ -1377,6 +1377,30 @@ select relname, relrowsecurity from pg_class
 Without RLS on, the anon key in every visitor's browser can read every
 customer's messages to their bank. Do not skip the second query.
 
+If the app still says the table is missing after you have created it, it is the
+API's schema cache, not the database. PostgREST answers from its own picture of
+the schema and a table created a moment ago is not in it yet. Running
+`setup.sql` ends by asking for a reload; on its own:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+### What the reference on the error means
+
+The Support screen shows a plain sentence with a short code on the end. The
+code is the fault, and it says which of these to fix:
+
+| Ref | Meaning |
+| --- | --- |
+| `PGRST205` | the table is not in the API's schema cache — create it, or reload the cache as above |
+| `42P01` | the table really is not there — run step 1 |
+| `42501` | row level security refused the row — section 4 has not run against these tables |
+| `23503` | the thread the message belongs to does not exist |
+
+No code on the end means the request never reached the database: the browser
+was offline, or the project URL and anon key are wrong.
+
 ### 2. Point the mail at your inbox
 
 Messages go to **support@verceilbank.com**, from
