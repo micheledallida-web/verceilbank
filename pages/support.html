@@ -100,6 +100,39 @@
        ids, the same queries behind them. -->
   <div id="supThreadView" class="hidden sup-chat">
 
+    <!-- ---- the rail ----
+         Wide enough for a desktop and the conversation stops being the only
+         thing on the screen: the list you came from can stay beside it instead
+         of being somewhere you go back to. Hidden below that width, where there
+         is only room for one of the two and the list is its own view.
+
+         It is the same threads, the same array, the same click that opens one —
+         a second way of drawing what the app has already loaded, not a second
+         thing to load. -->
+    <aside class="sup-rail">
+
+      <button id="supRailNewBtn" type="button" class="sup-rail-new">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+        <span>New conversation</span>
+      </button>
+
+      <div id="supRailList" class="sup-rail-list"></div>
+
+      <div class="sup-rail-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3 5 6v6c0 4.2 2.8 7.9 7 9 4.2-1.1 7-4.8 7-9V6z"></path>
+        </svg>
+        <span class="min-w-0">
+          <span class="sup-rail-note-t">Your messages are secure</span>
+          <span class="sup-rail-note-d">We use encryption to help keep your messages secure.</span>
+        </span>
+      </div>
+
+    </aside>
+
+    <!-- ---- the conversation ---- -->
+    <div class="sup-chat-main">
+
     <div class="sup-chat-head">
       <div class="sup-chat-head-in">
 
@@ -184,6 +217,8 @@
 
       </div>
     </div>
+
+    </div><!-- /.sup-chat-main -->
 
   </div>
 

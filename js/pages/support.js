@@ -95,6 +95,15 @@ function relativeDate(value) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// "Aug 18, 1:50 PM". The rail shows both halves because it is a list of
+// conversations rather than a list of days: which one was last spoken in, and
+// when, is the whole reason to look at it.
+function stampDateTime(value) {
+  const date = new Date(value);
+  if (isNaN(date)) return '';
+  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
 function preview(body) {
   const text = String(body || '').replace(/\s+/g, ' ').trim();
   return text.length > 60 ? text.slice(0, 60) : text;
@@ -269,6 +278,41 @@ function renderHistoryBadges(root) {
   });
 }
 
+// The rail beside an open conversation. Same `threads` array the list view
+// draws, same rows, same statuses — read once by loadThreads and drawn twice,
+// so the two can never disagree and the second one costs no query.
+//
+// The click is delegated to the container, registered once in init: these rows
+// are rebuilt every time a thread is opened, and a listener per row per render
+// would pile up for as long as the screen is open.
+function renderRail(root) {
+  const list = root.querySelector('#supRailList');
+  if (!list) return;
+
+  if (!threads.length) {
+    list.innerHTML = '<div class="sup-rail-empty">No conversations yet.</div>';
+    return;
+  }
+
+  list.innerHTML = threads.map((thread) => {
+    const isActive = activeThread && String(activeThread.id) === String(thread.id);
+    const isUnread = thread.status === 'answered';
+    return `
+      <button type="button" class="sup-rail-row${isActive ? ' sup-rail-row-on' : ''}" data-id="${escapeHtml(thread.id)}"${isActive ? ' aria-current="true"' : ''}>
+        <span class="sup-rail-row-in">
+          <span class="sup-rail-t">
+            ${isUnread ? '<span class="sup-rail-dot"></span>' : ''}
+            <span class="sup-rail-subj">${escapeHtml(thread.subject)}</span>
+          </span>
+          <span class="sup-rail-meta">${escapeHtml(statusLabel(thread.status))} &bull; ${escapeHtml(categoryLabel(thread.category))}</span>
+          <span class="sup-rail-when">${escapeHtml(stampDateTime(thread.updated_at || thread.created_at))}</span>
+        </span>
+        <svg class="sup-rail-go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    `;
+  }).join('');
+}
+
 function renderThreads(root, ctx) {
   const list = root.querySelector('#supThreads');
   const unreadEl = root.querySelector('#supUnreadCount');
@@ -326,6 +370,7 @@ async function loadThreads(root, ctx) {
     if (!user || !supabaseClient) {
       renderThreads(root, ctx);
       renderThreadsSummary(root);
+      renderRail(root);
       return;
     }
 
@@ -359,6 +404,7 @@ async function loadThreads(root, ctx) {
   renderThreads(root, ctx);
   renderThreadsSummary(root);
   renderHistoryBadges(root);
+  renderRail(root);
 }
 
 // ---------- View 2: Thread detail ----------
@@ -497,6 +543,7 @@ async function markThreadRead(root, ctx, thread) {
 
   renderThreadsSummary(root);
   renderHistoryBadges(root);
+  renderRail(root);
 
   try {
     if (!ctx.supabaseClient) return;
@@ -531,6 +578,10 @@ async function openThread(root, ctx, thread) {
   root.querySelector('#supReplyInput').value = '';
   hideError(root, '#supReplyError');
   hideAttachNote(root);
+
+  // Which row the rail shows as the one being read. markThreadRead redraws it
+  // too, but only for a thread that was unread — this is every thread.
+  renderRail(root);
 
   showView(root, 'thread');
   renderComposer(root);
@@ -839,6 +890,17 @@ export async function init(root, ctx, options) {
     if (e.key === 'Enter') { e.preventDefault(); sendReply(root, ctx); }
   });
   on(root.querySelector('#supReplySendBtn'), 'click', () => sendReply(root, ctx));
+
+  // The rail. One handler on the container rather than one per row, because
+  // the rows are rebuilt every time a conversation is opened.
+  on(root.querySelector('#supRailList'), 'click', (e) => {
+    const row = e.target.closest('.sup-rail-row');
+    if (!row) return;
+    const thread = threads.find((entry) => String(entry.id) === row.getAttribute('data-id'));
+    if (thread && (!activeThread || String(activeThread.id) !== String(thread.id))) openThread(root, ctx, thread);
+  });
+
+  on(root.querySelector('#supRailNewBtn'), 'click', () => ctx.openSupportMessage({ category: 'general' }));
 
   // Documents are not carried by support_messages, and adding a picker that
   // led nowhere would be worse than the paperclip not being there at all. It
