@@ -175,7 +175,22 @@ function reportNotifyFailure(error) {
 class SupportMessageError extends Error {}
 
 function customerFacing(err, fallback) {
-  return err instanceof SupportMessageError && err.message ? err.message : fallback;
+  if (err instanceof SupportMessageError && err.message) return err.message;
+
+  // A short reference on the end of the sentence, and the reason is what
+  // happened the first time: taking the raw fault off the screen also took away
+  // the only way anybody outside the console could say what went wrong, so
+  // "could not send" was all anyone had to go on. A code is safe to show — it
+  // names a class of fault, not the schema — and it is the difference between
+  // "it still fails" and one line that identifies the cause:
+  //
+  //   PGRST205  the table is not in PostgREST's schema cache: either it was
+  //             never created, or it was and the cache has not reloaded yet
+  //   42P01     the table really is not there
+  //   42501     the row was refused by row level security
+  //   23503     the thread this message belongs to does not exist
+  const ref = err && (err.code || err.status);
+  return ref ? `${fallback} (ref ${String(ref).slice(0, 16)})` : fallback;
 }
 
 function emptyState(message) {

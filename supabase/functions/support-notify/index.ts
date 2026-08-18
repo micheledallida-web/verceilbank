@@ -88,7 +88,17 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
-  const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX');
+  // The bank's own address. Where the mail goes is not confidential — it is on
+  // the marketing site, in the footer, in the page's structured data and on the
+  // Support screen itself — and leaving it to configuration meant the whole path
+  // could be deployed, correct, and silently mailing nowhere because one more
+  // variable was missed. It can still be overridden from the environment;
+  // without one it is right rather than unset.
+  //
+  // The sender is not read here. A mailbox can only send as itself, so the
+  // mailer derives it from the account that logs in — there is no address this
+  // could be set to that the provider would accept.
+  const SUPPORT_INBOX = Deno.env.get('SUPPORT_INBOX') || 'support@verceilbank.com';
   // Deliberately no fallback. Until a domain is set up to receive mail there is
   // no address a reply could come back through, and quietly falling back to the
   // inbox itself would put a Reply-To on the mail that just loops to the reader.
@@ -171,8 +181,7 @@ Deno.serve(async (req) => {
 
   if (!settings || missing.length > 0) {
     console.error('support-notify is missing:', missing.join(', '));
-    return json({ error: 'Email is not configured', missing }, 500);
-  }
+    return json({ error: 'Email is not configured', missing }, 500);  }
 
   try {
     const { thread_id, message_id } = await req.json();

@@ -36,11 +36,12 @@ export function readSmtpSettings(): { settings: SmtpSettings | null; missing: st
   const port = Number(Deno.env.get('SMTP_PORT') || DEFAULT_PORT);
   const user = Deno.env.get('SMTP_USER') || '';
   const password = Deno.env.get('SMTP_PASSWORD') || '';
-  // A mailbox can only send as itself, so the mailbox address is the sensible
-  // default sender. Setting SUPPORT_FROM adds a display name to it; it cannot
-  // change who the mail is from, because the provider refuses a From that is
-  // not the account that authenticated.
-  const from = Deno.env.get('SUPPORT_FROM') || user;
+  // A mailbox can only send as itself, so the sender is the mailbox with the
+  // bank's name in front of it — which is what a recipient sees, and the one
+  // part of the address that is free to choose. Setting SUPPORT_FROM replaces
+  // the whole thing, but it cannot change who the mail is really from: the
+  // provider refuses a From that is not the account that authenticated.
+  const from = Deno.env.get('SUPPORT_FROM') || (user ? `Verceil Bank <${user}>` : '');
 
   const missing = [
     ['SMTP_USER', user],

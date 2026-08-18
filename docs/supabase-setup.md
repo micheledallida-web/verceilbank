@@ -1001,7 +1001,35 @@ select relname, relrowsecurity from pg_class
 Without RLS on, the anon key in every visitor's browser can read every
 customer's messages to their bank. Do not skip the second query.
 
-### 2. Point the mail at your business address
+If the app still says the table is missing after you have created it, it is the
+API's schema cache, not the database. PostgREST answers from its own picture of
+the schema and a table created a moment ago is not in it yet. Running
+`setup.sql` ends by asking for a reload; on its own:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+### What the reference on the error means
+
+The Support screen shows a plain sentence with a short code on the end. The
+code is the fault, and it says which of these to fix:
+
+| Ref | Meaning |
+| --- | --- |
+| `PGRST205` | the table is not in the API's schema cache — create it, or reload the cache as above |
+| `42P01` | the table really is not there — run step 1 |
+| `42501` | row level security refused the row — section 4 has not run against these tables |
+| `23503` | the thread the message belongs to does not exist |
+
+No code on the end means the request never reached the database: the browser
+was offline, or the project URL and anon key are wrong.
+
+### 2. Point the mail at your inbox
+
+Messages go to **support@verceilbank.com**, from
+`Verceil Bank <support@verceilbank.com>`. Both are the function's defaults, so
+there is one thing to set:
 
 The mail goes out through the `support@verceilbank.com` mailbox on **Namecheap
 Private Email**, over SMTP. There is no API key, because a mailbox provider has
@@ -1012,19 +1040,23 @@ the way a mail client would.
 supabase functions deploy support-notify
 supabase secrets set \
   SMTP_USER=support@verceilbank.com \
-  SMTP_PASSWORD='your-mailbox-password' \
-  SUPPORT_INBOX=you@yourbusiness.com \
-  SUPPORT_FROM='Verceil Bank <support@verceilbank.com>'
+  SMTP_PASSWORD='your-mailbox-password'
 ```
 
 | Secret | | |
 | --- | --- | --- |
 | `SMTP_USER` | required | the full mailbox address. Namecheap wants the whole address, not a username |
 | `SMTP_PASSWORD` | required | the mailbox password from the Private Email dashboard — there is no separate app password. Server-side only: this password can *read* support@ as well as send from it, which is the entire reason this runs as a function |
-| `SUPPORT_INBOX` | required | **where the message lands: your business email** |
-| `SUPPORT_FROM` | optional | adds a display name, as `Verceil Bank <support@verceilbank.com>`. Defaults to `SMTP_USER`. It cannot change *who* the mail is from — the provider refuses a From that is not the mailbox that logged in |
+| `SUPPORT_INBOX` | optional | overrides where the message lands. Defaults to `support@verceilbank.com` |
+| `SUPPORT_FROM` | optional | overrides the sender. Defaults to `Verceil Bank <SMTP_USER>`. It cannot change *who* the mail is from — the provider refuses a From that is not the mailbox that logged in |
 | `SMTP_HOST` | optional | defaults to `mail.privateemail.com` |
 | `SMTP_PORT` | optional | defaults to `465`. **Leave it there** — see below |
+
+Only the two secrets have to be set. Where the mail goes is not a secret — it
+is in the site footer, in the page's structured data and on the Support screen
+— and it is a default rather than a variable because a list of required
+settings meant the path could be deployed, correct, and silently mailing
+nowhere for want of one of them.
 
 **Port 465, not 587.** Namecheap documents both, but Supabase's edge runtime
 does not allow outbound connections on port 25 and is unreliable on 587, so 465
@@ -1204,7 +1236,7 @@ already written for it:
 ```bash
 supabase functions deploy support-inbound
 supabase secrets set \
-  SUPPORT_INBOUND_ADDRESS=support@yourbusiness.com \
+  SUPPORT_INBOUND_ADDRESS=support@verceilbank.com \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
@@ -1301,7 +1333,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox and `SUPPORT_INBOX` set to your business email — confirmed with `?test=1` landing a mail in that inbox (section 5i)
+- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox — confirmed with `?test=1` landing a mail in support@ (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**
