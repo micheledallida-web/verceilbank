@@ -196,13 +196,6 @@ function relativeDate(value) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function messageTimestamp(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (isNaN(date)) return '';
-  return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
-
 function preview(body) {
   const text = String(body || '').replace(/\s+/g, ' ').trim();
   return text.length > 60 ? text.slice(0, 60) : text;
@@ -447,18 +440,102 @@ async function loadThreads(root, ctx) {
 
 // ---------- View 2: Thread detail ----------
 
+// An address or a link inside a reply is usually the thing the customer came
+// for — the mailbox to pay into, the page to open — so it is drawn as one
+// rather than as characters to copy out by hand.
+//
+// It runs on text that has already been escaped, so a body containing markup
+// is still inert, and it runs in a single pass: two passes would find the
+// address inside a `mailto:` this function had just written and nest an anchor
+// inside an anchor.
+const LINK_PATTERN = /(https?:\/\/[^\s<]+[^\s<.,;:!?)"']|[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)/g;
+
+function linkify(escaped) {
+  return escaped.replace(LINK_PATTERN, (match) => {
+    if (/^https?:\/\//.test(match)) {
+      return `<a class="sup-link" href="${match}" target="_blank" rel="noopener noreferrer">${match}</a>`;
+    }
+    return `<a class="sup-link" href="mailto:${match}">${match}</a>`;
+  });
+}
+
+// The day a message belongs to, and the heading that day gets. The heading
+// carries the date so the times under the bubbles do not have to: "2:33 PM"
+// under a message is only unambiguous while something above it says which day
+// that was.
+function dayKey(value) {
+  const date = new Date(value);
+  if (isNaN(date)) return '';
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function dayLabel(value) {
+  const date = new Date(value);
+  if (isNaN(date)) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function messageTime(value) {
+  const date = new Date(value);
+  if (isNaN(date)) return '';
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+// One tick is sent, two is read. Nothing in the schema records a read receipt
+// and this screen is not the place to add one — but a reply written after a
+// message is proof that somebody read it, so that is what the second tick is
+// saying, out of rows this screen already has.
+function ticksHtml(seen) {
+  return `
+    <svg class="sup-tick${seen ? ' sup-tick-seen' : ''}" viewBox="0 0 22 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="1 6.6 4.6 10.2 11.4 2.2"></polyline>
+      ${seen ? '<polyline points="9.6 10.2 16.4 2.2"></polyline>' : ''}
+    </svg>
+  `;
+}
+
 function renderMessages(root) {
-  root.querySelector('#supMessages').innerHTML = activeMessages.length
-    ? activeMessages.map((message) => {
-      const isUser = message.sender === 'user';
-      return `
-        <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'}">
-          <div class="max-w-[75%] px-[12px] py-[8px] rounded-[12px] text-[13px] ${isUser ? 'bg-[#2563EB] text-white' : 'bg-white dark:bg-[#0D1728] text-[#111827] dark:text-white'}">${escapeHtml(message.body)}</div>
-          <span class="text-[10px] text-white/70 dark:text-[#8E9CBA] mt-[3px] px-[2px]">${escapeHtml(messageTimestamp(message.created_at))}</span>
+  const list = root.querySelector('#supMessages');
+
+  if (!activeMessages.length) {
+    list.innerHTML = emptyState('No messages in this conversation yet.');
+    return;
+  }
+
+  const lastAgentAt = activeMessages.reduce((latest, message) => {
+    if (message.sender === 'user') return latest;
+    const at = new Date(message.created_at).getTime();
+    return isNaN(at) ? latest : Math.max(latest, at);
+  }, 0);
+
+  let lastDay = '';
+
+  list.innerHTML = activeMessages.map((message) => {
+    const isUser = message.sender === 'user';
+
+    const day = dayKey(message.created_at);
+    const heading = day && day !== lastDay
+      ? `<div class="sup-day"><span>${escapeHtml(dayLabel(message.created_at))}</span></div>`
+      : '';
+    if (day) lastDay = day;
+
+    const at = new Date(message.created_at).getTime();
+    const seen = isUser && !isNaN(at) && lastAgentAt > at;
+
+    return `
+      ${heading}
+      <div class="sup-msg ${isUser ? 'sup-msg-out' : 'sup-msg-in'}">
+        <div class="sup-msg-line">
+          ${isUser ? '' : '<span class="sup-avatar" aria-hidden="true">V</span>'}
+          <div class="sup-bubble">${linkify(escapeHtml(message.body))}</div>
         </div>
-      `;
-    }).join('')
-    : emptyState('No messages in this conversation yet.');
+        <div class="sup-msg-meta">
+          <span>${escapeHtml(messageTime(message.created_at))}</span>
+          ${isUser ? ticksHtml(seen) : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderComposer(root) {
@@ -523,12 +600,13 @@ async function openThread(root, ctx, thread) {
 
   root.querySelector('#supThreadSubject').textContent = thread.subject || '';
   const statusEl = root.querySelector('#supThreadStatus');
-  statusEl.className = `inline-flex items-center px-[8px] h-[20px] rounded-full text-[10px] font-bold ${statusPillClasses(thread.status)}`;
+  statusEl.className = `sup-chat-status ${statusPillClasses(thread.status)}`;
   statusEl.textContent = statusLabel(thread.status);
   root.querySelector('#supThreadCategory').textContent = categoryLabel(thread.category);
 
   root.querySelector('#supReplyInput').value = '';
   hideError(root, '#supReplyError');
+  hideAttachNote(root);
 
   showView(root, 'thread');
   renderComposer(root);
@@ -692,6 +770,13 @@ async function submitNew(root, ctx) {
 
 // ---------- Shared bits ----------
 
+// The paperclip's note. Closed again whenever a thread is opened, so it is
+// something the reader asked for rather than something waiting for them.
+function hideAttachNote(root) {
+  const note = root.querySelector('#supAttachNote');
+  if (note) note.classList.add('hidden');
+}
+
 function setBusy(root, buttonSelector, spinnerSelector, busy) {
   const btn = root.querySelector(buttonSelector);
   const spinner = root.querySelector(spinnerSelector);
@@ -817,6 +902,16 @@ export async function init(root, ctx, options) {
     if (e.key === 'Enter') { e.preventDefault(); sendReply(root, ctx); }
   });
   on(root.querySelector('#supReplySendBtn'), 'click', () => sendReply(root, ctx));
+
+  // Documents are not carried by support_messages, and adding a picker that
+  // led nowhere would be worse than the paperclip not being there at all. It
+  // says where a document does go instead — the same mailbox the home screen
+  // and the send function quote, from the same constant.
+  const attachNote = root.querySelector('#supAttachNote');
+  if (attachNote) attachNote.textContent = `To send a document, email it to ${SUPPORT_EMAIL} and mention this conversation.`;
+  on(root.querySelector('#supAttachBtn'), 'click', () => {
+    if (attachNote) attachNote.classList.toggle('hidden');
+  });
 
   if (options && options.view === 'new') {
     openNew(root, options);
