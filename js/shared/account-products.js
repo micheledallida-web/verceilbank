@@ -184,6 +184,10 @@ export const EXTERNAL_ACCOUNT_ACTIVE = 'active';
 // Customer care. The same number the Support and Help Center screens print, so
 // the bank has one phone number rather than one per screen.
 export const SUPPORT_PHONE = '+18572087394';
+// The mailbox the support functions send to, and the one a customer writes to
+// directly. One constant so the screen, the footer and the edge function
+// cannot end up quoting three different addresses.
+export const SUPPORT_EMAIL = 'support@verceilbank.com';
 export const SUPPORT_PHONE_DISPLAY = '(857) 208-7394';
 export const SUPPORT_HOURS = 'Monday to Friday, 8am–9pm ET · Saturday, 9am–5pm ET';
 

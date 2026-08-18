@@ -3,7 +3,7 @@
 // back stack and swapping a hidden class is cheaper than tearing the page down
 // and refetching on every hop between them.
 
-import { SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY } from '../shared/account-products.js';
+import { SUPPORT_PHONE, SUPPORT_PHONE_DISPLAY, SUPPORT_EMAIL } from '../shared/account-products.js';
 
 // The categories the support_threads table accepts, paired with something a
 // person would actually recognise. This is the only place the mapping lives.
@@ -31,36 +31,106 @@ const SUPPORT_CATEGORIES = [
 // Each topic is a shortcut into the new-message form with the category and
 // subject already filled in, so the common cases never make anyone read the
 // category list. Icons are stroke SVGs matching the rest of the app.
+//
+// `group` decides which list a row appears under. The funding rows also carry
+// a `body`, which is what the Fund account screen has always done: those
+// details are issued per request, so the row's whole job is to open a message
+// that already says what is being asked for. That shortcut used to exist only
+// on the funding screen, which meant somebody who came to Support to ask the
+// same question had to write it themselves — and the ones who did are the
+// threads sitting in this project's database.
 const SUPPORT_TOPICS = [
   {
     label: 'Cards & PINs',
+    group: 'common',
     category: 'card_application',
     icon: '<rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M2 10h20"></path><path d="M6 15h4"></path>',
   },
   {
     label: 'Disputes',
+    group: 'common',
     category: 'disputes',
     icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path>',
   },
   {
     label: 'Transfers',
+    group: 'common',
     category: 'funding_ach',
     icon: '<path d="M7 7h11m0 0-4-4m4 4-4 4"></path><path d="M17 17H6m0 0 4 4m-4-4 4-4"></path>',
   },
   {
     label: 'Statements',
+    group: 'common',
     category: 'general',
     icon: '<path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path><path d="M9 9h6M9 13h6M9 17h4"></path>',
   },
   {
     label: 'Account access',
+    group: 'common',
     category: 'account_access',
     icon: '<rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path>',
   },
   {
     label: 'Fees',
+    group: 'common',
     category: 'general',
     icon: '<path d="M19 5 5 19"></path><circle cx="7.5" cy="7.5" r="2.5"></circle><circle cx="16.5" cy="16.5" r="2.5"></circle>',
+  },
+  // Categories the rest of the app files messages under, which had no way in
+  // from this screen — somebody asking about a joint owner or a rollover had
+  // to find the category list themselves.
+  {
+    label: 'Joint account ownership',
+    group: 'common',
+    category: 'account_ownership',
+    icon: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+  },
+  {
+    label: 'Investments',
+    group: 'common',
+    category: 'investments',
+    icon: '<path d="M3 17l6-6 4 4 7-7"></path><path d="M14 8h6v6"></path>',
+  },
+  {
+    label: 'Personal details',
+    group: 'common',
+    category: 'personal_details',
+    icon: '<circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path>',
+  },
+  // The funding rows. Same shortcut the Fund account screen offers, and the
+  // same wording, so a request that arrives from here is indistinguishable
+  // from one that arrives from there.
+  {
+    label: 'Fund by Zelle',
+    group: 'funding',
+    category: 'funding_zelle',
+    subject: 'Zelle funding request',
+    body: 'I would like to fund my account via Zelle. Please send me the details.',
+    icon: '<path d="M12 2v20"></path><path d="M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>',
+  },
+  {
+    label: 'Fund by Cash App',
+    group: 'funding',
+    category: 'funding_cashapp',
+    subject: 'Cash App funding request',
+    body: 'I would like to fund my account via Cash App. Please send me the details.',
+    icon: '<rect x="3" y="3" width="18" height="18" rx="5"></rect><path d="M14 9.5a3 3 0 0 0-4.5 2c0 2.5 5 1.5 5 4a3 3 0 0 1-4.5 2"></path><path d="M12 7v10"></path>',
+  },
+  {
+    label: 'Fund by PayPal',
+    group: 'funding',
+    category: 'funding_paypal',
+    subject: 'PayPal funding request',
+    body: 'I would like to fund my account via PayPal. Please send me the details.',
+    icon: '<path d="M3 7a2 2 0 0 1 2-2h11"></path><rect x="3" y="7" width="18" height="12" rx="2"></rect><circle cx="16.5" cy="13" r="1.3"></circle>',
+  },
+  {
+    label: 'Fund by ACH transfer',
+    group: 'funding',
+    category: 'funding_ach',
+    subject: 'ACH funding request',
+    body: 'I would like to fund my account via ACH transfer. Please send me the details.',
+    icon: '<path d="M3 10 12 4l9 6"></path><path d="M5 10v9"></path><path d="M19 10v9"></path><path d="M9 10v9"></path><path d="M15 10v9"></path><path d="M3 21h18"></path>',
   },
 ];
 
@@ -214,24 +284,38 @@ function showView(root, name) {
 
 // Flat rows on the page background, divided by a hairline — the same row the
 // rest of this screen uses. No card, no container.
-function renderTopics(root) {
-  const list = root.querySelector('#supTopics');
-  const empty = root.querySelector('#supTopicsEmpty');
-  const needle = topicFilter.trim().toLowerCase();
-  const matches = needle
-    ? SUPPORT_TOPICS.filter((topic) => topic.label.toLowerCase().includes(needle))
-    : SUPPORT_TOPICS;
-
-  list.innerHTML = matches.map((topic) => `
+// One row template, two lists. Funding and everything else are separated
+// because they are different questions — "send me the details so I can pay in"
+// against "something is wrong with my account" — and a single run of thirteen
+// rows buries both.
+function topicRowHtml(topic) {
+  return `
     <button type="button" class="sup-topic w-full flex items-center gap-[12px] px-[12px] py-[14px] text-left cursor-pointer border-b border-white/15 dark:border-white/[0.08]" data-label="${escapeHtml(topic.label)}">
       <svg class="w-[20px] h-[20px] text-white/80 dark:text-[#8E9CBA] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${topic.icon}</svg>
       <span class="flex-1 min-w-0 text-[15px] font-medium text-white truncate">${escapeHtml(topic.label)}</span>
       <svg class="w-[16px] h-[16px] text-white/60 dark:text-[#52607D] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
     </button>
-  `).join('');
+  `;
+}
 
-  list.classList.toggle('hidden', !matches.length);
-  empty.classList.toggle('hidden', !!matches.length);
+function renderTopics(root) {
+  const needle = topicFilter.trim().toLowerCase();
+  const matches = (topic) => !needle || topic.label.toLowerCase().includes(needle);
+
+  const funding = SUPPORT_TOPICS.filter((topic) => topic.group === 'funding' && matches(topic));
+  const common = SUPPORT_TOPICS.filter((topic) => topic.group !== 'funding' && matches(topic));
+
+  // A heading with nothing under it reads as a list that failed to load, so
+  // each one is hidden along with its rows when the search excludes them all.
+  root.querySelector('#supFunding').innerHTML = funding.map(topicRowHtml).join('');
+  root.querySelector('#supFundingHead').classList.toggle('hidden', !funding.length);
+  root.querySelector('#supFunding').classList.toggle('hidden', !funding.length);
+
+  root.querySelector('#supTopics').innerHTML = common.map(topicRowHtml).join('');
+  root.querySelector('#supTopicsHead').classList.toggle('hidden', !common.length);
+  root.querySelector('#supTopics').classList.toggle('hidden', !common.length);
+
+  root.querySelector('#supTopicsEmpty').classList.toggle('hidden', !!(funding.length || common.length));
 }
 
 // The home row summarises the inbox: what the last conversation was about, and
@@ -639,6 +723,13 @@ export async function init(root, ctx, options) {
   if (callBtn) callBtn.setAttribute('href', `tel:${SUPPORT_PHONE}`);
   if (callNumber) callNumber.textContent = SUPPORT_PHONE_DISPLAY;
 
+  // Same treatment for the mailbox: one constant, so this screen cannot come
+  // to quote a different address from the footer or the function that sends.
+  const emailBtn = root.querySelector('#spEmailBtn');
+  const emailAddress = root.querySelector('#spEmailAddress');
+  if (emailBtn) emailBtn.setAttribute('href', `mailto:${SUPPORT_EMAIL}`);
+  if (emailAddress) emailAddress.textContent = SUPPORT_EMAIL;
+
   threads = [];
   latestByThread = {};
   activeThread = null;
@@ -694,14 +785,24 @@ export async function init(root, ctx, options) {
   });
 
   // Delegated, because the rows are rebuilt every time the search changes.
-  on(root.querySelector('#supTopics'), 'click', (e) => {
+  // Delegated on both lists, because the rows are rebuilt on every search.
+  // A funding row opens the message already written, the way the Fund account
+  // screen does; the others open the form with the category chosen and the
+  // subject filled in, and leave the writing to the customer.
+  const openTopic = (e) => {
     const row = e.target.closest('.sup-topic');
     if (!row) return;
     const label = row.getAttribute('data-label');
     const topic = SUPPORT_TOPICS.find((entry) => entry.label === label);
     if (!topic) return;
-    ctx.openSupportMessage({ category: topic.category, subject: topic.label });
-  });
+    ctx.openSupportMessage({
+      category: topic.category,
+      subject: topic.subject || topic.label,
+      ...(topic.body ? { body: topic.body } : {}),
+    });
+  };
+  on(root.querySelector('#supTopics'), 'click', openTopic);
+  on(root.querySelector('#supFunding'), 'click', openTopic);
 
   on(root.querySelector('#supNewMsgBtn'), 'click', () => ctx.openSupportMessage({ category: 'general' }));
   on(root.querySelector('#supClosedNewBtn'), 'click', () => openNew(root, { category: activeThread ? activeThread.category : '' }));
