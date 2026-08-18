@@ -2453,6 +2453,200 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
 .dark .sup-chat { background: #060B14; }
 
+/* The conversation's own column — header, messages, composer — now that the
+   screen may hold a second one beside it. On a phone this is the only child
+   and the row is a column of one, which is exactly what it was before. */
+.sup-chat-main {
+  flex: 1 1 auto;
+  /* Or a long conversation refuses to shrink and pushes the composer off the
+     bottom, the same way the message list would without it. */
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- the rail ----
+   The list of conversations, kept beside the open one. It exists only where
+   there is room for two columns; below that the list is its own view and this
+   is not drawn at all. */
+.sup-rail {
+  display: none;
+  flex: 0 0 var(--sup-rail, 320px);
+  width: var(--sup-rail, 320px);
+  min-height: 0;
+  flex-direction: column;
+  padding: 16px 12px;
+  gap: 12px;
+  border-right: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.dark .sup-rail { border-right-color: rgba(255, 255, 255, 0.06); }
+
+.sup-rail-new {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 46px;
+  border: none;
+  border-radius: 14px;
+  background: #1D61F2;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sup-rail-new svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* The rail scrolls on its own. A long history must not take the conversation
+   beside it with it. */
+.sup-rail-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sup-rail-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 12px;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.07);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.dark .sup-rail-row { border-bottom-color: rgba(255, 255, 255, 0.06); }
+
+/* The one being read. It is the only row that is a shape rather than a line in
+   a list, which is what tells you where you are without reading anything. */
+.sup-rail-row-on {
+  background: #E7EEFE;
+  border-bottom-color: transparent;
+  border-radius: 14px;
+}
+
+.dark .sup-rail-row-on { background: rgba(255, 255, 255, 0.07); }
+
+.sup-rail-row-in {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sup-rail-t {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sup-rail-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #1D61F2;
+}
+
+.sup-rail-subj {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark .sup-rail-subj { color: #FFFFFF; }
+
+.sup-rail-meta,
+.sup-rail-when {
+  font-size: 12px;
+  color: #6B7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark .sup-rail-meta,
+.dark .sup-rail-when { color: #8E9CBA; }
+
+.sup-rail-go {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: #9CA3AF;
+  opacity: 0;
+}
+
+.sup-rail-row-on .sup-rail-go { opacity: 1; color: #1D61F2; }
+
+.sup-rail-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: #6B7280;
+}
+
+.dark .sup-rail-empty { color: #8E9CBA; }
+
+/* The same sentence the composer ends on, said once for the whole screen
+   rather than per conversation. */
+.sup-rail-note {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(29, 97, 242, 0.07);
+}
+
+.dark .sup-rail-note { background: rgba(255, 255, 255, 0.05); }
+
+.sup-rail-note svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: #1D61F2;
+}
+
+.dark .sup-rail-note svg { color: #3B82F6; }
+
+.sup-rail-note-t {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dark .sup-rail-note-t { color: #FFFFFF; }
+
+.sup-rail-note-d {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6B7280;
+}
+
+.dark .sup-rail-note-d { color: #8E9CBA; }
+
 /* ---- the header band ---- */
 /* Sticky rather than fixed: it belongs to this screen, so it scrolls in and out
    with the view being swapped rather than needing to be toggled separately the
@@ -3124,6 +3318,29 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   :root {
     --screen-top: 96px;
     --screen-bottom: 0px;
+    /* The rail's width. A list of subjects and dates, at the width the app
+       already gives a column of rows — wide enough for a subject, narrow
+       enough that the conversation keeps the screen. */
+    --sup-rail: 320px;
+  }
+
+  /* Two columns: the conversations on the left, the open one on the right.
+     The conversation's own rows keep --page-col inside whatever is left, so a
+     line of a reply is still a line rather than a ribbon across a television. */
+  .sup-chat { flex-direction: row; }
+
+  .sup-rail { display: flex; }
+
+  /* The conversation's rows keep the column width the app gives every screen,
+     but they start at the rail rather than in the middle of what is left.
+     Centred, they left a band of empty surface between the list and the first
+     thing in the conversation, and the back arrow — the control that undoes
+     the list — sat two hundred pixels away from it. */
+  .sup-chat-main .sup-chat-head-in,
+  .sup-chat-main .sup-chat-body,
+  .sup-chat-main .sup-composer-in {
+    margin-left: 0;
+    margin-right: auto;
   }
 }
 
