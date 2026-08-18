@@ -107,10 +107,25 @@ function preview(body) {
 // and forget on purpose: the message is already saved by the time this runs, so
 // a mail outage must never surface to the user as a failed send. It is logged
 // and nothing else.
+// Which deployed function to call.
+//
+// It is `support-notify` unless something says otherwise, because that is what
+// the function is called in this repository and what the setup docs deploy.
+// The override exists because the name is not always the deployer's to choose:
+// Supabase's dashboard editor generates a name of its own, and a project that
+// took that name had an app calling one thing and a function answering to
+// another — a 404 the app is deliberately built not to notice, so every
+// notification went nowhere while every message saved perfectly.
+//
+// Set SUPPORT_NOTIFY_FUNCTION in the build environment to point at whatever
+// the function is actually called. Renaming it properly later needs no code
+// change either: clear the variable and the default is right again.
+const NOTIFY_FUNCTION = (typeof window !== 'undefined' && window.SUPPORT_NOTIFY_FUNCTION) || 'support-notify';
+
 function notifySupportInbox(ctx, threadId, messageId) {
   if (!ctx.supabaseClient || !ctx.supabaseClient.functions || !threadId || !messageId) return;
   ctx.supabaseClient.functions
-    .invoke('support-notify', { body: { thread_id: threadId, message_id: messageId } })
+    .invoke(NOTIFY_FUNCTION, { body: { thread_id: threadId, message_id: messageId } })
     .then(({ error }) => { if (error) reportNotifyFailure(error); })
     .catch((err) => reportNotifyFailure(err));
 }
