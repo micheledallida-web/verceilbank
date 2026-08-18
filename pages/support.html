@@ -103,49 +103,75 @@
   </div>
 
   <!-- ============================ VIEW 2: THREAD DETAIL ============================ -->
-  <div id="supThreadView" class="hidden w-full max-w-[430px] mx-auto px-[16px] pt-[14px] pb-[140px]">
+  <!-- A conversation, drawn the way a conversation is drawn: a header band that
+       stays put while the exchange scrolls under it, the messages on their own
+       light surface rather than on the blue of the screen behind them, and the
+       composer pinned above the navigation bar instead of over it.
 
-    <div class="flex items-center gap-3 mb-[10px]">
-      <button data-action="sup-back" class="w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Back">
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-      </button>
-      <div id="supThreadSubject" class="text-[20px] font-bold text-white truncate flex-1 min-w-0"></div>
-      <!-- Message history. A screen you can reach on purpose, rather than by
-           guessing how many times to press back. It carries the unread count
-           so the way in is also the thing that tells you there is something
-           waiting. -->
-      <button data-action="sup-history" class="sup-history-btn relative w-[40px] h-[40px] rounded-full bg-white dark:bg-[#0D1728] border border-transparent dark:border-white/[0.06] flex items-center justify-center text-[#111827] dark:text-white shadow-lg cursor-pointer flex-shrink-0" aria-label="Message history" title="Message history">
-        <svg class="w-[19px] h-[19px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v5h5"></path>
-          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
-          <polyline points="12 7 12 12 15 14"></polyline>
-        </svg>
-        <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
-      </button>
+       Nothing here changes what is read or written — the same elements, the same
+       ids, the same queries behind them. -->
+  <div id="supThreadView" class="hidden sup-chat">
+
+    <div class="sup-chat-head">
+      <div class="sup-chat-head-in">
+
+        <div class="sup-chat-head-row">
+          <button data-action="sup-back" class="sup-chat-icon" aria-label="Back">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div id="supThreadSubject" class="sup-chat-title"></div>
+          <!-- Message history. A screen you can reach on purpose, rather than by
+               guessing how many times to press back. It carries the unread count
+               so the way in is also the thing that tells you there is something
+               waiting. -->
+          <button data-action="sup-history" class="sup-history-btn sup-chat-icon" aria-label="Message history" title="Message history">
+            <svg class="w-[19px] h-[19px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v5h5"></path>
+              <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+              <polyline points="12 7 12 12 15 14"></polyline>
+            </svg>
+            <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
+          </button>
+        </div>
+
+        <div class="sup-chat-sub">
+          <span id="supThreadStatus" class="sup-chat-status"></span>
+          <span id="supThreadCategory" class="sup-chat-cat"></span>
+        </div>
+
+      </div>
     </div>
 
-    <div class="flex items-center gap-[8px] mb-[14px] px-[2px]">
-      <span id="supThreadStatus" class="inline-flex items-center px-[8px] h-[20px] rounded-full text-[10px] font-bold"></span>
-      <span id="supThreadCategory" class="text-[12px] text-white/75 dark:text-[#8E9CBA] truncate"></span>
+    <div class="sup-chat-body">
+      <div id="supMessages" class="sup-chat-msgs"></div>
     </div>
-
-    <div id="supMessages" class="flex flex-col gap-[12px]"></div>
 
   </div>
 
   <!-- Reply composer. Fixed to the bottom of the screen so it stays put while the
        conversation scrolls behind it; shown and hidden with the thread view. -->
-  <!-- Above the bottom navigation, not under it. At z-41 the nav bar was
-       painted over the reply box, so the one control this screen exists for
-       was half covered by tabs. -->
-  <div id="supComposer" class="hidden fixed bottom-0 left-0 right-0 z-[51] bg-white dark:bg-[#0D1728] border-t border-gray-100 dark:border-white/[0.06]">
-    <div class="w-full max-w-[430px] mx-auto px-[16px] py-[10px]">
+  <!-- Above the bottom navigation, not over it. It used to be pinned to the foot
+       of the viewport at z-41, where the nav bar painted over the reply box; then
+       at z-51, where the reply box painted over the five tabs. Sitting it on top
+       of the bar — `bottom` is the bar's own measured height — is the only
+       arrangement where both are whole. -->
+  <div id="supComposer" class="hidden fixed bottom-[var(--nav-h)] left-0 right-0 z-[51] sup-composer">
+    <div class="sup-composer-in">
 
       <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
 
-      <div id="supReplyRow" class="flex gap-[8px]">
-        <input id="supReplyInput" type="text" placeholder="Write a reply..." class="flex-1 h-[44px] px-[14px] rounded-[14px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-[13px] text-[#111827] dark:text-white placeholder-gray-400 dark:placeholder-[#52607D] outline-none">
-        <button id="supReplySendBtn" type="button" disabled class="h-[44px] px-[16px] rounded-[14px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer flex items-center justify-center gap-[8px] disabled:opacity-50">
+      <!-- Documents do not go through this table, so the paperclip says where
+           they do go rather than opening a picker that leads nowhere. -->
+      <div id="supAttachNote" class="hidden sup-attach-note"></div>
+
+      <div id="supReplyRow" class="sup-composer-row">
+        <button id="supAttachBtn" type="button" class="sup-attach" aria-label="Sending a document">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.2a3.67 3.67 0 0 1 5.18 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.6-2.59l8.5-8.49"></path>
+          </svg>
+        </button>
+        <input id="supReplyInput" type="text" placeholder="Write a secure message..." class="sup-composer-input">
+        <button id="supReplySendBtn" type="button" disabled class="sup-send">
           <span id="supReplySpinner" class="kyc-spinner hidden"></span>
           <span id="supReplyLabel">Send</span>
         </button>
@@ -154,6 +180,14 @@
       <div id="supClosedNotice" class="hidden">
         <div class="text-[13px] text-[#6B7280] dark:text-[#8E9CBA] text-center mb-[10px]">This conversation is closed.</div>
         <button id="supClosedNewBtn" type="button" class="w-full h-[42px] rounded-[12px] bg-[#2563EB] text-white text-[13px] font-semibold cursor-pointer">Start a new message</button>
+      </div>
+
+      <div class="sup-secure">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="10" width="16" height="11" rx="2.4"></rect>
+          <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+        </svg>
+        <span>Your messages are secure and encrypted.</span>
       </div>
 
     </div>

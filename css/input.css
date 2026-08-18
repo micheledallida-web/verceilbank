@@ -2403,6 +2403,401 @@ html.dark body .fund-amount-meta { border-top-color: rgba(255, 255, 255, 0.06); 
    field still reads as empty in dark mode. */
 html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
 
+/* ================= SUPPORT — THE CONVERSATION =================
+   The thread screen is the one place in the app that is a conversation rather
+   than a form, and it was drawn as a form: bubbles floating on the blue of the
+   screen behind them, a header that scrolled away, a reply box parked over the
+   navigation bar.
+
+   Here it is drawn as what it is. The header band stays put so the subject and
+   the status of the thread are readable at any point in a long exchange; the
+   exchange itself sits on its own light surface, so a bubble reads as a message
+   on a page rather than as a card floating on the app's background; and the
+   composer stands ON TOP of the bottom navigation instead of over it, so the
+   five tabs are whole while somebody is typing.
+
+   Presentation only. Every id the script reads is still here, and nothing in
+   this block knows anything about what is stored or sent. */
+.sup-chat {
+  min-height: 100%;
+  background: #F1F4F9;
+  /* The composer is fixed over the foot of this screen, so the conversation has
+     to end above it. The navigation bar's own height is already reserved by
+     #page-root; this is the composer on top of that. */
+  padding-bottom: 120px;
+}
+
+.dark .sup-chat { background: #060B14; }
+
+/* The surface, for the whole window rather than only for as far as the messages
+   reach. #page-root reserves a runway at the foot of every screen for the
+   navigation bar, and that reserved strip is the blue of the screen container —
+   which showed up as a band of blue between a short conversation and the
+   composer standing over it. This paints the conversation's own surface across
+   the viewport, behind everything in the view and above the container's
+   background, so the screen is one surface however little has been said. */
+.sup-chat::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: #F1F4F9;
+}
+
+.dark .sup-chat::before { background: #060B14; }
+
+/* ---- the header band ---- */
+/* Sticky rather than fixed: it belongs to this screen, so it scrolls in and out
+   with the view being swapped rather than needing to be toggled separately the
+   way the composer does. */
+.sup-chat-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #0B4CC2;
+  padding: 14px 0 15px;
+  box-shadow: 0 2px 12px rgba(8, 20, 50, 0.16);
+}
+
+.dark .sup-chat-head {
+  background: #060B14;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+}
+
+.sup-chat-head-in,
+.sup-chat-body,
+.sup-composer-in {
+  width: 100%;
+  max-width: var(--page-col);
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.sup-chat-head-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sup-chat-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: #FFFFFF;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(8, 20, 50, 0.18);
+}
+
+.dark .sup-chat-icon {
+  background: #0D1728;
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sup-chat-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #FFFFFF;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sup-chat-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  padding-left: 2px;
+}
+
+/* The colours come from the status itself — the same three the message list
+   uses — so only the shape of the pill is decided here. */
+.sup-chat-status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sup-chat-cat {
+  min-width: 0;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dark .sup-chat-cat { color: #8E9CBA; }
+
+/* ---- the exchange ---- */
+.sup-chat-body { padding-top: 18px; }
+
+.sup-chat-msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The date, once, over the messages it covers — which is what lets the time
+   under a bubble be just a time. */
+.sup-day {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 2px;
+}
+
+.sup-day::before,
+.sup-day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(17, 24, 39, 0.10);
+}
+
+.dark .sup-day::before,
+.dark .sup-day::after { background: rgba(255, 255, 255, 0.10); }
+
+.sup-day span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.dark .sup-day span { color: #8E9CBA; }
+
+.sup-msg { display: flex; flex-direction: column; }
+
+.sup-msg-out { align-items: flex-end; }
+.sup-msg-in { align-items: flex-start; }
+
+.sup-msg-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 80%;
+}
+
+/* The bank's mark on its own replies, so a long thread reads as two voices
+   rather than as one column of alternating colours. */
+.sup-avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #0B4CC2;
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.dark .sup-avatar { background: #1D61F2; }
+
+.sup-bubble {
+  padding: 11px 14px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  /* Paragraphs somebody typed stay paragraphs, and a long reference or address
+     wraps inside the bubble rather than widening it off the screen. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.sup-msg-out .sup-bubble {
+  background: #1D61F2;
+  color: #FFFFFF;
+  border-bottom-right-radius: 7px;
+}
+
+.sup-msg-in .sup-bubble {
+  background: #FFFFFF;
+  color: #111827;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-top-left-radius: 7px;
+}
+
+.dark .sup-msg-in .sup-bubble {
+  background: #0D1728;
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.sup-link {
+  color: #1D61F2;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sup-msg-out .sup-link {
+  color: #FFFFFF;
+  text-decoration: underline;
+}
+
+.dark .sup-msg-in .sup-link { color: #6AA0FF; }
+
+.sup-msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #6B7280;
+}
+
+.dark .sup-msg-meta { color: #8E9CBA; }
+
+/* Under the bubble, not under the avatar. */
+.sup-msg-in .sup-msg-meta { padding-left: 44px; }
+.sup-msg-out .sup-msg-meta { padding-right: 2px; }
+
+.sup-tick {
+  width: 16px;
+  height: 9px;
+  flex-shrink: 0;
+  color: #9CA3AF;
+}
+
+.sup-tick-seen { color: #1D61F2; }
+.dark .sup-tick-seen { color: #3B82F6; }
+
+/* ---- the composer ---- */
+.sup-composer {
+  background: #F1F4F9;
+  border-top: 1px solid rgba(17, 24, 39, 0.07);
+}
+
+.dark .sup-composer {
+  background: #060B14;
+  border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.sup-composer-in { padding-top: 10px; padding-bottom: 12px; }
+
+.sup-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 8px;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 6px 18px rgba(8, 20, 50, 0.08);
+}
+
+.dark .sup-composer-row {
+  background: #0D1728;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+.sup-attach {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #6B7280;
+  cursor: pointer;
+}
+
+.sup-attach svg { width: 20px; height: 20px; }
+.dark .sup-attach { color: #8E9CBA; }
+
+.sup-attach-note {
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(29, 97, 242, 0.08);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #4B5563;
+}
+
+.dark .sup-attach-note {
+  background: rgba(255, 255, 255, 0.06);
+  color: #8E9CBA;
+}
+
+.sup-composer-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  color: #111827;
+}
+
+.sup-composer-input::placeholder { color: #9CA3AF; }
+.dark .sup-composer-input { color: #FFFFFF; }
+.dark .sup-composer-input::placeholder { color: #52607D; }
+
+.sup-send {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 12px;
+  background: #1D61F2;
+  color: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sup-send:disabled { opacity: 0.5; cursor: default; }
+
+.sup-secure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 9px;
+  font-size: 11.5px;
+  color: #6B7280;
+}
+
+.sup-secure svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.dark .sup-secure { color: #8E9CBA; }
+
 /* ================= ONE COLUMN, FOUR SIZES OF SCREEN =================
    The app is a column. What changes between a phone, a tablet, a laptop and a
    television is how wide that column is allowed to get — not how the app is
@@ -2701,15 +3096,26 @@ html.dark body .fund-amount-cur.fund-amount-dim { color: #9AA4B8; }
   }
 
   /* The composer keeps the centring the narrower screens gave it; only its
-     width changes here. Without this it would snap back to the left edge. */
+     width changes here. Without this it would snap back to the left edge.
+
+     `bottom` goes back to the foot of the window as well. On a phone the
+     composer stands on top of the navigation bar, which is why it is offset by
+     that bar's measured height — but here the bar is at the TOP of the page,
+     so the same offset would leave the reply box hovering seventy-odd pixels
+     above the bottom of the screen with nothing under it. */
   #supComposer {
     left: 50%;
     right: auto;
     transform: translateX(-50%);
     width: var(--page-col);
+    bottom: 0;
     border-top-left-radius: 20px;
     border-top-right-radius: 20px;
   }
+
+  /* The conversation's own header sticks below the top bar rather than under
+     it — the same clearance #page-root gives its content. */
+  .sup-chat-head { top: 96px; }
 }
 
 /* ================= LARGE DESKTOPS AND TELEVISIONS =================
