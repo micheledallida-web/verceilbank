@@ -1520,6 +1520,43 @@ existing wrong policy cannot block a right one, unless it was written
 
 ---
 
+### 2c. Reading and answering threads from the dashboard
+
+Until the mail is deployed — and afterwards too, since the email is a copy and
+the app is the record — every conversation is readable in **SQL Editor**.
+
+Every thread, newest first, with who sent what:
+
+```sql
+select t.id as thread, t.subject, t.status, u.email,
+       m.sender, m.body, m.created_at
+  from public.support_threads t
+  join auth.users u            on u.id = t.user_id
+  join public.support_messages m on m.thread_id = t.id
+ order by t.updated_at desc, m.created_at;
+```
+
+To answer, write a message onto the thread as `support`. The `user_id` must
+stay the **customer's**, because that is what RLS reads to decide who may see
+the row — selecting it from the thread rather than typing it is what keeps that
+right:
+
+```sql
+insert into public.support_messages (thread_id, user_id, sender, body)
+select t.id, t.user_id, 'support', 'Here are the Zelle details: ...'
+  from public.support_threads t
+ where t.id = 1;          -- the thread id from the query above
+```
+
+Nothing else is needed. The `touch_support_thread` trigger moves the thread to
+**answered**, which is what puts the unread dot on it, and the customer sees
+the reply the next time the screen loads.
+
+To close a finished thread, `update public.support_threads set status =
+'closed' where id = 1;` — the composer disappears on a closed thread.
+
+---
+
 ### 3. Replying by email — not available on Namecheap
 
 Sending and receiving are separate capabilities, and Private Email only does
