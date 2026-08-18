@@ -1169,6 +1169,45 @@ The usual ones:
 | `550` / `553` | the From is not the mailbox that logged in — unset `SUPPORT_FROM`, or point it at the same address |
 | a timeout, no code | the port. See above: use 465 |
 
+### 2a. Sending messages that are already in the database
+
+A message is saved whether or not the mail goes out — the app never waits on
+the send, because a mail outage must not look to a customer like a failed send.
+The cost of that choice is that a spell of broken or unconfigured mail leaves
+real requests sitting in the database that nobody has read.
+
+`?resend=1` collects them. It reads each thread's first message and mails it to
+`SUPPORT_INBOX`, addressed exactly as the original would have been — same
+subject tag, same `Reply-To` — because both paths build the mail with the same
+function.
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify?resend=1" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+# {"resend":true,"to":"support@verceilbank.com","threads_considered":8,"sent":5,
+#  "results":[{"thread":"9daa102d-…","skipped":"no messages on this thread"}, …]}
+```
+
+| | |
+| --- | --- |
+| `?thread=<id>` | just that one |
+| `?limit=<n>` | how many threads to consider, oldest first. Default 25, hard cap 100 |
+
+It takes the **service role key**, and it only ever sends to `SUPPORT_INBOX` —
+the destination comes from config and can never be passed in. Both halves
+matter for the same reasons they matter on `?test=1`: without the first, anyone
+who found the URL could make the mailbox send on demand; without the second,
+this would be an open relay with a database of real customers behind it.
+
+A thread with no messages is skipped and said so. The app writes the thread
+before its first message, so an empty one is a send that failed rather than a
+request somebody made — there is nothing in it to forward.
+
+This does not mail the customer. Nothing in this project does: `support-notify`
+mails *into* the support inbox, and a reply written onto a thread is seen when
+that customer next opens the app. If somebody has been waiting hours, write to
+them from the mailbox by hand as well.
+
 ### 2b. "Could not send your message" with code 42501
 
 `42501` is Postgres `insufficient_privilege` — RLS refused the write. The mail
