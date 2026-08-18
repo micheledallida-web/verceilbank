@@ -33,6 +33,7 @@ declare
   n         bigint;
   m         bigint;
   seen      timestamptz;
+  txt       text;
 begin
   -- ---- the two tables -------------------------------------------------------
   part := 'table support_threads';
@@ -104,6 +105,46 @@ begin
     return next;
   end if;
 
+  -- The words these two columns accept, against the words the code writes.
+  -- A constraint that forbids one of them does not fail loudly: the app keys
+  -- its unread dot on status = 'answered', so a schema without that value
+  -- simply never shows one, and support-inbound writes sender = 'support', so
+  -- a schema without that value refuses every arriving email. Both look like
+  -- nothing happening rather than like an error.
+  if threads is not null then
+    select pg_get_constraintdef(oid) into txt from pg_constraint
+     where conrelid = threads and contype = 'c' and conname like '%status%';
+    part := 'status accepts answered';
+    if txt is null then
+      status := 'info'; detail := 'no check constraint on status — nothing to forbid it';
+    elsif position('answered' in txt) > 0 then
+      status := 'ok'; detail := 'the unread dot and the tab count can work';
+    else
+      status := 'missing';
+      detail := 'status is limited to ' || txt
+                || ' — the app keys its unread dot on answered, so a reply will never be flagged, '
+                || 'and the touch_support_thread trigger cannot write it';
+    end if;
+    return next;
+  end if;
+
+  if messages is not null then
+    select pg_get_constraintdef(oid) into txt from pg_constraint
+     where conrelid = messages and contype = 'c' and conname like '%sender%';
+    part := 'sender accepts support';
+    if txt is null then
+      status := 'info'; detail := 'no check constraint on sender — nothing to forbid it';
+    elsif position('support' in txt) > 0 then
+      status := 'ok'; detail := 'the bank can write a reply, and support-inbound can too';
+    else
+      status := 'missing';
+      detail := 'sender is limited to ' || txt
+                || ' — support-inbound writes ''support'' and would be refused. The app itself is '
+                || 'indifferent: it renders anything that is not ''user'' as the bank';
+    end if;
+    return next;
+  end if;
+
   part := 'indexes';
   select count(*) into n from pg_indexes
    where schemaname = 'public'
@@ -128,8 +169,13 @@ begin
   end if;
 
   if messages is not null then
+    -- Anything that is not the customer is the bank. Which word a schema uses
+    -- for that — 'support', 'agent' — is not something this should assume: the
+    -- first version of this file counted sender = 'support' and would have
+    -- reported a schema that says 'agent' as having no replies at all, on a
+    -- day when the whole question was whether replies were getting through.
     execute 'select count(*) from public.support_messages where sender = ''user''' into n;
-    execute 'select count(*), max(created_at) from public.support_messages where sender = ''support''' into m, seen;
+    execute 'select count(*), max(created_at) from public.support_messages where sender <> ''user''' into m, seen;
     part := 'messages';
     status := 'info';
     detail := n || ' from customers, ' || m || ' from the bank'
@@ -171,7 +217,7 @@ begin
         from public.support_threads t
        where t.status = 'open'
          and not exists (select 1 from public.support_messages m
-                          where m.thread_id = t.id and m.sender = 'support')
+                          where m.thread_id = t.id and m.sender <> 'user')
     $q$ into n, seen;
     if n > 0 then
       part := 'waiting on the bank';
