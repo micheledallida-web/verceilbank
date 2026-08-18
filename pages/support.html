@@ -145,18 +145,6 @@
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           <div id="supThreadSubject" class="sup-chat-title"></div>
-          <!-- Message history. A screen you can reach on purpose, rather than by
-               guessing how many times to press back. It carries the unread count
-               so the way in is also the thing that tells you there is something
-               waiting. -->
-          <button data-action="sup-history" class="sup-history-btn sup-chat-icon" aria-label="Message history" title="Message history">
-            <svg class="w-[19px] h-[19px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 3v5h5"></path>
-              <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
-              <polyline points="12 7 12 12 15 14"></polyline>
-            </svg>
-            <span class="sup-history-dot hidden absolute top-[-3px] right-[-3px] min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
-          </button>
           <button data-action="close" class="sup-chat-icon" aria-label="Close support">
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
           </button>
@@ -168,6 +156,23 @@
         </div>
 
       </div>
+    </div>
+
+    <!-- Message history. A screen you can reach on purpose, rather than by
+         guessing how many times to press back. It says what it is: a clock and
+         the word, on the conversation's own surface, where a round icon in the
+         header band was one more symbol to decode. It carries the unread count
+         so the way in is also the thing that says there is something waiting. -->
+    <div class="sup-histbar">
+      <button data-action="sup-history" class="sup-history-btn sup-hist" title="Message history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v5h5"></path>
+          <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"></path>
+          <polyline points="12 7 12 12 15 14"></polyline>
+        </svg>
+        <span>History</span>
+        <span class="sup-history-dot hidden min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2563EB] text-white text-[10px] font-bold items-center justify-center leading-none"></span>
+      </button>
     </div>
 
     <div class="sup-chat-body">
@@ -185,12 +190,25 @@
 
         <div id="supReplyError" class="hidden text-[12px] font-medium text-[#EF4444] mb-[8px]"></div>
 
-        <!-- Documents do not go through this table, so the paperclip says where
-             they do go rather than opening a picker that leads nowhere. -->
-        <div id="supAttachNote" class="hidden sup-attach-note"></div>
+        <!-- The file waiting to go with the next reply. Chosen, shown, and
+             removable before anything is uploaded: nothing reaches the bucket
+             until Send is pressed. -->
+        <input id="supAttachInput" type="file" class="hidden" accept="image/*,application/pdf,.pdf,.doc,.docx,.txt,.csv,.heic,.heif">
+
+        <div id="supAttachChip" class="hidden sup-att-chip">
+          <svg class="sup-att-chip-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 3h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"></path>
+            <path d="M14 3v4h4"></path>
+          </svg>
+          <span id="supAttachName" class="sup-att-chip-n"></span>
+          <span id="supAttachSize" class="sup-att-chip-s"></span>
+          <button id="supAttachClear" type="button" class="sup-att-x" aria-label="Remove file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+          </button>
+        </div>
 
         <div id="supReplyRow" class="sup-composer-row">
-          <button id="supAttachBtn" type="button" class="sup-attach" aria-label="Sending a document">
+          <button id="supAttachBtn" type="button" class="sup-attach" aria-label="Attach a file">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.2a3.67 3.67 0 0 1 5.18 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.6-2.59l8.5-8.49"></path>
             </svg>
