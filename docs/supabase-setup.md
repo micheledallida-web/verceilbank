@@ -1435,6 +1435,29 @@ curl "$SUPABASE_URL/functions/v1/support-notify?verify=1" -H "Authorization: Bea
 # {"smtp_login":"failed","smtp_code":535,"smtp_message":"535 Incorrect authentication data"}
 ```
 
+Once that says `ok`, send a real one. This posts an actual email to
+`SUPPORT_INBOX`, which is the only thing that proves delivery rather than
+login:
+
+```bash
+curl "$SUPABASE_URL/functions/v1/support-notify?test=1" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"
+# {"smtp_login":"ok","test_send":"accepted","test_send_to":"you@yourbusiness.com"}
+```
+
+It takes the **service role key**, not the anon key, and it always sends to
+`SUPPORT_INBOX` — the destination comes from config and can never be passed in.
+Anything less would leave a URL that makes the mailbox send on demand for
+anyone who finds it.
+
+Note that `POST` cannot be used as a mail test, whatever payload you give it.
+It takes `thread_id` and `message_id` for rows that already exist and reads the
+message out of the database, and it wants the access token of the customer who
+owns the thread — an anon key is not a signed-in user, so it is turned away
+with `401` before any mail is attempted. That is correct for the send path and
+useless for "does mail work at all", which is what `?verify=1` and `?test=1`
+are for.
+
 When a send fails, the response carries what the mail server said:
 
 ```json
@@ -1567,7 +1590,7 @@ Never put the service key in these variables.
 - [ ] Both tables added to the `supabase_realtime` publication (section 3)
 - [ ] Identity freeze trigger installed on `user_profile` (section 4)
 - [ ] `support_threads` and `support_messages` created, RLS on both (section 5i)
-- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox and `SUPPORT_INBOX` set to your business email — check with `?verify=1` (section 5i)
+- [ ] `support-notify` deployed with `SMTP_USER`/`SMTP_PASSWORD` for the Namecheap mailbox and `SUPPORT_INBOX` set to your business email — confirmed with `?test=1` landing a mail in that inbox (section 5i)
 - [ ] Address / SSN-last-4 columns added if you want them off metadata (section 5)
 - [ ] `user_profile` unique constraint, columns and RLS policies (section 5b) — **this is what makes address, phone and email saves work**
 - [ ] Balance triggers installed on `transactions` (section 5c) — **the most important one left**

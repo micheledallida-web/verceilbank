@@ -10,7 +10,7 @@
 // look to the user like a failed send.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
-import { readSmtpSettings, sendMail, verifySmtp } from '../_shared/mailer.ts';
+import { readSmtpSettings, sendMail, verifySmtp, type SendResult } from '../_shared/mailer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,6 +55,15 @@ function replyToAddress(inbound: string, threadId: string) {
   return `${local}+${threadId}@${domain}`;
 }
 
+// Compared without an early exit, so the response time does not leak how much
+// of the key was right.
+function secretMatches(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST' && req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -81,11 +90,48 @@ Deno.serve(async (req) => {
   // GET is a config check, so "is this deployed, and is it configured?" can be
   // answered by opening the URL — without sending a message to find out. It
   // reports only whether each setting is present, never what it is set to.
-  // ?verify=1 goes further and logs in to the mailbox, which is the only way to
-  // tell a wrong password apart from a message that was accepted and then lost.
+  //
+  // ?verify=1 logs in to the mailbox, which is the only way to tell a wrong
+  // password apart from a message that was accepted and then lost. ?test=1
+  // goes all the way and posts a real email, because a login that succeeds
+  // still does not prove delivery.
+  //
+  // The POST path cannot stand in for either of these. It reads the message
+  // out of the database rather than taking it from the caller, so it needs a
+  // thread and a message that already exist, and it needs the access token of
+  // the customer who owns them — an anon key is not a signed-in user and is
+  // turned away before any mail is attempted. That is the right behaviour for
+  // the send path and a poor way to ask "does mail work at all", which is what
+  // these two answer.
   if (req.method === 'GET') {
-    const wantsVerify = new URL(req.url).searchParams.get('verify') === '1';
+    const params = new URL(req.url).searchParams;
+    const wantsTest = params.get('test') === '1';
+    const wantsVerify = params.get('verify') === '1' || wantsTest;
+
+    // A test send is gated on the service role key, and goes only ever to
+    // SUPPORT_INBOX — the destination comes from config, never from the
+    // request. Both halves matter: without the first, anyone who found the URL
+    // could make the mailbox send on demand; without the second, this would be
+    // an open relay pointed at whatever address a stranger passed in.
+    if (wantsTest) {
+      const supplied = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+      if (!SERVICE_KEY || !secretMatches(supplied, SERVICE_KEY)) {
+        return json({ error: 'A test send needs the service role key' }, 401);
+      }
+    }
+
     const check = wantsVerify && settings ? await verifySmtp(settings) : null;
+
+    let testSend: SendResult | null = null;
+    if (wantsTest && settings && SUPPORT_INBOX && check?.ok) {
+      testSend = await sendMail(settings, {
+        to: SUPPORT_INBOX,
+        subject: 'Verceil Bank — support mail test',
+        html: '<p>If this arrived, support-notify can send mail.</p>',
+        text: 'If this arrived, support-notify can send mail.',
+      });
+    }
+
     return json({
       function: 'support-notify',
       deployed: true,
@@ -97,6 +143,11 @@ Deno.serve(async (req) => {
         ? check.ok
           ? { smtp_login: 'ok' }
           : { smtp_login: 'failed', smtp_code: check.code, smtp_message: check.message }
+        : {}),
+      ...(testSend
+        ? testSend.ok
+          ? { test_send: 'accepted', test_send_to: SUPPORT_INBOX }
+          : { test_send: 'failed', smtp_code: testSend.code, smtp_message: testSend.message }
         : {}),
     });
   }
