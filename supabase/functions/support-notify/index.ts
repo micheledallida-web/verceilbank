@@ -55,6 +55,23 @@ function replyToAddress(inbound: string, threadId: string) {
   return `${local}+${threadId}@${domain}`;
 }
 
+// Reads the `role` claim out of a JWT without verifying it. This is only ever
+// used to write a better error message — never to decide whether a caller is
+// allowed in. That decision stays with getUser(), which checks the signature.
+// An unverified claim is fine for "what did you probably mean to send"; it
+// would be a hole for "may you do this".
+function tokenRole(jwt: string) {
+  try {
+    const payload = jwt.split('.')[1];
+    if (!payload) return '';
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/')
+      .padEnd(payload.length + ((4 - (payload.length % 4)) % 4), '=');
+    return String(JSON.parse(atob(padded))?.role ?? '');
+  } catch {
+    return '';
+  }
+}
+
 // Compared without an early exit, so the response time does not leak how much
 // of the key was right.
 function secretMatches(a: string, b: string) {
@@ -169,7 +186,22 @@ Deno.serve(async (req) => {
 
     const anon = createClient(SUPABASE_URL, ANON_KEY);
     const { data: userData, error: userError } = await anon.auth.getUser(jwt);
-    if (userError || !userData?.user) return json({ error: 'Not signed in' }, 401);
+    if (userError || !userData?.user) {
+      // A project key is the thing people reach for first, and both of them
+      // land here looking exactly like an expired token. They are not weaker
+      // credentials than a customer's — they are not a customer at all, which
+      // is what this asks for, so saying "not signed in" sends the reader off
+      // to check their session instead of their header.
+      const role = tokenRole(jwt);
+      if (role === 'anon' || role === 'service_role') {
+        return json({
+          error: `That is the ${role} key, not a signed-in customer's access token`,
+          detail: 'This endpoint emails one customer\'s own message, so it needs that customer. A project key is not a user and has no thread to send.',
+          hint: 'To check mail instead, GET this URL with ?test=1 and the service role key.',
+        }, 401);
+      }
+      return json({ error: 'Not signed in' }, 401);
+    }
     const user = userData.user;
 
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);

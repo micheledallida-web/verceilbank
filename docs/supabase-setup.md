@@ -1450,6 +1450,12 @@ It takes the **service role key**, not the anon key, and it always sends to
 Anything less would leave a URL that makes the mailbox send on demand for
 anyone who finds it.
 
+Neither project key works on `POST`, and this catches people out: the anon key
+and the **service role key** both come back `401`. Service role bypasses RLS,
+but this path is not gated on RLS — it asks which customer is sending, and a
+project key is not a customer. It needs the access token of a signed-in user.
+The `401` now says which key it was given rather than a flat "not signed in".
+
 Note that `POST` cannot be used as a mail test, whatever payload you give it.
 It takes `thread_id` and `message_id` for rows that already exist and reads the
 message out of the database, and it wants the access token of the customer who
