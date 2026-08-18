@@ -1326,32 +1326,64 @@ thread.
 
 ---
 
-### 3. Replying by email — not available on Namecheap
+### 3. Replying by email — Resend for inbound, Namecheap for outbound
 
-Sending and receiving are separate capabilities, and Private Email only does
-the first. Turning a reply into a message in the customer's app needs a
-provider that **posts arriving mail to a webhook** (Resend, Mailgun, SendGrid
-and Postmark all do; a mailbox does not). Namecheap has no such hook, so there
-is nothing to point at `support-inbound` while it is the only mail account.
+Sending and receiving are separate capabilities and Namecheap Private Email
+only does the first: a mailbox has no way to hand an arriving message to a URL.
+Turning a reply into a message in the customer's app needs a provider that
+posts inbound mail to a webhook, so the two halves are split — Namecheap keeps
+sending, because that already works and its From is the bank's own address, and
+Resend receives.
 
-**Leave `SUPPORT_INBOUND_ADDRESS` unset.** That is the correct state, not a
-missing step: the outbound mail then drops its `Reply-To` and its footer says
-to answer from the Supabase dashboard, instead of inviting a reply that would
-silently go nowhere. Answer threads from the dashboard, or from the app.
+Nothing needs to move for that. The outbound mail simply gains a `Reply-To` at
+the receiving domain, with the thread id as a plus tag.
 
-If you later add a provider that does inbound parsing, `support-inbound` is
-already written for it:
+**The status constraint first.** `support-inbound` sets a thread to `answered`,
+so a schema that does not allow that value accepts the email and then refuses
+it at the last step:
+
+```sql
+select pg_get_constraintdef(oid) from pg_constraint
+ where conrelid = 'public.support_threads'::regclass and conname like '%status%';
+-- must include 'answered'; section 5i above has the migration if it does not
+```
+
+**Deploy it with JWT verification off.** Resend has no Supabase session, so with
+verification on the gateway answers 401 before the function runs. What guards
+the endpoint instead is a secret in its URL — anything that can post here can
+write messages a customer reads as coming from their bank.
 
 ```bash
-supabase functions deploy support-inbound
+supabase functions deploy support-inbound --no-verify-jwt
 supabase secrets set \
-  SUPPORT_INBOUND_ADDRESS=support@verceilbank.com \
+  SUPPORT_INBOUND_ADDRESS=support@<your-domain> \
   SUPPORT_INBOUND_SECRET=$(openssl rand -hex 24)
 ```
 
-Then point that provider's inbound webhook at the function URL and include the
-secret — it is what stops anyone who finds the URL from writing messages into a
-customer's conversation as the bank.
+From the dashboard: deploy via the editor, then turn off **Enforce JWT
+verification** on the function's settings page.
+
+Then point the provider's inbound route at the function, secret included:
+
+```
+https://<project>.supabase.co/functions/v1/support-inbound?token=<the secret>
+```
+
+**Use a subdomain if you verify your own domain.** Inbound needs MX records
+pointed at the receiving provider, and the root domain's MX are what deliver to
+the Namecheap mailbox. Repointing those kills the mailbox that sends. A
+subdomain — `reply.example.com` — gets its own MX and leaves it alone. A
+provider's own onboarding domain avoids the question entirely.
+
+With `SUPPORT_INBOUND_ADDRESS` set, `support-notify` puts
+`Reply-To: support+<thread-id>@<domain>` on every notification and its footer
+changes from "answer from the dashboard" to "reply to this email". Nothing is
+asked of whoever answers: they hit reply, and the plus tag says which
+conversation it belongs to. If a client strips it, the `[VB-<id>]` subject tag
+is the fallback.
+
+Left unset, none of this happens and the mail says to answer from the
+dashboard, which is the honest state rather than a missing step.
 
 ### 4. Check it end to end
 

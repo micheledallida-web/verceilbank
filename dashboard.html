@@ -814,7 +814,14 @@
   </div>
 
   <!-- Lazy-loaded screen container. Filled/cleared by loadPage() in js/main.js -->
-  <div id="page-root" class="hidden fixed inset-0 z-40 bg-[#0B4CC2] dark:bg-[#060B14] overflow-y-auto"></div>
+  <!-- tabindex so this can hold focus. It is the element that scrolls when a
+       screen is open, and a keyboard — which on a television is the only input
+       there is — can only scroll what is focused or the document. The document
+       is frozen behind this overlay, so without a tabindex the arrow keys, Page
+       Down and End all went nowhere and a long screen could not be read past
+       its first viewport. A wheel or a finger always worked, which is why it
+       looked fine on a laptop and a phone. -->
+  <div id="page-root" tabindex="-1" class="hidden fixed inset-0 z-40 bg-[#0B4CC2] dark:bg-[#060B14] overflow-y-auto outline-none"></div>
 
   <!-- INTERACTIVE MODAL OVERLAY -->
   <div id="actionModal" data-glass class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
