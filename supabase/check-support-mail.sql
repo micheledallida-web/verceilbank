@@ -138,6 +138,24 @@ begin
                       else '' end;
     return next;
 
+    -- The app writes the thread, then the first message, and cannot make the
+    -- two one operation from the browser. So a message insert that is refused
+    -- — RLS, usually, coming back as 42501 — leaves the thread behind with
+    -- nothing in it. The customer saw an error and their text still in the box;
+    -- what is left here is the count of times that happened. It is the one
+    -- number in this report that means a customer tried and did not get through.
+    execute $q$
+      select count(*) from public.support_threads t
+       where not exists (select 1 from public.support_messages m where m.thread_id = t.id)
+    $q$ into n;
+    if n > 0 then
+      part := 'threads holding no message';
+      status := 'info';
+      detail := n || ' — each one is a send whose message was refused after the '
+                || 'thread was written. Check the policies on support_messages';
+      return next;
+    end if;
+
     -- A message written from the app and never emailed leaves no trace here,
     -- so the oldest unanswered one is the closest thing the database has to
     -- "mail is not arriving". It is a prompt to check, not a fault.
