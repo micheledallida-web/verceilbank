@@ -7,7 +7,8 @@
     "prebuild": "node scripts/generate-config.js",
     "build": "tailwindcss -i ./css/input.css -o ./css/output.css --minify",
     "predev": "node scripts/generate-config.js",
-    "dev": "tailwindcss -i ./css/input.css -o ./css/output.css --watch"
+    "dev": "tailwindcss -i ./css/input.css -o ./css/output.css --watch",
+    "check:support": "node scripts/check-support-mail.js"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.17"

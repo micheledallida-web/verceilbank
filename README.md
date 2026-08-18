@@ -33,6 +33,12 @@ Then apply `supabase/setup.sql` once in the Supabase SQL editor. It is safe to
 re-run and it reports what it found; `docs/supabase-setup.md` explains what each
 section is for and what breaks without it.
 
+To see how much of the support-mail path is already in place — the tables, the
+edge functions, the mailbox secrets — run `npm run check:support` (add
+`-- --verify` to log in to the mailbox, `-- --test` to send one). It only reads.
+Its database-side counterpart is `supabase/check-support-mail.sql`, pasted into
+the SQL editor.
+
 ### Configuration
 
 The Supabase URL and anon key are **not** in tracked source. They are written at
@@ -78,6 +84,7 @@ pages/
   ...
 supabase/
   setup.sql             # Everything the database needs, in the order it needs it
+  check-support-mail.sql # Read-only: what the support path already has, from SQL
   functions/            # Edge functions: the deposit webhook, and support mail
                         # out through the support mailbox
 docs/
