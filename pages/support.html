@@ -40,8 +40,29 @@
 
     <div class="text-[12px] text-white/70 dark:text-[#8E9CBA] mt-[8px] px-[2px]">A representative replies within 1 business day.</div>
 
+    <!-- ---- EMAIL US ---- -->
+    <!-- The third way in. Messaging keeps the conversation in the app where it
+         can be answered and tracked; this is for somebody who would rather use
+         their own mail client, and it is the same mailbox either way. -->
+    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mt-[24px] mb-[8px]">EMAIL US</div>
+
+    <a id="spEmailBtn" href="mailto:support@verceilbank.com" class="w-full flex items-center justify-between gap-[12px] px-[12px] py-[14px] text-left cursor-pointer border-b border-white/15 dark:border-white/[0.08]">
+      <span class="min-w-0 flex-1">
+        <span class="block text-[15px] font-medium text-white">Email support</span>
+        <span class="block text-[13px] text-white/70 dark:text-[#8E9CBA] mt-[2px]">We reply within 1 business day</span>
+      </span>
+      <span id="spEmailAddress" class="text-[13px] text-white/70 dark:text-[#8E9CBA] flex-shrink-0 truncate">support@verceilbank.com</span>
+    </a>
+
+    <!-- ---- FUNDING ---- -->
+    <!-- Payment details are issued per request, so each row opens a message
+         that already asks for the right one. The same shortcut the Fund
+         account screen offers, for somebody who came to Support first. -->
+    <div id="supFundingHead" class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mt-[24px] mb-[8px]">FUNDING &amp; PAYMENTS</div>
+    <div id="supFunding"></div>
+
     <!-- ---- COMMON TOPICS ---- -->
-    <div class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mt-[24px] mb-[8px]">COMMON TOPICS</div>
+    <div id="supTopicsHead" class="text-[11px] font-bold tracking-[1.2px] text-white/75 dark:text-[#8E9CBA] uppercase mt-[24px] mb-[8px]">COMMON TOPICS</div>
     <div id="supTopics"></div>
     <div id="supTopicsEmpty" class="hidden px-[12px] py-[14px] text-[13px] text-white/70 dark:text-[#8E9CBA]">No topics match that search.</div>
 
