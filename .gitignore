@@ -8,3 +8,6 @@ css/output.css
 # SUPABASE_ANON_KEY env vars. Never commit real credentials — see
 # js/config.example.js for the expected shape.
 js/config.js
+
+# Build artifacts from scripts/bundle-function.js — generate, paste, discard.
+dist-functions/

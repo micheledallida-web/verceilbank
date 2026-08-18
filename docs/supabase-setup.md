@@ -1169,6 +1169,41 @@ The usual ones:
 | `550` / `553` | the From is not the mailbox that logged in — unset `SUPPORT_FROM`, or point it at the same address |
 | a timeout, no code | the port. See above: use 465 |
 
+### 1b. Deploying without a terminal
+
+A project came back `404 NOT_FOUND` from this function after a morning of
+customers using the Support screen: the tables were there, the secrets were
+there, and the function had simply never been deployed. Nothing complained,
+because the app never waits on the mail — the messages were saved and read
+back perfectly while every notification went to a function that did not exist.
+
+Ask before assuming it is there:
+
+```sql
+select net.http_get(
+  url := '<project-url>/functions/v1/support-notify',
+  headers := '{"Authorization": "Bearer <anon key>"}'::jsonb) ;
+-- then, a few seconds later:
+select status_code, content from net._http_response order by created desc limit 1;
+```
+
+(`create extension if not exists pg_net;` first, if `net` does not exist.)
+
+`404` means deploy it. With the CLI that is `supabase functions deploy
+support-notify`. From the dashboard — **Edge Functions → Deploy a new function
+→ via editor** — the editor deploys the files of one folder and cannot follow
+`../_shared/mailer.ts`, so give it a flattened copy:
+
+```bash
+node scripts/bundle-function.js support-notify
+# -> dist-functions/support-notify.ts, paste that
+```
+
+The bundle inlines the shared mailer and leaves the `npm:` and `https://`
+imports for Deno to resolve at deploy time. It is a build artifact, gitignored:
+generate it, paste it, discard it. Editing it instead of the source is how the
+two drift apart.
+
 ### 2a. Sending messages that are already in the database
 
 A message is saved whether or not the mail goes out — the app never waits on
