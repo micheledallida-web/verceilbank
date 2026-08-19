@@ -16,6 +16,10 @@ Disallow: /pages/
 Disallow: /js/
 Disallow: /supabase/
 
+# Internal brand material — the email signature is a page staff copy from,
+# not something a customer searches for
+Disallow: /brand/
+
 # Auth flows — indexing these competes with the homepage and exposes
 # password-reset endpoints to crawlers
 Disallow: /signin.html
